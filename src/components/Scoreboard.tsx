@@ -26,6 +26,19 @@ export const Scoreboard = ({ players }: ScoreboardProps) => {
 
   const topPlayer = sortedPlayers[0];
 
+  // Classificações especiais
+  const reiDoPVP = useMemo(() => {
+    return [...players].sort((a, b) => b.kills - a.kills)[0];
+  }, [players]);
+
+  const brabissimo = useMemo(() => {
+    return [...players].sort((a, b) => b.kda - a.kda)[0];
+  }, [players]);
+
+  const coneMonodedo = useMemo(() => {
+    return [...players].sort((a, b) => b.deaths - a.deaths)[0];
+  }, [players]);
+
   if (players.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -67,6 +80,36 @@ export const Scoreboard = ({ players }: ScoreboardProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Classificações Especiais */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="bg-warning/10 border-2 border-warning rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
+          <Trophy className="w-10 h-10 text-warning mx-auto mb-3 animate-pulse" />
+          <h3 className="text-lg font-bold text-warning mb-2">👑 Rei do PVP</h3>
+          <p className="text-2xl font-bold text-foreground text-glow mb-1">{reiDoPVP?.name}</p>
+          <p className="text-sm text-muted-foreground">
+            <span className="text-success font-bold">{reiDoPVP?.kills}</span> kills
+          </p>
+        </div>
+
+        <div className="bg-primary/10 border-2 border-primary rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
+          <TrendingUp className="w-10 h-10 text-primary mx-auto mb-3 animate-pulse" />
+          <h3 className="text-lg font-bold text-primary mb-2">⚡ Brabissimo</h3>
+          <p className="text-2xl font-bold text-foreground text-glow mb-1">{brabissimo?.name}</p>
+          <p className="text-sm text-muted-foreground">
+            KDA: <span className="text-warning font-bold">{brabissimo?.kda.toFixed(2)}</span>
+          </p>
+        </div>
+
+        <div className="bg-destructive/10 border-2 border-destructive rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
+          <Skull className="w-10 h-10 text-destructive mx-auto mb-3 animate-pulse" />
+          <h3 className="text-lg font-bold text-destructive mb-2">🍦 Cone monodedo</h3>
+          <p className="text-2xl font-bold text-foreground text-glow mb-1">{coneMonodedo?.name}</p>
+          <p className="text-sm text-muted-foreground">
+            <span className="text-destructive font-bold">{coneMonodedo?.deaths}</span> deaths
+          </p>
+        </div>
+      </div>
+
       <div className="flex flex-wrap gap-3 justify-center items-center">
         <SortButton label="Kills" sortKey="kills" icon={Crosshair} />
         <SortButton label="Deaths" sortKey="deaths" icon={Skull} />
