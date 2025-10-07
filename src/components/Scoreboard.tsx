@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Trophy, Skull, Crosshair, TrendingUp } from 'lucide-react';
+import { Trophy, Skull, Crosshair, TrendingUp, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import * as XLSX from 'xlsx';
 
 export interface PlayerStats {
   name: string;
@@ -33,6 +35,21 @@ export const Scoreboard = ({ players }: ScoreboardProps) => {
     );
   }
 
+  const exportToExcel = () => {
+    const dataToExport = sortedPlayers.map((player, index) => ({
+      'Rank': index + 1,
+      'Jogador': player.name,
+      'Kills': player.kills,
+      'Deaths': player.deaths,
+      'KDA': player.kda.toFixed(2)
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Placar');
+    XLSX.writeFile(workbook, 'battle-scoreboard.xlsx');
+  };
+
   const SortButton = ({ label, sortKey, icon: Icon }: { label: string; sortKey: SortKey; icon: any }) => (
     <button
       onClick={() => setSortBy(sortKey)}
@@ -50,10 +67,18 @@ export const Scoreboard = ({ players }: ScoreboardProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-3 justify-center">
+      <div className="flex flex-wrap gap-3 justify-center items-center">
         <SortButton label="Kills" sortKey="kills" icon={Crosshair} />
         <SortButton label="Deaths" sortKey="deaths" icon={Skull} />
         <SortButton label="KDA" sortKey="kda" icon={TrendingUp} />
+        <Button 
+          onClick={exportToExcel}
+          className="flex items-center gap-2 glow-success"
+          variant="default"
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          Exportar Excel
+        </Button>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card/50 backdrop-blur">
