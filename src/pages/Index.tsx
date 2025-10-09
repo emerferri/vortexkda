@@ -6,10 +6,12 @@ import { Swords } from 'lucide-react';
 
 const Index = () => {
   const [players, setPlayers] = useState<PlayerStats[]>([]);
+  const [bossLabel, setBossLabel] = useState<string | null>(null);
 
   const handleFileUpload = (content: string) => {
-    const parsedPlayers = parseTxtFile(content);
-    setPlayers(parsedPlayers);
+    const result = parseTxtFile(content);
+    setPlayers(result.players);
+    setBossLabel(result.bossLabel);
   };
 
   return (
@@ -30,7 +32,7 @@ const Index = () => {
 
         <div className="space-y-8">
           <FileUpload onFileUpload={handleFileUpload} />
-          <Scoreboard players={players} />
+          <Scoreboard players={players} bossLabel={bossLabel} />
         </div>
       </div>
     </div>

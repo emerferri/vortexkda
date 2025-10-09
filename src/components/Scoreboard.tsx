@@ -14,11 +14,12 @@ export interface PlayerStats {
 
 interface ScoreboardProps {
   players: PlayerStats[];
+  bossLabel?: string | null;
 }
 
 type SortKey = 'kills' | 'deaths' | 'kda';
 
-export const Scoreboard = ({ players }: ScoreboardProps) => {
+export const Scoreboard = ({ players, bossLabel }: ScoreboardProps) => {
   const [sortBy, setSortBy] = useState<SortKey>('kills');
   const scoreboardRef = useRef<HTMLDivElement>(null);
 
@@ -79,7 +80,10 @@ export const Scoreboard = ({ players }: ScoreboardProps) => {
         if (blob) {
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
-          link.download = 'placar-humilhacao.jpg';
+          const fileName = bossLabel 
+            ? `placar-humilhacao-${bossLabel.replace(/\s+/g, '-').replace(/\//g, '-')}.jpg`
+            : 'placar-humilhacao.jpg';
+          link.download = fileName;
           link.href = url;
           link.click();
           URL.revokeObjectURL(url);
@@ -107,6 +111,17 @@ export const Scoreboard = ({ players }: ScoreboardProps) => {
 
   return (
     <div ref={scoreboardRef} className="space-y-6">
+      {/* Boss Label */}
+      {bossLabel && (
+        <div className="text-center">
+          <div className="inline-block bg-primary/20 border-2 border-primary rounded-lg px-6 py-3">
+            <p className="text-xl font-bold text-primary uppercase tracking-wider">
+              {bossLabel}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Classificações Especiais */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-warning/10 border-2 border-warning rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">

@@ -1,10 +1,27 @@
 import { PlayerStats } from '@/components/Scoreboard';
 
-export const parseTxtFile = (content: string): PlayerStats[] => {
+export interface ParseResult {
+  players: PlayerStats[];
+  bossLabel: string | null;
+}
+
+export const parseTxtFile = (content: string): ParseResult => {
   const lines = content.split('\n').filter(line => line.trim());
   const playerMap = new Map<string, { kills: number; deaths: number }>();
+  let bossLabel: string | null = null;
 
   lines.forEach(line => {
+    // Extract date/time from line (format: 08/10/2025 22:00:26)
+    const dateMatch = line.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/);
+    
+    if (dateMatch && !bossLabel) {
+      const day = dateMatch[1];
+      const month = dateMatch[2];
+      const hour = parseInt(dateMatch[4]);
+      
+      bossLabel = `boss ${day}/${month} ${hour} horas`;
+    }
+
     // Pattern: :dagger: KillerName matou :skull: VictimName
     const killMatch = line.match(/:dagger:\s*(\w+)\s+matou\s+:skull:\s*(\w+)/i);
     
@@ -32,5 +49,5 @@ export const parseTxtFile = (content: string): PlayerStats[] => {
     kda: stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths,
   }));
 
-  return players;
+  return { players, bossLabel };
 };
