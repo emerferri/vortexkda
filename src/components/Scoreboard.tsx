@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
-import { Trophy, Skull, Crosshair, TrendingUp, FileSpreadsheet } from 'lucide-react';
+import { useMemo, useState, useRef } from 'react';
+import { Trophy, Skull, Crosshair, TrendingUp, FileSpreadsheet, Image } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import * as XLSX from 'xlsx';
+import html2canvas from 'html2canvas';
 
 export interface PlayerStats {
   name: string;
@@ -19,6 +20,7 @@ type SortKey = 'kills' | 'deaths' | 'kda';
 
 export const Scoreboard = ({ players }: ScoreboardProps) => {
   const [sortBy, setSortBy] = useState<SortKey>('kills');
+  const scoreboardRef = useRef<HTMLDivElement>(null);
 
   const sortedPlayers = useMemo(() => {
     return [...players].sort((a, b) => b[sortBy] - a[sortBy]);
@@ -63,6 +65,31 @@ export const Scoreboard = ({ players }: ScoreboardProps) => {
     XLSX.writeFile(workbook, 'battle-scoreboard.xlsx');
   };
 
+  const exportToImage = async () => {
+    if (!scoreboardRef.current) return;
+
+    try {
+      const canvas = await html2canvas(scoreboardRef.current, {
+        backgroundColor: '#0a0a0a',
+        scale: 2,
+        logging: false,
+      });
+
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.download = 'placar-humilhacao.jpg';
+          link.href = url;
+          link.click();
+          URL.revokeObjectURL(url);
+        }
+      }, 'image/jpeg', 0.95);
+    } catch (error) {
+      console.error('Erro ao exportar imagem:', error);
+    }
+  };
+
   const SortButton = ({ label, sortKey, icon: Icon }: { label: string; sortKey: SortKey; icon: any }) => (
     <button
       onClick={() => setSortBy(sortKey)}
@@ -79,7 +106,7 @@ export const Scoreboard = ({ players }: ScoreboardProps) => {
   );
 
   return (
-    <div className="space-y-6">
+    <div ref={scoreboardRef} className="space-y-6">
       {/* Classificações Especiais */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-warning/10 border-2 border-warning rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
@@ -121,6 +148,14 @@ export const Scoreboard = ({ players }: ScoreboardProps) => {
         >
           <FileSpreadsheet className="w-4 h-4" />
           Exportar Excel
+        </Button>
+        <Button 
+          onClick={exportToImage}
+          className="flex items-center gap-2 glow-primary"
+          variant="default"
+        >
+          <Image className="w-4 h-4" />
+          Exportar Imagem
         </Button>
       </div>
 
