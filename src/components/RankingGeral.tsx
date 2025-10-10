@@ -23,9 +23,11 @@ export const RankingGeral = () => {
   const [sortBy, setSortBy] = useState<SortKey>('kills');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
+  const [hourFrom, setHourFrom] = useState<number>();
+  const [hourTo, setHourTo] = useState<number>();
 
   const { data: aggregatedData, isLoading } = useQuery({
-    queryKey: ['ranking-geral', dateFrom, dateTo],
+    queryKey: ['ranking-geral', dateFrom, dateTo, hourFrom, hourTo],
     queryFn: async () => {
       let query = supabase
         .from('pvp_match_players')
@@ -34,7 +36,7 @@ export const RankingGeral = () => {
           kills,
           deaths,
           kda,
-          pvp_matches!inner(match_date)
+          pvp_matches!inner(match_date, match_hour)
         `);
 
       if (dateFrom) {
@@ -42,6 +44,12 @@ export const RankingGeral = () => {
       }
       if (dateTo) {
         query = query.lte('pvp_matches.match_date', format(dateTo, 'yyyy-MM-dd'));
+      }
+      if (hourFrom !== undefined) {
+        query = query.gte('pvp_matches.match_hour', hourFrom);
+      }
+      if (hourTo !== undefined) {
+        query = query.lte('pvp_matches.match_hour', hourTo);
       }
 
       const { data, error } = await query;
@@ -124,72 +132,106 @@ export const RankingGeral = () => {
 
   return (
     <div className="space-y-6">
-      {/* Filtros de Data */}
-      <div className="flex flex-wrap gap-4 justify-center items-center bg-card/50 p-6 rounded-xl border border-border">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-muted-foreground">De:</span>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-[200px] justify-start text-left font-normal",
-                  !dateFrom && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateFrom ? format(dateFrom, "PPP", { locale: ptBR }) : "Selecione"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={dateFrom}
-                onSelect={setDateFrom}
-                initialFocus
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
+      {/* Filtros de Data e Hora */}
+      <div className="bg-card/50 p-6 rounded-xl border border-border space-y-4">
+        <div className="flex flex-wrap gap-4 justify-center items-center">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">De:</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[200px] justify-start text-left font-normal",
+                    !dateFrom && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateFrom ? format(dateFrom, "PPP", { locale: ptBR }) : "Selecione"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateFrom}
+                  onSelect={setDateFrom}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">Até:</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[200px] justify-start text-left font-normal",
+                    !dateTo && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateTo ? format(dateTo, "PPP", { locale: ptBR }) : "Selecione"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateTo}
+                  onSelect={setDateTo}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-muted-foreground">Até:</span>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-[200px] justify-start text-left font-normal",
-                  !dateTo && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateTo ? format(dateTo, "PPP", { locale: ptBR }) : "Selecione"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={dateTo}
-                onSelect={setDateTo}
-                initialFocus
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
+        <div className="flex flex-wrap gap-4 justify-center items-center">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">Hora Inicial:</span>
+            <select
+              value={hourFrom ?? ''}
+              onChange={(e) => setHourFrom(e.target.value ? parseInt(e.target.value) : undefined)}
+              className="px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">Todas</option>
+              {Array.from({ length: 24 }, (_, i) => (
+                <option key={i} value={i}>{i}:00</option>
+              ))}
+            </select>
+          </div>
 
-        <Button
-          variant="ghost"
-          onClick={() => {
-            setDateFrom(undefined);
-            setDateTo(undefined);
-          }}
-          className="text-sm"
-        >
-          Limpar Filtros
-        </Button>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">Hora Final:</span>
+            <select
+              value={hourTo ?? ''}
+              onChange={(e) => setHourTo(e.target.value ? parseInt(e.target.value) : undefined)}
+              className="px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">Todas</option>
+              {Array.from({ length: 24 }, (_, i) => (
+                <option key={i} value={i}>{i}:00</option>
+              ))}
+            </select>
+          </div>
+
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setDateFrom(undefined);
+              setDateTo(undefined);
+              setHourFrom(undefined);
+              setHourTo(undefined);
+            }}
+            className="text-sm"
+          >
+            Limpar Filtros
+          </Button>
+        </div>
       </div>
 
       {/* Classificações Especiais */}
