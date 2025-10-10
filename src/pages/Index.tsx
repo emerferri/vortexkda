@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { FileUpload } from '@/components/FileUpload';
 import { Scoreboard, PlayerStats } from '@/components/Scoreboard';
+import { RankingGeral } from '@/components/RankingGeral';
 import { parseTxtFile } from '@/utils/txtParser';
 import { Swords } from 'lucide-react';
 import { Footer } from '@/components/Footer';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Index = () => {
   const [players, setPlayers] = useState<PlayerStats[]>([]);
@@ -32,8 +34,25 @@ const Index = () => {
         </header>
 
         <div className="space-y-8">
-          <FileUpload onFileUpload={handleFileUpload} />
-          <Scoreboard players={players} bossLabel={bossLabel} />
+          <Tabs defaultValue="placar" className="w-full">
+            <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
+              <TabsTrigger value="placar" className="text-base font-semibold">
+                Placar da Humilhação
+              </TabsTrigger>
+              <TabsTrigger value="ranking" className="text-base font-semibold">
+                Ranking Geral
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="placar" className="space-y-8">
+              <FileUpload onFileUpload={handleFileUpload} />
+              <Scoreboard players={players} bossLabel={bossLabel} />
+            </TabsContent>
+            
+            <TabsContent value="ranking">
+              <RankingGeral />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
       <Footer />
