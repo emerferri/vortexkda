@@ -3,6 +3,7 @@ import { FileUpload } from '@/components/FileUpload';
 import { Scoreboard, PlayerStats } from '@/components/Scoreboard';
 import { parseTxtFile } from '@/utils/txtParser';
 import { Swords } from 'lucide-react';
+import { Footer } from '@/components/Footer';
 
 const Index = () => {
   const [players, setPlayers] = useState<PlayerStats[]>([]);
@@ -35,6 +36,7 @@ const Index = () => {
           <Scoreboard players={players} bossLabel={bossLabel} />
         </div>
       </div>
+      <Footer />
     </div>
   );
 };

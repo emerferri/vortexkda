@@ -14,7 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      pvp_match_players: {
+        Row: {
+          created_at: string
+          deaths: number
+          id: string
+          kda: number
+          kills: number
+          match_id: string
+          player_name: string
+        }
+        Insert: {
+          created_at?: string
+          deaths?: number
+          id?: string
+          kda?: number
+          kills?: number
+          match_id: string
+          player_name: string
+        }
+        Update: {
+          created_at?: string
+          deaths?: number
+          id?: string
+          kda?: number
+          kills?: number
+          match_id?: string
+          player_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pvp_match_players_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "pvp_matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pvp_matches: {
+        Row: {
+          boss_label: string
+          created_at: string
+          id: string
+          match_date: string
+          match_hour: number
+        }
+        Insert: {
+          boss_label: string
+          created_at?: string
+          id?: string
+          match_date: string
+          match_hour: number
+        }
+        Update: {
+          boss_label?: string
+          created_at?: string
+          id?: string
+          match_date?: string
+          match_hour?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

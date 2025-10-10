@@ -1,9 +1,11 @@
 import { useMemo, useState, useRef } from 'react';
-import { Trophy, Skull, Crosshair, TrendingUp, FileSpreadsheet, Image } from 'lucide-react';
+import { Trophy, Skull, Crosshair, TrendingUp, FileSpreadsheet, Image, Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/use-toast';
 
 export interface PlayerStats {
   name: string;
@@ -94,6 +96,71 @@ export const Scoreboard = ({ players, bossLabel }: ScoreboardProps) => {
     }
   };
 
+  const saveToDatabase = async () => {
+    if (!bossLabel || players.length === 0) {
+      toast({
+        title: "Erro",
+        description: "Não há dados para salvar",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Parse date and hour from boss label (format: "boss DD/MM HH horas")
+      const match = bossLabel.match(/boss (\d{2})\/(\d{2}) (\d{1,2}) horas/);
+      if (!match) {
+        throw new Error("Formato de label inválido");
+      }
+
+      const day = parseInt(match[1]);
+      const month = parseInt(match[2]);
+      const hour = parseInt(match[3]);
+      const year = new Date().getFullYear();
+      const matchDate = new Date(year, month - 1, day);
+
+      // Insert match
+      const { data: matchData, error: matchError } = await supabase
+        .from('pvp_matches')
+        .insert({
+          boss_label: bossLabel,
+          match_date: matchDate.toISOString().split('T')[0],
+          match_hour: hour
+        })
+        .select()
+        .single();
+
+      if (matchError) throw matchError;
+
+      // Insert players
+      const playersData = players.map(player => ({
+        match_id: matchData.id,
+        player_name: player.name,
+        kills: player.kills,
+        deaths: player.deaths,
+        kda: player.kda
+      }));
+
+      const { error: playersError } = await supabase
+        .from('pvp_match_players')
+        .insert(playersData);
+
+      if (playersError) throw playersError;
+
+      toast({
+        title: "Sucesso!",
+        description: "Dados salvos no banco de dados",
+      });
+    } catch (error) {
+      console.error('Erro ao salvar no banco:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao salvar no banco de dados",
+        variant: "destructive"
+      });
+    }
+  };
+
   const SortButton = ({ label, sortKey, icon: Icon }: { label: string; sortKey: SortKey; icon: any }) => (
     <button
       onClick={() => setSortBy(sortKey)}
@@ -171,6 +238,14 @@ export const Scoreboard = ({ players, bossLabel }: ScoreboardProps) => {
         >
           <Image className="w-4 h-4" />
           Exportar Imagem
+        </Button>
+        <Button 
+          onClick={saveToDatabase}
+          className="flex items-center gap-2 opacity-20 hover:opacity-100 transition-opacity duration-300"
+          variant="ghost"
+          size="sm"
+        >
+          <Database className="w-3 h-3" />
         </Button>
       </div>
 
