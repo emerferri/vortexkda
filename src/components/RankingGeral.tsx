@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react';
-import { Trophy, Skull, Crosshair, TrendingUp, Calendar as CalendarIcon } from 'lucide-react';
+import { useMemo, useState, useRef } from 'react';
+import { Trophy, Skull, Crosshair, TrendingUp, Calendar as CalendarIcon, Download, FileImage } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import html2canvas from 'html2canvas';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -25,6 +27,7 @@ export const RankingGeral = () => {
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
   const [hourTo, setHourTo] = useState<number>();
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const { data: aggregatedData, isLoading } = useQuery({
     queryKey: ['ranking-geral', dateFrom, dateTo, hourFrom, hourTo],
@@ -97,6 +100,53 @@ export const RankingGeral = () => {
   const coneMonodedo = useMemo(() => {
     return [...sortedPlayers].sort((a, b) => b.deaths - a.deaths)[0];
   }, [sortedPlayers]);
+
+  const exportToExcel = () => {
+    const worksheetData = [
+      ['Ranking Geral - PVP'],
+      [''],
+      ['Rank', 'Jogador', 'Kills', 'Deaths', 'KDA', 'Boss'],
+      ...sortedPlayers.map((player, index) => [
+        index + 1,
+        player.name,
+        player.kills,
+        player.deaths,
+        player.kda.toFixed(2),
+        player.matches
+      ]),
+      [''],
+      ['Totais'],
+      ['Total Kills', sortedPlayers.reduce((sum, p) => sum + p.kills, 0)],
+      ['Total Deaths', sortedPlayers.reduce((sum, p) => sum + p.deaths, 0)],
+      ['Total Jogadores', sortedPlayers.length]
+    ];
+
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Ranking Geral');
+    
+    const fileName = `ranking-geral-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  };
+
+  const exportToImage = async () => {
+    if (!tableRef.current) return;
+
+    try {
+      const canvas = await html2canvas(tableRef.current, {
+        backgroundColor: '#1a1a1a',
+        scale: 2,
+        logging: false
+      });
+
+      const link = document.createElement('a');
+      link.download = `ranking-geral-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.jpg`;
+      link.href = canvas.toDataURL('image/jpeg', 0.95);
+      link.click();
+    } catch (error) {
+      console.error('Erro ao exportar imagem:', error);
+    }
+  };
 
   const SortButton = ({ label, sortKey, icon: Icon }: { label: string; sortKey: SortKey; icon: any }) => (
     <button
@@ -267,15 +317,35 @@ export const RankingGeral = () => {
         </div>
       </div>
 
-      {/* Botões de ordenação */}
+      {/* Botões de ordenação e exportação */}
       <div className="flex flex-wrap gap-3 justify-center items-center">
         <SortButton label="Kills" sortKey="kills" icon={Crosshair} />
         <SortButton label="Deaths" sortKey="deaths" icon={Skull} />
         <SortButton label="KDA" sortKey="kda" icon={TrendingUp} />
+        
+        <div className="w-px h-8 bg-border mx-2" />
+        
+        <Button
+          onClick={exportToExcel}
+          variant="secondary"
+          className="flex items-center gap-2"
+        >
+          <Download className="w-4 h-4" />
+          Excel
+        </Button>
+        
+        <Button
+          onClick={exportToImage}
+          variant="secondary"
+          className="flex items-center gap-2"
+        >
+          <FileImage className="w-4 h-4" />
+          JPG
+        </Button>
       </div>
 
       {/* Tabela de Rankings */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card/50 backdrop-blur">
+      <div ref={tableRef} className="overflow-hidden rounded-xl border border-border bg-card/50 backdrop-blur">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
