@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Trophy, Skull, Crosshair, TrendingUp, FileSpreadsheet, Image, Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 export interface PlayerStats {
   name: string;
@@ -24,6 +26,8 @@ type SortKey = 'kills' | 'deaths' | 'kda';
 export const Scoreboard = ({ players, bossLabel }: ScoreboardProps) => {
   const [sortBy, setSortBy] = useState<SortKey>('kills');
   const scoreboardRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const sortedPlayers = useMemo(() => {
     return [...players].sort((a, b) => b[sortBy] - a[sortBy]);
@@ -97,6 +101,17 @@ export const Scoreboard = ({ players, bossLabel }: ScoreboardProps) => {
   };
 
   const saveToDatabase = async () => {
+    // Check if user is authenticated
+    if (!user) {
+      toast({
+        title: "Login necessário",
+        description: "Você precisa fazer login para salvar dados",
+        variant: "destructive"
+      });
+      navigate('/auth');
+      return;
+    }
+
     if (!bossLabel || players.length === 0) {
       toast({
         title: "Erro",
