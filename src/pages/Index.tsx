@@ -40,7 +40,7 @@ const Index = () => {
           <div className="flex items-center justify-center gap-4 mb-4 relative">
             <Swords className="w-12 h-12 text-primary animate-pulse" />
             <h1 className="text-5xl font-bold text-foreground text-glow">
-              Placar da humiliação
+              Ranking de Kill - PVP BOSS
             </h1>
             <Swords className="w-12 h-12 text-primary animate-pulse" />
             
@@ -76,7 +76,7 @@ const Index = () => {
             </div>
           </div>
           <p className="text-lg text-muted-foreground">
-            Extrator de nuub, idenfica o cara mais horrivel e a lenda do game!
+            Aqui separamos os homens das crianças, quem é superior no pvp? quem mais se destaca?
           </p>
         </header>
 
