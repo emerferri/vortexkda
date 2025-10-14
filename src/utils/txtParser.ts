@@ -22,6 +22,11 @@ export const parseTxtFile = (content: string): ParseResult => {
       bossLabel = `boss ${day}/${month} ${hour} horas`;
     }
 
+    // Only consider kills in PvP Square map
+    if (!line.includes(':map: PvP Square - [Server: Boss Event PvP]')) {
+      return; // Skip this line if not in PvP Square
+    }
+
     // Pattern: :dagger: KillerName matou :skull: VictimName
     const killMatch = line.match(/:dagger:\s*(\w+)\s+matou\s+:skull:\s*(\w+)/i);
     
