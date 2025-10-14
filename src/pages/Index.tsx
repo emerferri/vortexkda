@@ -4,6 +4,7 @@ import { FileUpload } from '@/components/FileUpload';
 import { Scoreboard, PlayerStats } from '@/components/Scoreboard';
 import { RankingGeral } from '@/components/RankingGeral';
 import { Characters } from '@/components/Characters';
+import { ClassGuildRanking } from '@/components/ClassGuildRanking';
 import { parseTxtFile } from '@/utils/txtParser';
 import { Swords, LogIn, LogOut, User } from 'lucide-react';
 import { Footer } from '@/components/Footer';
@@ -80,12 +81,15 @@ const Index = () => {
 
         <div className="space-y-8">
           <Tabs defaultValue="placar" className="w-full">
-            <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-3 mb-8">
+            <TabsList className="grid w-full max-w-3xl mx-auto grid-cols-4 mb-8">
               <TabsTrigger value="placar" className="text-base font-semibold">
                 Placar da Humilhação
               </TabsTrigger>
               <TabsTrigger value="ranking" className="text-base font-semibold">
                 Ranking Geral
+              </TabsTrigger>
+              <TabsTrigger value="classe-guild" className="text-base font-semibold">
+                Classe/Guild
               </TabsTrigger>
               <TabsTrigger value="personagens" className="text-base font-semibold">
                 Personagens
@@ -99,6 +103,10 @@ const Index = () => {
             
             <TabsContent value="ranking">
               <RankingGeral />
+            </TabsContent>
+
+            <TabsContent value="classe-guild">
+              <ClassGuildRanking />
             </TabsContent>
 
             <TabsContent value="personagens">
