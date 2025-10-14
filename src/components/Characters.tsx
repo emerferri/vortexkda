@@ -33,13 +33,40 @@ export const Characters = () => {
 
   const loadCharacters = async () => {
     try {
-      const { data, error } = await supabase
+      // Get all registered characters
+      const { data: registeredChars, error: charsError } = await supabase
         .from('characters')
         .select('*')
         .order('name');
 
-      if (error) throw error;
-      setCharacters(data || []);
+      if (charsError) throw charsError;
+
+      // Get all unique player names from matches
+      const { data: matchPlayers, error: matchError } = await supabase
+        .from('pvp_match_players')
+        .select('player_name');
+
+      if (matchError) throw matchError;
+
+      // Get unique player names
+      const uniquePlayerNames = [...new Set(matchPlayers?.map(p => p.player_name) || [])];
+
+      // Find players not yet registered
+      const registeredNames = new Set(registeredChars?.map(c => c.name) || []);
+      const unregisteredPlayers = uniquePlayerNames
+        .filter(name => !registeredNames.has(name))
+        .map(name => ({
+          id: `unregistered-${name}`,
+          name,
+          guild: '',
+          class: '',
+        }));
+
+      // Combine registered and unregistered, sort by name
+      const allCharacters = [...(registeredChars || []), ...unregisteredPlayers]
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      setCharacters(allCharacters);
     } catch (error) {
       console.error('Error loading characters:', error);
       toast({
@@ -103,6 +130,16 @@ export const Characters = () => {
       toast({
         title: 'Erro',
         description: 'Você precisa estar logado',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Cannot delete unregistered characters
+    if (id.startsWith('unregistered-')) {
+      toast({
+        title: 'Aviso',
+        description: 'Não é possível excluir um personagem não cadastrado',
         variant: 'destructive',
       });
       return;
@@ -263,9 +300,16 @@ export const Characters = () => {
               ) : (
                 filteredCharacters.map((character) => (
                   <TableRow key={character.id}>
-                    <TableCell className="font-medium">{character.name}</TableCell>
-                    <TableCell>{character.guild}</TableCell>
-                    <TableCell>{character.class}</TableCell>
+                    <TableCell className="font-medium">
+                      {character.name}
+                      {!character.guild && !character.class && (
+                        <span className="ml-2 text-xs text-yellow-600 font-semibold">
+                          (Não cadastrado)
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>{character.guild || '-'}</TableCell>
+                    <TableCell>{character.class || '-'}</TableCell>
                     {user && (
                       <TableCell>
                         <div className="flex gap-2">

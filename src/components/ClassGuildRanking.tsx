@@ -8,6 +8,7 @@ import { Crosshair, Users, Sword, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 interface PlayerWithCharacter {
   player_name: string;
@@ -26,6 +27,19 @@ interface AggregatedStats {
 }
 
 type FilterType = 'class' | 'guild';
+
+const COLORS = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+  '#8b5cf6',
+  '#ec4899',
+  '#f97316',
+  '#06b6d4',
+  '#84cc16',
+];
 
 export const ClassGuildRanking = () => {
   const [filterType, setFilterType] = useState<FilterType>('class');
@@ -117,6 +131,15 @@ export const ClassGuildRanking = () => {
     return playersData.filter((p) => !p.class || !p.guild);
   }, [playersData]);
 
+  const chartData = useMemo(() => {
+    return aggregatedStats
+      .filter(stat => !stat.isGeneric)
+      .map(stat => ({
+        name: stat.name,
+        value: stat.totalKills,
+      }));
+  }, [aggregatedStats]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -127,6 +150,36 @@ export const ClassGuildRanking = () => {
 
   return (
     <div className="space-y-6">
+      {chartData.length > 0 && (
+        <Card className="p-6">
+          <h3 className="text-xl font-bold mb-4 text-center">
+            Distribuição de Kills por {filterType === 'class' ? 'Classe' : 'Guild'}
+          </h3>
+          <ResponsiveContainer width="100%" height={400}>
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                outerRadius={120}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip 
+                formatter={(value: number) => [`${value} kills`, 'Total']}
+              />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
+
       {unregisteredPlayers.length > 0 && (
         <Alert>
           <AlertCircle className="h-4 w-4" />
