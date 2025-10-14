@@ -30,6 +30,7 @@ interface AggregatedStats {
   name: string;
   totalKills: number;
   totalDeaths: number;
+  totalKda: number;
   playerCount: number;
   isGeneric?: boolean;
 }
@@ -157,10 +158,13 @@ export const ClassGuildRanking = () => {
           ? player.class || 'Genérico (Sem Classe)'
           : player.guild || 'Genérico (Sem Guild)';
 
+      const playerKda = player.deaths > 0 ? player.kills / player.deaths : player.kills;
+
       const existing = statsMap.get(key) || {
         name: key,
         totalKills: 0,
         totalDeaths: 0,
+        totalKda: 0,
         playerCount: 0,
         isGeneric: !player.class || !player.guild,
       };
@@ -169,6 +173,7 @@ export const ClassGuildRanking = () => {
         name: key,
         totalKills: existing.totalKills + player.kills,
         totalDeaths: existing.totalDeaths + player.deaths,
+        totalKda: existing.totalKda + playerKda,
         playerCount: existing.playerCount + 1,
         isGeneric: key.includes('Genérico'),
       });
@@ -200,6 +205,7 @@ export const ClassGuildRanking = () => {
         'Total Deaths': stat.totalDeaths,
         'Jogadores': stat.playerCount,
         'Média Kills': (stat.totalKills / stat.playerCount).toFixed(2),
+        'KDA Médio': (stat.totalKda / stat.playerCount).toFixed(2),
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(data);
@@ -477,6 +483,7 @@ export const ClassGuildRanking = () => {
                 <TableHead className="text-right">Total Deaths</TableHead>
                 <TableHead className="text-right">Jogadores</TableHead>
                 <TableHead className="text-right">Média Kills</TableHead>
+                <TableHead className="text-right">KDA Médio</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -501,6 +508,9 @@ export const ClassGuildRanking = () => {
                   <TableCell className="text-right">{stat.playerCount}</TableCell>
                   <TableCell className="text-right font-medium">
                     {(stat.totalKills / stat.playerCount).toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right font-bold text-primary">
+                    {(stat.totalKda / stat.playerCount).toFixed(2)}
                   </TableCell>
                 </TableRow>
               ))}
