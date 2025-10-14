@@ -191,12 +191,18 @@ export const Characters = () => {
   const filteredCharacters = characters.filter((char) => {
     const matchesSearch =
       char.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      char.guild.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      char.class.toLowerCase().includes(searchTerm.toLowerCase());
+      char.guild?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      char.class?.toLowerCase().includes(searchTerm.toLowerCase());
     
+    // If searching, show all matching results regardless of filter
+    if (searchTerm.trim()) {
+      return matchesSearch;
+    }
+    
+    // Otherwise apply the unregistered filter
     const matchesFilter = showUnregisteredOnly ? (!char.guild || char.guild === '') && (!char.class || char.class === '') : true;
     
-    return matchesSearch && matchesFilter;
+    return matchesFilter;
   });
 
   if (loading) {
