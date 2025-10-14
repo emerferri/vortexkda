@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableRow, TableHeader } from './ui/table';
-import { Crosshair, Users, Sword, AlertCircle, Calendar as CalendarIcon } from 'lucide-react';
+import { Crosshair, Users, Sword, AlertCircle, Calendar as CalendarIcon, Download, Image } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +14,9 @@ import { Calendar } from './ui/calendar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import * as XLSX from 'xlsx';
+import html2canvas from 'html2canvas';
+import { toast } from 'sonner';
 
 interface PlayerWithCharacter {
   player_name: string;
@@ -68,6 +71,8 @@ export const ClassGuildRanking = () => {
   const [hourFrom, setHourFrom] = useState<number>();
   const [hourTo, setHourTo] = useState<number>();
   const navigate = useNavigate();
+  const chartRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const BOSS_HOURS = [20, 21, 22];
 
@@ -186,6 +191,58 @@ export const ClassGuildRanking = () => {
       }));
   }, [aggregatedStats]);
 
+  const exportToExcel = () => {
+    try {
+      const data = aggregatedStats.map((stat, index) => ({
+        Rank: index + 1,
+        [filterType === 'class' ? 'Classe' : 'Guild']: stat.name,
+        'Total Kills': stat.totalKills,
+        'Total Deaths': stat.totalDeaths,
+        'Jogadores': stat.playerCount,
+        'Média Kills': (stat.totalKills / stat.playerCount).toFixed(2),
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, `Ranking ${filterType}`);
+
+      const fileName = `ranking_${filterType}_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      
+      toast.success('Arquivo Excel exportado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao exportar para Excel:', error);
+      toast.error('Erro ao exportar para Excel');
+    }
+  };
+
+  const exportToImage = async () => {
+    if (!chartRef.current) return;
+
+    try {
+      const canvas = await html2canvas(chartRef.current, {
+        backgroundColor: '#1a1a2e',
+        scale: 2,
+        logging: false,
+      });
+
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `ranking_${filterType}_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.png`;
+          link.click();
+          URL.revokeObjectURL(url);
+          toast.success('Imagem exportada com sucesso!');
+        }
+      });
+    } catch (error) {
+      console.error('Erro ao exportar imagem:', error);
+      toast.error('Erro ao exportar imagem');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -299,10 +356,32 @@ export const ClassGuildRanking = () => {
       </div>
 
       {chartData.length > 0 && (
-        <Card className="p-6">
-          <h3 className="text-2xl font-bold mb-6 text-center">
-            Distribuição de Kills por {filterType === 'class' ? 'Classe' : 'Guild'}
-          </h3>
+        <Card className="p-6" ref={chartRef}>
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-2xl font-bold text-center flex-1">
+              Distribuição de Kills por {filterType === 'class' ? 'Classe' : 'Guild'}
+            </h3>
+            <div className="flex gap-2">
+              <Button
+                onClick={exportToImage}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <Image className="w-4 h-4" />
+                Exportar Imagem
+              </Button>
+              <Button
+                onClick={exportToExcel}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Exportar Excel
+              </Button>
+            </div>
+          </div>
           <ResponsiveContainer width="100%" height={500}>
             <PieChart>
               <Pie
@@ -359,7 +438,7 @@ export const ClassGuildRanking = () => {
         </Alert>
       )}
 
-      <Card className="p-6">
+      <Card className="p-6" ref={tableRef}>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             {filterType === 'class' ? (
@@ -372,18 +451,20 @@ export const ClassGuildRanking = () => {
             </h2>
           </div>
 
-          <Select
-            value={filterType}
-            onValueChange={(value) => setFilterType(value as FilterType)}
-          >
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="class">Por Classe</SelectItem>
-              <SelectItem value="guild">Por Guild</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2 items-center">
+            <Select
+              value={filterType}
+              onValueChange={(value) => setFilterType(value as FilterType)}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="class">Por Classe</SelectItem>
+                <SelectItem value="guild">Por Guild</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="rounded-md border">
