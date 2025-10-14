@@ -84,7 +84,7 @@ const Index = () => {
           <Tabs defaultValue="placar" className="w-full">
             <TabsList className="grid w-full max-w-4xl mx-auto grid-cols-5 mb-8">
               <TabsTrigger value="placar" className="text-base font-semibold">
-                Placar da Humilhação
+                Incluir Dados
               </TabsTrigger>
               <TabsTrigger value="ranking" className="text-base font-semibold">
                 Ranking Geral
