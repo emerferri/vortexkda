@@ -1,12 +1,33 @@
 import { PlayerStats } from '@/components/Scoreboard';
+import { z } from 'zod';
 
 export interface ParseResult {
   players: PlayerStats[];
   bossLabel: string | null;
 }
 
+const playerNameSchema = z.string()
+  .trim()
+  .min(1)
+  .max(50)
+  .regex(/^[a-zA-Z0-9_-]+$/, 'Invalid characters');
+
 export const parseTxtFile = (content: string): ParseResult => {
-  const lines = content.split('\n').filter(line => line.trim());
+  const MAX_LINES = 10000;
+  const MAX_CONTENT_SIZE = 1024 * 1024; // 1MB
+
+  if (content.length === 0) {
+    throw new Error('Arquivo vazio');
+  }
+
+  if (content.length > MAX_CONTENT_SIZE) {
+    throw new Error('Conteúdo muito grande');
+  }
+
+  const lines = content.split('\n')
+    .filter(line => line.trim())
+    .slice(0, MAX_LINES);
+  
   const playerMap = new Map<string, { kills: number; deaths: number }>();
   let bossLabel: string | null = null;
 
@@ -31,18 +52,23 @@ export const parseTxtFile = (content: string): ParseResult => {
     const killMatch = line.match(/:dagger:\s*(\w+)\s+matou\s+:skull:\s*(\w+)/i);
     
     if (killMatch) {
-      const killer = killMatch[1].trim();
-      const victim = killMatch[2].trim();
+      try {
+        const killer = playerNameSchema.parse(killMatch[1].trim());
+        const victim = playerNameSchema.parse(killMatch[2].trim());
 
-      // Update killer stats
-      const killerStats = playerMap.get(killer) || { kills: 0, deaths: 0 };
-      killerStats.kills += 1;
-      playerMap.set(killer, killerStats);
+        // Update killer stats
+        const killerStats = playerMap.get(killer) || { kills: 0, deaths: 0 };
+        killerStats.kills += 1;
+        playerMap.set(killer, killerStats);
 
-      // Update victim stats
-      const victimStats = playerMap.get(victim) || { kills: 0, deaths: 0 };
-      victimStats.deaths += 1;
-      playerMap.set(victim, victimStats);
+        // Update victim stats
+        const victimStats = playerMap.get(victim) || { kills: 0, deaths: 0 };
+        victimStats.deaths += 1;
+        playerMap.set(victim, victimStats);
+      } catch {
+        // Skip invalid player names
+        console.warn('Invalid player name, skipping');
+      }
     }
   });
 

@@ -11,8 +11,20 @@ export const FileUpload = ({ onFileUpload }: FileUploadProps) => {
   const [fileName, setFileName] = useState<string | null>(null);
 
   const handleFile = useCallback((file: File) => {
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
     if (!file.name.endsWith('.txt')) {
       alert('Por favor, selecione um arquivo .txt');
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      alert('Arquivo muito grande. Limite: 5MB');
+      return;
+    }
+
+    if (file.size === 0) {
+      alert('Arquivo vazio');
       return;
     }
 
