@@ -29,31 +29,31 @@ interface AggregatedStats {
 type FilterType = 'class' | 'guild';
 
 const COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
-  '#8b5cf6',
-  '#ec4899',
-  '#f97316',
-  '#06b6d4',
-  '#84cc16',
-  '#3b82f6',
-  '#ef4444',
-  '#10b981',
-  '#f59e0b',
-  '#6366f1',
-  '#14b8a6',
-  '#f43f5e',
-  '#8b5cf6',
-  '#a855f7',
-  '#d946ef',
-  '#0ea5e9',
-  '#22c55e',
-  '#eab308',
-  '#fb923c',
-  '#c084fc',
+  '#3b82f6', // Azul
+  '#ef4444', // Vermelho
+  '#10b981', // Verde
+  '#f59e0b', // Laranja
+  '#8b5cf6', // Roxo
+  '#ec4899', // Rosa
+  '#06b6d4', // Ciano
+  '#84cc16', // Lima
+  '#f97316', // Laranja escuro
+  '#6366f1', // Índigo
+  '#14b8a6', // Teal
+  '#f43f5e', // Rosa escuro
+  '#a855f7', // Roxo claro
+  '#d946ef', // Magenta
+  '#0ea5e9', // Azul céu
+  '#22c55e', // Verde claro
+  '#eab308', // Amarelo
+  '#fb923c', // Laranja pêssego
+  '#c084fc', // Lavanda
+  '#facc15', // Amarelo ouro
+  '#4ade80', // Verde menta
+  '#fb7185', // Rosa coral
+  '#38bdf8', // Azul claro
+  '#fbbf24', // Âmbar
+  '#a78bfa', // Violeta
 ];
 
 export const ClassGuildRanking = () => {
