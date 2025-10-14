@@ -92,7 +92,7 @@ export const Characters = () => {
 
     setSubmitting(true);
     try {
-      if (editingCharacter) {
+      if (editingCharacter && !editingCharacter.id.startsWith('unregistered-')) {
         const { error } = await supabase
           .from('characters')
           .update(formData)
