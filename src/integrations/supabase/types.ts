@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      characters: {
+        Row: {
+          class: string
+          created_at: string
+          guild: string
+          id: string
+          name: string
+        }
+        Insert: {
+          class: string
+          created_at?: string
+          guild: string
+          id?: string
+          name: string
+        }
+        Update: {
+          class?: string
+          created_at?: string
+          guild?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       pvp_match_players: {
         Row: {
           created_at: string

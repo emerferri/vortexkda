@@ -1,0 +1,298 @@
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { toast } from '@/hooks/use-toast';
+import { Loader2, Plus, Search, Trash2, Pencil } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+
+interface Character {
+  id: string;
+  name: string;
+  guild: string;
+  class: string;
+}
+
+export const Characters = () => {
+  const { user } = useAuth();
+  const [characters, setCharacters] = useState<Character[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingCharacter, setEditingCharacter] = useState<Character | null>(null);
+  const [formData, setFormData] = useState({ name: '', guild: '', class: '' });
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    loadCharacters();
+  }, []);
+
+  const loadCharacters = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('characters')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setCharacters(data || []);
+    } catch (error) {
+      console.error('Error loading characters:', error);
+      toast({
+        title: 'Erro',
+        description: 'Falha ao carregar personagens',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      toast({
+        title: 'Erro',
+        description: 'Você precisa estar logado',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      if (editingCharacter) {
+        const { error } = await supabase
+          .from('characters')
+          .update(formData)
+          .eq('id', editingCharacter.id);
+
+        if (error) throw error;
+        toast({ title: 'Sucesso', description: 'Personagem atualizado!' });
+      } else {
+        const { error } = await supabase
+          .from('characters')
+          .insert([formData]);
+
+        if (error) throw error;
+        toast({ title: 'Sucesso', description: 'Personagem adicionado!' });
+      }
+
+      setDialogOpen(false);
+      setFormData({ name: '', guild: '', class: '' });
+      setEditingCharacter(null);
+      loadCharacters();
+    } catch (error: any) {
+      console.error('Error saving character:', error);
+      toast({
+        title: 'Erro',
+        description: error.message || 'Falha ao salvar personagem',
+        variant: 'destructive',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!user) {
+      toast({
+        title: 'Erro',
+        description: 'Você precisa estar logado',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!confirm('Tem certeza que deseja excluir este personagem?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('characters')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      toast({ title: 'Sucesso', description: 'Personagem excluído!' });
+      loadCharacters();
+    } catch (error) {
+      console.error('Error deleting character:', error);
+      toast({
+        title: 'Erro',
+        description: 'Falha ao excluir personagem',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const openEditDialog = (character: Character) => {
+    setEditingCharacter(character);
+    setFormData({ name: character.name, guild: character.guild, class: character.class });
+    setDialogOpen(true);
+  };
+
+  const openAddDialog = () => {
+    setEditingCharacter(null);
+    setFormData({ name: '', guild: '', class: '' });
+    setDialogOpen(true);
+  };
+
+  const filteredCharacters = characters.filter(
+    (char) =>
+      char.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      char.guild.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      char.class.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Personagens Cadastrados</CardTitle>
+        <CardDescription>
+          Total de {characters.length} personagens registrados
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome, guild ou classe..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          {user && (
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={openAddDialog}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Adicionar
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <form onSubmit={handleSubmit}>
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingCharacter ? 'Editar Personagem' : 'Novo Personagem'}
+                    </DialogTitle>
+                    <DialogDescription>
+                      Preencha os dados do personagem
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Nome do Assassino</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        required
+                        disabled={submitting}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="guild">Guild</Label>
+                      <Input
+                        id="guild"
+                        value={formData.guild}
+                        onChange={(e) => setFormData({ ...formData, guild: e.target.value })}
+                        required
+                        disabled={submitting}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="class">Classe</Label>
+                      <Input
+                        id="class"
+                        value={formData.class}
+                        onChange={(e) => setFormData({ ...formData, class: e.target.value })}
+                        required
+                        disabled={submitting}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" disabled={submitting}>
+                      {submitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Salvando...
+                        </>
+                      ) : (
+                        'Salvar'
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Assassino</TableHead>
+                <TableHead>Guild</TableHead>
+                <TableHead>Classe</TableHead>
+                {user && <TableHead className="w-[100px]">Ações</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCharacters.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={user ? 4 : 3} className="text-center text-muted-foreground">
+                    Nenhum personagem encontrado
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredCharacters.map((character) => (
+                  <TableRow key={character.id}>
+                    <TableCell className="font-medium">{character.name}</TableCell>
+                    <TableCell>{character.guild}</TableCell>
+                    <TableCell>{character.class}</TableCell>
+                    {user && (
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(character)}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(character.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
