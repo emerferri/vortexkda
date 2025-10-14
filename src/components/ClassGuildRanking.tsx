@@ -152,18 +152,17 @@ export const ClassGuildRanking = () => {
     <div className="space-y-6">
       {chartData.length > 0 && (
         <Card className="p-6">
-          <h3 className="text-xl font-bold mb-4 text-center">
+          <h3 className="text-2xl font-bold mb-6 text-center">
             Distribuição de Kills por {filterType === 'class' ? 'Classe' : 'Guild'}
           </h3>
-          <ResponsiveContainer width="100%" height={400}>
+          <ResponsiveContainer width="100%" height={500}>
             <PieChart>
               <Pie
                 data={chartData}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={120}
+                outerRadius={150}
                 fill="#8884d8"
                 dataKey="value"
               >
@@ -173,8 +172,21 @@ export const ClassGuildRanking = () => {
               </Pie>
               <Tooltip 
                 formatter={(value: number) => [`${value} kills`, 'Total']}
+                contentStyle={{
+                  backgroundColor: 'hsl(var(--background))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '8px',
+                  padding: '8px 12px'
+                }}
               />
-              <Legend />
+              <Legend 
+                wrapperStyle={{ paddingTop: '20px' }}
+                iconType="circle"
+                formatter={(value, entry: any) => {
+                  const percent = ((entry.payload.value / chartData.reduce((sum, d) => sum + d.value, 0)) * 100).toFixed(1);
+                  return `${value} (${percent}%)`;
+                }}
+              />
             </PieChart>
           </ResponsiveContainer>
         </Card>
@@ -191,7 +203,7 @@ export const ClassGuildRanking = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate('/?tab=personagens')}
+              onClick={() => navigate('/?tab=personagens&filter=unregistered')}
             >
               Gerenciar Personagens
             </Button>

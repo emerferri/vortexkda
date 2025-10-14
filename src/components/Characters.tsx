@@ -6,9 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Plus, Search, Trash2, Pencil } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Pencil, Filter, FilterX } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { useSearchParams } from 'react-router-dom';
 
 interface Character {
   id: string;
@@ -26,10 +28,16 @@ export const Characters = () => {
   const [editingCharacter, setEditingCharacter] = useState<Character | null>(null);
   const [formData, setFormData] = useState({ name: '', guild: '', class: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [showUnregisteredOnly, setShowUnregisteredOnly] = useState(false);
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     loadCharacters();
-  }, []);
+    // Check if we should show unregistered only
+    if (searchParams.get('filter') === 'unregistered') {
+      setShowUnregisteredOnly(true);
+    }
+  }, [searchParams]);
 
   const loadCharacters = async () => {
     try {
@@ -178,12 +186,18 @@ export const Characters = () => {
     setDialogOpen(true);
   };
 
-  const filteredCharacters = characters.filter(
-    (char) =>
+  const unregisteredCount = characters.filter(c => !c.guild && !c.class).length;
+
+  const filteredCharacters = characters.filter((char) => {
+    const matchesSearch =
       char.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       char.guild.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      char.class.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      char.class.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesFilter = showUnregisteredOnly ? (!char.guild && !char.class) : true;
+    
+    return matchesSearch && matchesFilter;
+  });
 
   if (loading) {
     return (
@@ -196,14 +210,23 @@ export const Characters = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Personagens Cadastrados</CardTitle>
-        <CardDescription>
-          Total de {characters.length} personagens registrados
-        </CardDescription>
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle>Personagens Cadastrados</CardTitle>
+            <CardDescription>
+              Total de {characters.length} personagens ({unregisteredCount} não cadastrados)
+            </CardDescription>
+          </div>
+          {unregisteredCount > 0 && (
+            <Badge variant="secondary" className="text-yellow-600 border-yellow-600">
+              {unregisteredCount} sem cadastro completo
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
+        <div className="flex gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Buscar por nome, guild ou classe..."
@@ -212,6 +235,25 @@ export const Characters = () => {
               className="pl-10"
             />
           </div>
+          {unregisteredCount > 0 && (
+            <Button
+              variant={showUnregisteredOnly ? "default" : "outline"}
+              onClick={() => setShowUnregisteredOnly(!showUnregisteredOnly)}
+              className="gap-2"
+            >
+              {showUnregisteredOnly ? (
+                <>
+                  <FilterX className="w-4 h-4" />
+                  Mostrar Todos
+                </>
+              ) : (
+                <>
+                  <Filter className="w-4 h-4" />
+                  Apenas Não Cadastrados
+                </>
+              )}
+            </Button>
+          )}
           {user && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
