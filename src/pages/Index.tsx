@@ -6,6 +6,7 @@ import { RankingGeral } from '@/components/RankingGeral';
 import { Characters } from '@/components/Characters';
 import { ClassGuildRanking } from '@/components/ClassGuildRanking';
 import { PutinhaRanking } from '@/components/PutinhaRanking';
+import { MuralDaVergonha } from '@/components/MuralDaVergonha';
 import { parseTxtFile } from '@/utils/txtParser';
 import { Swords, LogIn, LogOut, User } from 'lucide-react';
 import { Footer } from '@/components/Footer';
@@ -82,7 +83,7 @@ const Index = () => {
 
         <div className="space-y-8">
           <Tabs defaultValue="placar" className="w-full">
-            <TabsList className="grid w-full max-w-4xl mx-auto grid-cols-5 mb-8">
+            <TabsList className="grid w-full max-w-4xl mx-auto grid-cols-6 mb-8">
               <TabsTrigger value="placar" className="text-base font-semibold">
                 Incluir Dados
               </TabsTrigger>
@@ -94,6 +95,9 @@ const Index = () => {
               </TabsTrigger>
               <TabsTrigger value="putinha" className="text-base font-semibold">
                 Minha Putinha
+              </TabsTrigger>
+              <TabsTrigger value="vergonha" className="text-base font-semibold">
+                Mural da Vergonha
               </TabsTrigger>
               <TabsTrigger value="personagens" className="text-base font-semibold">
                 Personagens
@@ -115,6 +119,10 @@ const Index = () => {
 
             <TabsContent value="putinha">
               <PutinhaRanking />
+            </TabsContent>
+
+            <TabsContent value="vergonha">
+              <MuralDaVergonha />
             </TabsContent>
 
             <TabsContent value="personagens">
