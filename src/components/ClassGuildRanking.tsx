@@ -3,12 +3,17 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Crosshair, Users, Sword, AlertCircle } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableRow, TableHeader } from './ui/table';
+import { Crosshair, Users, Sword, AlertCircle, Calendar as CalendarIcon } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Calendar } from './ui/calendar';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 interface PlayerWithCharacter {
   player_name: string;
@@ -58,15 +63,41 @@ const COLORS = [
 
 export const ClassGuildRanking = () => {
   const [filterType, setFilterType] = useState<FilterType>('class');
+  const [dateFrom, setDateFrom] = useState<Date>();
+  const [dateTo, setDateTo] = useState<Date>();
+  const [hourFrom, setHourFrom] = useState<number>();
+  const [hourTo, setHourTo] = useState<number>();
   const navigate = useNavigate();
 
+  const BOSS_HOURS = [20, 21, 22];
+
   const { data: playersData, isLoading } = useQuery({
-    queryKey: ['players-with-characters'],
+    queryKey: ['players-with-characters', dateFrom, dateTo, hourFrom, hourTo],
     queryFn: async () => {
       // Fetch all match players with their aggregate stats
-      const { data: matchPlayers, error: matchError } = await supabase
+      let query = supabase
         .from('pvp_match_players')
-        .select('player_name, kills, deaths');
+        .select(`
+          player_name,
+          kills,
+          deaths,
+          pvp_matches!inner(match_date, match_hour)
+        `);
+
+      if (dateFrom) {
+        query = query.gte('pvp_matches.match_date', format(dateFrom, 'yyyy-MM-dd'));
+      }
+      if (dateTo) {
+        query = query.lte('pvp_matches.match_date', format(dateTo, 'yyyy-MM-dd'));
+      }
+      if (hourFrom !== undefined) {
+        query = query.gte('pvp_matches.match_hour', hourFrom);
+      }
+      if (hourTo !== undefined) {
+        query = query.lte('pvp_matches.match_hour', hourTo);
+      }
+
+      const { data: matchPlayers, error: matchError } = await query;
 
       if (matchError) throw matchError;
 
@@ -165,6 +196,108 @@ export const ClassGuildRanking = () => {
 
   return (
     <div className="space-y-6">
+      {/* Filtros de Data e Hora */}
+      <div className="bg-card/50 p-6 rounded-xl border border-border space-y-4">
+        <div className="flex flex-wrap gap-4 justify-center items-center">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">De:</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[200px] justify-start text-left font-normal",
+                    !dateFrom && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateFrom ? format(dateFrom, "PPP", { locale: ptBR }) : "Selecione"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateFrom}
+                  onSelect={setDateFrom}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">Até:</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[200px] justify-start text-left font-normal",
+                    !dateTo && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateTo ? format(dateTo, "PPP", { locale: ptBR }) : "Selecione"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateTo}
+                  onSelect={setDateTo}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-4 justify-center items-center">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">Hora Inicial:</span>
+            <select
+              value={hourFrom ?? ''}
+              onChange={(e) => setHourFrom(e.target.value ? parseInt(e.target.value) : undefined)}
+              className="px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">Todas</option>
+              {BOSS_HOURS.map((hour) => (
+                <option key={hour} value={hour}>{hour}:00</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">Hora Final:</span>
+            <select
+              value={hourTo ?? ''}
+              onChange={(e) => setHourTo(e.target.value ? parseInt(e.target.value) : undefined)}
+              className="px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">Todas</option>
+              {BOSS_HOURS.map((hour) => (
+                <option key={hour} value={hour}>{hour}:00</option>
+              ))}
+            </select>
+          </div>
+
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setDateFrom(undefined);
+              setDateTo(undefined);
+              setHourFrom(undefined);
+              setHourTo(undefined);
+            }}
+            className="text-sm"
+          >
+            Limpar Filtros
+          </Button>
+        </div>
+      </div>
+
       {chartData.length > 0 && (
         <Card className="p-6">
           <h3 className="text-2xl font-bold mb-6 text-center">

@@ -194,7 +194,7 @@ export const Characters = () => {
       char.guild.toLowerCase().includes(searchTerm.toLowerCase()) ||
       char.class.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesFilter = showUnregisteredOnly ? (!char.guild && !char.class) : true;
+    const matchesFilter = showUnregisteredOnly ? (!char.guild || char.guild === '') && (!char.class || char.class === '') : true;
     
     return matchesSearch && matchesFilter;
   });

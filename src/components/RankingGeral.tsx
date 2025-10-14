@@ -249,8 +249,8 @@ export const RankingGeral = () => {
               className="px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="">Todas</option>
-              {Array.from({ length: 24 }, (_, i) => (
-                <option key={i} value={i}>{i}:00</option>
+              {[20, 21, 22].map((hour) => (
+                <option key={hour} value={hour}>{hour}:00</option>
               ))}
             </select>
           </div>
@@ -263,8 +263,8 @@ export const RankingGeral = () => {
               className="px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="">Todas</option>
-              {Array.from({ length: 24 }, (_, i) => (
-                <option key={i} value={i}>{i}:00</option>
+              {[20, 21, 22].map((hour) => (
+                <option key={hour} value={hour}>{hour}:00</option>
               ))}
             </select>
           </div>
