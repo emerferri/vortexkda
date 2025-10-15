@@ -9,6 +9,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 
+import { KillLog } from '@/utils/txtParser';
+
 export interface PlayerStats {
   name: string;
   kills: number;
@@ -19,11 +21,12 @@ export interface PlayerStats {
 interface ScoreboardProps {
   players: PlayerStats[];
   bossLabel?: string | null;
+  killLogs?: KillLog[];
 }
 
 type SortKey = 'kills' | 'deaths' | 'kda';
 
-export const Scoreboard = ({ players, bossLabel }: ScoreboardProps) => {
+export const Scoreboard = ({ players, bossLabel, killLogs = [] }: ScoreboardProps) => {
   const [sortBy, setSortBy] = useState<SortKey>('kills');
   const scoreboardRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
@@ -161,6 +164,24 @@ export const Scoreboard = ({ players, bossLabel }: ScoreboardProps) => {
         .insert(playersData);
 
       if (playersError) throw playersError;
+
+      // Insert kill logs if available
+      if (killLogs.length > 0) {
+        const killLogsData = killLogs.map(log => ({
+          match_id: matchData.id,
+          killer_name: log.killer,
+          victim_name: log.victim
+        }));
+
+        const { error: killLogsError } = await supabase
+          .from('pvp_kill_logs')
+          .insert(killLogsData);
+
+        if (killLogsError) {
+          console.error('Erro ao salvar kill logs:', killLogsError);
+          // Não falhar a operação toda se os kill logs não salvarem
+        }
+      }
 
       toast({
         title: "Sucesso!",

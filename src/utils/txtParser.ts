@@ -1,9 +1,15 @@
 import { PlayerStats } from '@/components/Scoreboard';
 import { z } from 'zod';
 
+export interface KillLog {
+  killer: string;
+  victim: string;
+}
+
 export interface ParseResult {
   players: PlayerStats[];
   bossLabel: string | null;
+  killLogs: KillLog[];
 }
 
 const playerNameSchema = z.string()
@@ -29,6 +35,7 @@ export const parseTxtFile = (content: string): ParseResult => {
     .slice(0, MAX_LINES);
   
   const playerMap = new Map<string, { kills: number; deaths: number }>();
+  const killLogs: KillLog[] = [];
   let bossLabel: string | null = null;
 
   lines.forEach(line => {
@@ -56,6 +63,9 @@ export const parseTxtFile = (content: string): ParseResult => {
         const killer = playerNameSchema.parse(killMatch[1].trim());
         const victim = playerNameSchema.parse(killMatch[2].trim());
 
+        // Add to kill logs
+        killLogs.push({ killer, victim });
+
         // Update killer stats
         const killerStats = playerMap.get(killer) || { kills: 0, deaths: 0 };
         killerStats.kills += 1;
@@ -80,5 +90,5 @@ export const parseTxtFile = (content: string): ParseResult => {
     kda: stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths,
   }));
 
-  return { players, bossLabel };
+  return { players, bossLabel, killLogs };
 };

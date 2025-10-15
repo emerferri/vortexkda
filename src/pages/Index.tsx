@@ -7,6 +7,7 @@ import { Characters } from '@/components/Characters';
 import { ClassGuildRanking } from '@/components/ClassGuildRanking';
 import { PutinhaRanking } from '@/components/PutinhaRanking';
 import { MuralDaVergonha } from '@/components/MuralDaVergonha';
+import { ConfrontosDiretos } from '@/components/ConfrontosDiretos';
 import { parseTxtFile } from '@/utils/txtParser';
 import { Swords, LogIn, LogOut, User } from 'lucide-react';
 import { Footer } from '@/components/Footer';
@@ -25,6 +26,7 @@ import {
 const Index = () => {
   const [players, setPlayers] = useState<PlayerStats[]>([]);
   const [bossLabel, setBossLabel] = useState<string | null>(null);
+  const [killLogs, setKillLogs] = useState<any[]>([]);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -32,6 +34,7 @@ const Index = () => {
     const result = parseTxtFile(content);
     setPlayers(result.players);
     setBossLabel(result.bossLabel);
+    setKillLogs(result.killLogs);
   };
 
   return (
@@ -83,7 +86,7 @@ const Index = () => {
 
         <div className="space-y-8">
           <Tabs defaultValue="placar" className="w-full">
-            <TabsList className="grid w-full max-w-4xl mx-auto grid-cols-6 mb-8">
+            <TabsList className="grid w-full max-w-5xl mx-auto grid-cols-7 mb-8">
               <TabsTrigger value="placar" className="text-base font-semibold">
                 Incluir Dados
               </TabsTrigger>
@@ -99,6 +102,9 @@ const Index = () => {
               <TabsTrigger value="vergonha" className="text-base font-semibold">
                 Mural da Vergonha
               </TabsTrigger>
+              <TabsTrigger value="confrontos" className="text-base font-semibold">
+                Confrontos Diretos
+              </TabsTrigger>
               <TabsTrigger value="personagens" className="text-base font-semibold">
                 Personagens
               </TabsTrigger>
@@ -106,7 +112,7 @@ const Index = () => {
             
             <TabsContent value="placar" className="space-y-8">
               <FileUpload onFileUpload={handleFileUpload} />
-              <Scoreboard players={players} bossLabel={bossLabel} />
+              <Scoreboard players={players} bossLabel={bossLabel} killLogs={killLogs} />
             </TabsContent>
             
             <TabsContent value="ranking">
@@ -123,6 +129,10 @@ const Index = () => {
 
             <TabsContent value="vergonha">
               <MuralDaVergonha />
+            </TabsContent>
+
+            <TabsContent value="confrontos">
+              <ConfrontosDiretos />
             </TabsContent>
 
             <TabsContent value="personagens">

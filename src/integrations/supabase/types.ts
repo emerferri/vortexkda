@@ -38,6 +38,38 @@ export type Database = {
         }
         Relationships: []
       }
+      pvp_kill_logs: {
+        Row: {
+          created_at: string
+          id: string
+          killer_name: string
+          match_id: string
+          victim_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          killer_name: string
+          match_id: string
+          victim_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          killer_name?: string
+          match_id?: string
+          victim_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pvp_kill_logs_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "pvp_matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pvp_match_players: {
         Row: {
           created_at: string
