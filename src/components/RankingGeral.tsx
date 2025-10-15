@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
@@ -28,7 +29,23 @@ export const RankingGeral = () => {
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
   const [hourTo, setHourTo] = useState<number>();
+  const [classFilter, setClassFilter] = useState<string>('all');
   const tableRef = useRef<HTMLDivElement>(null);
+
+  const { data: classes } = useQuery({
+    queryKey: ['classes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('characters')
+        .select('class')
+        .not('class', 'is', null);
+      
+      if (error) throw error;
+      
+      const uniqueClasses = [...new Set(data?.map(c => c.class).filter(Boolean))];
+      return uniqueClasses.sort();
+    }
+  });
 
   const { data: aggregatedData, isLoading } = useQuery({
     queryKey: ['ranking-geral', dateFrom, dateTo, hourFrom, hourTo],
@@ -93,8 +110,14 @@ export const RankingGeral = () => {
 
   const sortedPlayers = useMemo(() => {
     if (!aggregatedData) return [];
-    return [...aggregatedData].sort((a, b) => b[sortBy] - a[sortBy]);
-  }, [aggregatedData, sortBy]);
+    
+    let filtered = aggregatedData;
+    if (classFilter !== 'all') {
+      filtered = aggregatedData.filter(p => p.class === classFilter);
+    }
+    
+    return [...filtered].sort((a, b) => b[sortBy] - a[sortBy]);
+  }, [aggregatedData, sortBy, classFilter]);
 
   const topPlayer = sortedPlayers[0];
 
@@ -196,6 +219,23 @@ export const RankingGeral = () => {
       <div className="bg-card/50 p-6 rounded-xl border border-border space-y-4">
         <div className="flex flex-wrap gap-4 justify-center items-center">
           <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">Classe:</span>
+            <Select value={classFilter} onValueChange={setClassFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Todas as classes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {classes?.map((className) => (
+                  <SelectItem key={className} value={className}>
+                    {className}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-muted-foreground">De:</span>
             <Popover>
               <PopoverTrigger asChild>
@@ -286,6 +326,7 @@ export const RankingGeral = () => {
               setDateTo(undefined);
               setHourFrom(undefined);
               setHourTo(undefined);
+              setClassFilter('all');
             }}
             className="text-sm"
           >
