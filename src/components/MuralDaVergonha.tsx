@@ -16,6 +16,7 @@ interface PlayerDeathStats {
   matchesPlayed: number;
   avgDeathsPerMatch: number;
   guild?: string;
+  class?: string;
 }
 
 export const MuralDaVergonha = () => {
@@ -38,26 +39,28 @@ export const MuralDaVergonha = () => {
 
       if (playersError) throw playersError;
 
-      // Buscar informações de guild dos personagens
+      // Buscar informações de guild e classe dos personagens
       const { data: characters } = await supabase
         .from('characters')
-        .select('name, guild');
+        .select('name, guild, class');
 
       const characterMap = new Map(
-        characters?.map(char => [char.name.toLowerCase(), char.guild]) || []
+        characters?.map(char => [char.name.toLowerCase(), { guild: char.guild, class: char.class }]) || []
       );
 
       // Agregar dados por jogador
       const statsMap = new Map<string, PlayerDeathStats>();
 
       matchPlayers?.forEach(player => {
+        const charInfo = characterMap.get(player.player_name.toLowerCase());
         const existing = statsMap.get(player.player_name) || {
           playerName: player.player_name,
           totalDeaths: 0,
           totalKills: 0,
           matchesPlayed: 0,
           avgDeathsPerMatch: 0,
-          guild: characterMap.get(player.player_name.toLowerCase()),
+          guild: charInfo?.guild,
+          class: charInfo?.class,
         };
 
         statsMap.set(player.player_name, {
@@ -89,9 +92,9 @@ export const MuralDaVergonha = () => {
     const data = deathStats.map((stat, index) => ({
       'Posição': index + 1,
       'Jogador': stat.playerName,
+      'Classe': stat.class || 'Sem Classe',
       'Guild': stat.guild || 'Sem Guild',
       'Total de Mortes': stat.totalDeaths,
-      'Total de Kills': stat.totalKills,
       'Partidas Jogadas': stat.matchesPlayed,
       'Média Mortes/Partida': stat.avgDeathsPerMatch.toFixed(2),
     }));
@@ -179,9 +182,9 @@ export const MuralDaVergonha = () => {
             <TableRow>
               <TableHead className="w-20">Rank</TableHead>
               <TableHead>Jogador</TableHead>
+              <TableHead>Classe</TableHead>
               <TableHead>Guild</TableHead>
               <TableHead className="text-right">Total Mortes</TableHead>
-              <TableHead className="text-right">Total Kills</TableHead>
               <TableHead className="text-right">Partidas</TableHead>
               <TableHead className="text-right">Média Mortes</TableHead>
               <TableHead className="text-center">Nível de Vergonha</TableHead>
@@ -200,12 +203,14 @@ export const MuralDaVergonha = () => {
                   </TableCell>
                   <TableCell className="font-semibold">{stat.playerName}</TableCell>
                   <TableCell className="text-muted-foreground">
+                    {stat.class || 'Sem Classe'}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
                     {stat.guild || 'Sem Guild'}
                   </TableCell>
                   <TableCell className="text-right font-bold text-destructive">
                     {stat.totalDeaths}
                   </TableCell>
-                  <TableCell className="text-right">{stat.totalKills}</TableCell>
                   <TableCell className="text-right">{stat.matchesPlayed}</TableCell>
                   <TableCell className="text-right">
                     {stat.avgDeathsPerMatch.toFixed(2)}
