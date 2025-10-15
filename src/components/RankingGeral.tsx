@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface AggregatedPlayer {
   name: string;
+  class: string | null;
   kills: number;
   deaths: number;
   kda: number;
@@ -58,6 +59,13 @@ export const RankingGeral = () => {
       const { data, error } = await query;
       if (error) throw error;
 
+      // Get all characters to map names to classes
+      const { data: characters } = await supabase
+        .from('characters')
+        .select('name, class');
+
+      const characterMap = new Map(characters?.map(c => [c.name, c.class]) || []);
+
       // Aggregate by player
       const playerMap = new Map<string, { kills: number; deaths: number; matches: number }>();
       
@@ -72,6 +80,7 @@ export const RankingGeral = () => {
 
       const aggregated: AggregatedPlayer[] = Array.from(playerMap.entries()).map(([name, stats]) => ({
         name,
+        class: characterMap.get(name) || null,
         kills: stats.kills,
         deaths: stats.deaths,
         kda: stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths,
@@ -105,10 +114,11 @@ export const RankingGeral = () => {
     const worksheetData = [
       ['Ranking Geral - PVP'],
       [''],
-      ['Rank', 'Jogador', 'Kills', 'Deaths', 'KDA', 'Boss'],
+      ['Rank', 'Jogador', 'Classe', 'Kills', 'Deaths', 'KDA', 'Boss'],
       ...sortedPlayers.map((player, index) => [
         index + 1,
         player.name,
+        player.class || '-',
         player.kills,
         player.deaths,
         player.kda.toFixed(2),
@@ -356,6 +366,9 @@ export const RankingGeral = () => {
                 <th className="px-6 py-4 text-left text-sm font-bold text-foreground uppercase tracking-wider">
                   Jogador
                 </th>
+                <th className="px-6 py-4 text-left text-sm font-bold text-foreground uppercase tracking-wider">
+                  Classe
+                </th>
                 <th className="px-6 py-4 text-center text-sm font-bold text-success uppercase tracking-wider">
                   <div className="flex items-center justify-center gap-2">
                     <Crosshair className="w-4 h-4" />
@@ -409,6 +422,11 @@ export const RankingGeral = () => {
                         isTopPlayer && "text-primary text-glow"
                       )}>
                         {player.name}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-muted-foreground">
+                        {player.class || '-'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
