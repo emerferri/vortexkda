@@ -87,7 +87,7 @@ const Index = () => {
 
         <div className="space-y-8">
           <Tabs defaultValue="placar" className="w-full">
-            <TabsList className="grid w-full max-w-6xl mx-auto grid-cols-8 mb-8">
+            <TabsList className={`grid w-full max-w-6xl mx-auto ${user ? 'grid-cols-8' : 'grid-cols-7'} mb-8`}>
               <TabsTrigger value="placar" className="text-base font-semibold">
                 Incluir Dados
               </TabsTrigger>
@@ -109,9 +109,11 @@ const Index = () => {
               <TabsTrigger value="personagens" className="text-base font-semibold">
                 Personagens
               </TabsTrigger>
-              <TabsTrigger value="admin" className="text-base font-semibold">
-                Admin
-              </TabsTrigger>
+              {user && (
+                <TabsTrigger value="admin" className="text-base font-semibold">
+                  Admin
+                </TabsTrigger>
+              )}
             </TabsList>
             
             <TabsContent value="placar" className="space-y-8">
