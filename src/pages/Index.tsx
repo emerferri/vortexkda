@@ -8,6 +8,7 @@ import { ClassGuildRanking } from '@/components/ClassGuildRanking';
 import { PutinhaRanking } from '@/components/PutinhaRanking';
 import { MuralDaVergonha } from '@/components/MuralDaVergonha';
 import { ConfrontosDiretos } from '@/components/ConfrontosDiretos';
+import { DatabaseManager } from '@/components/DatabaseManager';
 import { parseTxtFile } from '@/utils/txtParser';
 import { Swords, LogIn, LogOut, User } from 'lucide-react';
 import { Footer } from '@/components/Footer';
@@ -86,7 +87,7 @@ const Index = () => {
 
         <div className="space-y-8">
           <Tabs defaultValue="placar" className="w-full">
-            <TabsList className="grid w-full max-w-5xl mx-auto grid-cols-7 mb-8">
+            <TabsList className="grid w-full max-w-6xl mx-auto grid-cols-8 mb-8">
               <TabsTrigger value="placar" className="text-base font-semibold">
                 Incluir Dados
               </TabsTrigger>
@@ -107,6 +108,9 @@ const Index = () => {
               </TabsTrigger>
               <TabsTrigger value="personagens" className="text-base font-semibold">
                 Personagens
+              </TabsTrigger>
+              <TabsTrigger value="admin" className="text-base font-semibold">
+                Admin
               </TabsTrigger>
             </TabsList>
             
@@ -137,6 +141,10 @@ const Index = () => {
 
             <TabsContent value="personagens">
               <Characters />
+            </TabsContent>
+
+            <TabsContent value="admin">
+              <DatabaseManager />
             </TabsContent>
           </Tabs>
         </div>
