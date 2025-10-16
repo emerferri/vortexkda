@@ -18,10 +18,11 @@ interface AggregatedPlayer {
   kills: number;
   deaths: number;
   kda: number;
+  weightedKda: number;
   matches: number;
 }
 
-type SortKey = 'kills' | 'deaths' | 'kda';
+type SortKey = 'kills' | 'deaths' | 'kda' | 'weightedKda';
 
 export const RankingGeral = () => {
   const [sortBy, setSortBy] = useState<SortKey>('kills');
@@ -95,14 +96,19 @@ export const RankingGeral = () => {
         });
       });
 
-      const aggregated: AggregatedPlayer[] = Array.from(playerMap.entries()).map(([name, stats]) => ({
-        name,
-        class: characterMap.get(name) || null,
-        kills: stats.kills,
-        deaths: stats.deaths,
-        kda: stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths,
-        matches: stats.matches
-      }));
+      const aggregated: AggregatedPlayer[] = Array.from(playerMap.entries()).map(([name, stats]) => {
+        const kda = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
+        const weightedKda = kda * Math.log10(stats.matches + 1);
+        return {
+          name,
+          class: characterMap.get(name) || null,
+          kills: stats.kills,
+          deaths: stats.deaths,
+          kda,
+          weightedKda,
+          matches: stats.matches
+        };
+      });
 
       return aggregated;
     }
@@ -133,11 +139,15 @@ export const RankingGeral = () => {
     return [...sortedPlayers].sort((a, b) => b.deaths - a.deaths)[0];
   }, [sortedPlayers]);
 
+  const melhorPonderado = useMemo(() => {
+    return [...sortedPlayers].sort((a, b) => b.weightedKda - a.weightedKda)[0];
+  }, [sortedPlayers]);
+
   const exportToExcel = () => {
     const worksheetData = [
       ['Ranking Geral - PVP'],
       [''],
-      ['Rank', 'Jogador', 'Classe', 'Kills', 'Deaths', 'KDA', 'Boss'],
+      ['Rank', 'Jogador', 'Classe', 'Kills', 'Deaths', 'KDA', 'KDA Ponderado', 'Boss'],
       ...sortedPlayers.map((player, index) => [
         index + 1,
         player.name,
@@ -145,6 +155,7 @@ export const RankingGeral = () => {
         player.kills,
         player.deaths,
         player.kda.toFixed(2),
+        player.weightedKda.toFixed(2),
         player.matches
       ]),
       [''],
@@ -336,7 +347,7 @@ export const RankingGeral = () => {
       </div>
 
       {/* Classificações Especiais */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-warning/10 border-2 border-warning rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
           <Trophy className="w-10 h-10 text-warning mx-auto mb-3 animate-pulse" />
           <h3 className="text-lg font-bold text-warning mb-2">👑 Rei do PVP</h3>
@@ -357,6 +368,16 @@ export const RankingGeral = () => {
           <p className="text-xs text-muted-foreground mt-1">{brabissimo?.matches} boss(es)</p>
         </div>
 
+        <div className="bg-accent/10 border-2 border-accent rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
+          <TrendingUp className="w-10 h-10 text-accent mx-auto mb-3 animate-pulse" />
+          <h3 className="text-lg font-bold text-accent mb-2">📊 KDA/Participação</h3>
+          <p className="text-2xl font-bold text-foreground text-glow mb-1">{melhorPonderado?.name}</p>
+          <p className="text-sm text-muted-foreground">
+            KDA Pond.: <span className="text-accent font-bold">{melhorPonderado?.weightedKda.toFixed(2)}</span>
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">{melhorPonderado?.matches} boss(es)</p>
+        </div>
+
         <div className="bg-destructive/10 border-2 border-destructive rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
           <Skull className="w-10 h-10 text-destructive mx-auto mb-3 animate-pulse" />
           <h3 className="text-lg font-bold text-destructive mb-2">🍦 Cone monodedo</h3>
@@ -373,6 +394,7 @@ export const RankingGeral = () => {
         <SortButton label="Kills" sortKey="kills" icon={Crosshair} />
         <SortButton label="Deaths" sortKey="deaths" icon={Skull} />
         <SortButton label="KDA" sortKey="kda" icon={TrendingUp} />
+        <SortButton label="KDA Ponderado" sortKey="weightedKda" icon={TrendingUp} />
         
         <div className="w-px h-8 bg-border mx-2" />
         
@@ -426,6 +448,12 @@ export const RankingGeral = () => {
                   <div className="flex items-center justify-center gap-2">
                     <TrendingUp className="w-4 h-4" />
                     KDA
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-center text-sm font-bold text-accent uppercase tracking-wider">
+                  <div className="flex items-center justify-center gap-2">
+                    <TrendingUp className="w-4 h-4" />
+                    KDA Pond.
                   </div>
                 </th>
                 <th className="px-6 py-4 text-center text-sm font-bold text-primary uppercase tracking-wider">
@@ -483,6 +511,11 @@ export const RankingGeral = () => {
                     <td className="px-6 py-4 text-center">
                       <span className="font-bold text-warning text-lg">
                         {player.kda.toFixed(2)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="font-bold text-accent text-lg">
+                        {player.weightedKda.toFixed(2)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
