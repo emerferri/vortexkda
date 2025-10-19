@@ -72,9 +72,9 @@ export const PutinhaRanking = () => {
         }
       }
 
-      // 4) Keep only relations with more than 10 deaths and sort desc
+      // 4) Keep only relations with 10 or more deaths and sort desc
       const putinhaRelations: PutinhaRelation[] = Array.from(deathCount.values())
-        .filter((r) => r.count > 10)
+        .filter((r) => r.count >= 10)
         .map((r) => ({
           victim: r.victim,
           killer: r.killer,
@@ -113,7 +113,7 @@ export const PutinhaRanking = () => {
           <div>
             <CardTitle>Ranking: Minha Putinha</CardTitle>
             <CardDescription>
-              Quem morre mais de 10 vezes para o mesmo jogador (Total: {relations.length} relações)
+              Quem morre 10 ou mais vezes para o mesmo jogador (Total: {relations.length} relações)
             </CardDescription>
           </div>
         </div>
@@ -122,7 +122,7 @@ export const PutinhaRanking = () => {
         {relations.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <p>Nenhuma relação de dominância encontrada ainda.</p>
-            <p className="text-sm mt-2">É necessário morrer mais de 10 vezes para o mesmo jogador.</p>
+            <p className="text-sm mt-2">É necessário morrer 10 ou mais vezes para o mesmo jogador.</p>
           </div>
         ) : (
           <div className="rounded-md border">
