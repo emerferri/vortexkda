@@ -24,24 +24,27 @@ export const PutinhaRanking = () => {
 
   const loadPutinhaRanking = async () => {
     try {
-      // Get all matches with players
-      const { data: matches, error: matchesError } = await supabase
-        .from('pvp_matches')
-        .select(`
-          id,
-          boss_label,
-          match_date,
-          pvp_match_players (
-            player_name,
-            kills,
-            deaths
-          )
-        `)
-        .order('match_date', { ascending: false });
+      setLoading(true);
 
-      if (matchesError) throw matchesError;
+      // 1) Fetch all kill logs with pagination to avoid row caps
+      const pageSize = 1000;
+      let from = 0;
+      let allKillLogs: { killer_name: string; victim_name: string }[] = [];
 
-      // Get character info for guilds
+      while (true) {
+        const { data, error } = await supabase
+          .from('pvp_kill_logs')
+          .select('killer_name, victim_name')
+          .order('created_at', { ascending: false })
+          .range(from, from + pageSize - 1);
+
+        if (error) throw error;
+        if (data && data.length > 0) allKillLogs = allKillLogs.concat(data);
+        if (!data || data.length < pageSize) break; // no more pages
+        from += pageSize;
+      }
+
+      // 2) Fetch character guild info
       const { data: characters, error: charsError } = await supabase
         .from('characters')
         .select('name, guild');
@@ -49,55 +52,35 @@ export const PutinhaRanking = () => {
       if (charsError) throw charsError;
 
       const characterMap = new Map(
-        characters?.map(c => [c.name, c.guild]) || []
+        (characters || []).map((c) => [c.name, c.guild])
       );
 
-      // Count deaths per killer-victim pair across all matches
+      // 3) Count deaths per exact killer->victim pair across ALL logs
       const deathCount = new Map<string, { killer: string; victim: string; count: number }>();
 
-      matches?.forEach(match => {
-        const players = match.pvp_match_players || [];
-        
-        // For each player, distribute their deaths proportionally to other players' kills
-        players.forEach(victim => {
-          if (victim.deaths > 0) {
-            const totalKills = players.reduce((sum, p) => p.player_name !== victim.player_name ? sum + p.kills : sum, 0);
-            
-            if (totalKills > 0) {
-              players.forEach(killer => {
-                if (killer.player_name !== victim.player_name && killer.kills > 0) {
-                  const deathsByKiller = Math.round((killer.kills / totalKills) * victim.deaths);
-                  
-                  if (deathsByKiller > 0) {
-                    const key = `${victim.player_name}->${killer.player_name}`;
-                    const existing = deathCount.get(key);
-                    
-                    if (existing) {
-                      existing.count += deathsByKiller;
-                    } else {
-                      deathCount.set(key, {
-                        victim: victim.player_name,
-                        killer: killer.player_name,
-                        count: deathsByKiller
-                      });
-                    }
-                  }
-                }
-              });
-            }
-          }
-        });
-      });
+      for (const log of allKillLogs) {
+        const key = `${log.victim_name}->${log.killer_name}`;
+        const existing = deathCount.get(key);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          deathCount.set(key, {
+            victim: log.victim_name,
+            killer: log.killer_name,
+            count: 1,
+          });
+        }
+      }
 
-      // Filter only relations with more than 10 deaths
+      // 4) Keep only relations with more than 10 deaths and sort desc
       const putinhaRelations: PutinhaRelation[] = Array.from(deathCount.values())
-        .filter(r => r.count > 10)
-        .map(r => ({
+        .filter((r) => r.count > 10)
+        .map((r) => ({
           victim: r.victim,
           killer: r.killer,
           deaths: r.count,
           victimGuild: characterMap.get(r.victim),
-          killerGuild: characterMap.get(r.killer)
+          killerGuild: characterMap.get(r.killer),
         }))
         .sort((a, b) => b.deaths - a.deaths);
 
