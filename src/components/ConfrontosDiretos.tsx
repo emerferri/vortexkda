@@ -36,13 +36,24 @@ export const ConfrontosDiretos = () => {
   const loadKillLogs = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('pvp_kill_logs')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const pageSize = 1000; // fetch all rows in pages to avoid server max-rows cap
+      let from = 0;
+      let accumulated: KillLog[] = [];
 
-      if (error) throw error;
-      setKillLogs(data || []);
+      while (true) {
+        const { data, error } = await supabase
+          .from('pvp_kill_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, from + pageSize - 1);
+
+        if (error) throw error;
+        if (data && data.length > 0) accumulated = accumulated.concat(data);
+        if (!data || data.length < pageSize) break; // no more pages
+        from += pageSize;
+      }
+
+      setKillLogs(accumulated);
     } catch (error) {
       console.error('Erro ao carregar logs de confrontos:', error);
       toast.error('Erro ao carregar confrontos diretos');
