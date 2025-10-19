@@ -130,9 +130,9 @@ export const PutinhaRanking = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">#</TableHead>
-                  <TableHead>Putinha</TableHead>
-                  <TableHead className="text-center w-24">Mortes</TableHead>
                   <TableHead>Dominador</TableHead>
+                  <TableHead className="text-center w-24">Kills</TableHead>
+                  <TableHead>Putinha</TableHead>
                   <TableHead className="text-center">Nível</TableHead>
                 </TableRow>
               </TableHeader>
@@ -157,12 +157,12 @@ export const PutinhaRanking = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Skull className="w-4 h-4 text-destructive" />
+                          <Target className="w-4 h-4 text-primary" />
                           <div>
-                            <div className="font-medium">{relation.victim}</div>
-                            {relation.victimGuild && (
+                            <div className="font-medium">{relation.killer}</div>
+                            {relation.killerGuild && (
                               <div className="text-xs text-muted-foreground">
-                                {relation.victimGuild}
+                                {relation.killerGuild}
                               </div>
                             )}
                           </div>
@@ -175,12 +175,12 @@ export const PutinhaRanking = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Target className="w-4 h-4 text-primary" />
+                          <Skull className="w-4 h-4 text-destructive" />
                           <div>
-                            <div className="font-medium">{relation.killer}</div>
-                            {relation.killerGuild && (
+                            <div className="font-medium">{relation.victim}</div>
+                            {relation.victimGuild && (
                               <div className="text-xs text-muted-foreground">
-                                {relation.killerGuild}
+                                {relation.victimGuild}
                               </div>
                             )}
                           </div>
