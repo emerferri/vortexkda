@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Skull, Target } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, Skull, Target, Download } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import html2canvas from 'html2canvas';
 
 interface PutinhaRelation {
   victim: string;
@@ -17,6 +19,8 @@ interface PutinhaRelation {
 export const PutinhaRanking = () => {
   const [relations, setRelations] = useState<PutinhaRelation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadPutinhaRanking();
@@ -97,6 +101,37 @@ export const PutinhaRanking = () => {
     }
   };
 
+  const exportAsImage = async () => {
+    if (!cardRef.current) return;
+
+    try {
+      setExporting(true);
+      const canvas = await html2canvas(cardRef.current, {
+        backgroundColor: '#1a1a1a',
+        scale: 2,
+      });
+
+      const link = document.createElement('a');
+      link.download = `minha-putinha-ranking-${new Date().toISOString().split('T')[0]}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+
+      toast({
+        title: 'Sucesso',
+        description: 'Imagem exportada com sucesso!',
+      });
+    } catch (error) {
+      console.error('Error exporting image:', error);
+      toast({
+        title: 'Erro',
+        description: 'Falha ao exportar imagem',
+        variant: 'destructive',
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -106,16 +141,27 @@ export const PutinhaRanking = () => {
   }
 
   return (
-    <Card>
+    <Card ref={cardRef}>
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <Skull className="w-6 h-6 text-destructive" />
-          <div>
-            <CardTitle>Ranking: Minha Putinha</CardTitle>
-            <CardDescription>
-              Quem morre 10 ou mais vezes para o mesmo jogador (Total: {relations.length} relações)
-            </CardDescription>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Skull className="w-6 h-6 text-destructive" />
+            <div>
+              <CardTitle>Ranking: Minha Putinha</CardTitle>
+              <CardDescription>
+                Quem morre 10 ou mais vezes para o mesmo jogador (Total: {relations.length} relações)
+              </CardDescription>
+            </div>
           </div>
+          <Button
+            onClick={exportAsImage}
+            disabled={exporting || relations.length === 0}
+            variant="outline"
+            size="sm"
+          >
+            <Download className="w-4 h-4" />
+            Exportar
+          </Button>
         </div>
       </CardHeader>
       <CardContent>
