@@ -218,6 +218,15 @@ export const RankingGeral = () => {
     
     setIsPublishing(true);
     try {
+      // Esconder elementos que não devem aparecer na imagem
+      const kdaMedioCard = document.querySelector('[data-hide-on-export="kda-medio-card"]') as HTMLElement;
+      const kdaMedioHeader = document.querySelector('[data-hide-on-export="kda-medio-header"]') as HTMLElement;
+      const kdaMedioCells = document.querySelectorAll('[data-hide-on-export="kda-medio-cell"]');
+      
+      if (kdaMedioCard) kdaMedioCard.style.display = 'none';
+      if (kdaMedioHeader) kdaMedioHeader.style.display = 'none';
+      kdaMedioCells.forEach(cell => (cell as HTMLElement).style.display = 'none');
+
       // Capturar os cards especiais como imagem
       const specialCardsCanvas = await html2canvas(specialCardsRef.current, {
         backgroundColor: '#1a1a1a',
@@ -325,6 +334,15 @@ export const RankingGeral = () => {
         variant: 'destructive'
       });
     } finally {
+      // Restaurar elementos escondidos
+      const kdaMedioCard = document.querySelector('[data-hide-on-export="kda-medio-card"]') as HTMLElement;
+      const kdaMedioHeader = document.querySelector('[data-hide-on-export="kda-medio-header"]') as HTMLElement;
+      const kdaMedioCells = document.querySelectorAll('[data-hide-on-export="kda-medio-cell"]');
+      
+      if (kdaMedioCard) kdaMedioCard.style.display = '';
+      if (kdaMedioHeader) kdaMedioHeader.style.display = '';
+      kdaMedioCells.forEach(cell => (cell as HTMLElement).style.display = '');
+      
       setIsPublishing(false);
     }
   };
@@ -505,7 +523,7 @@ export const RankingGeral = () => {
           <p className="text-xs text-muted-foreground mt-1">{brabissimo?.matches} boss(es)</p>
         </div>
 
-        <div className="bg-accent/10 border-2 border-accent rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
+        <div data-hide-on-export="kda-medio-card" className="bg-accent/10 border-2 border-accent rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
           <TrendingUp className="w-10 h-10 text-accent mx-auto mb-3 animate-pulse" />
           <h3 className="text-lg font-bold text-accent mb-2">📊 KDA/Médio</h3>
           <p className="text-2xl font-bold text-foreground text-glow mb-1">{melhorPonderado?.name}</p>
@@ -677,7 +695,7 @@ export const RankingGeral = () => {
                     KDA
                   </div>
                 </th>
-                <th className="px-6 py-4 text-center text-sm font-bold text-accent uppercase tracking-wider">
+                <th data-hide-on-export="kda-medio-header" className="px-6 py-4 text-center text-sm font-bold text-accent uppercase tracking-wider">
                   <div className="flex items-center justify-center gap-2">
                     <TrendingUp className="w-4 h-4" />
                     KDA/Médio
@@ -740,7 +758,7 @@ export const RankingGeral = () => {
                         {player.kda.toFixed(2)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td data-hide-on-export="kda-medio-cell" className="px-6 py-4 text-center">
                       <span className="font-bold text-accent text-lg">
                         {player.weightedKda.toFixed(2)}
                       </span>
