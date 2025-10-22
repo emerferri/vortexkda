@@ -23,6 +23,7 @@ interface Filters {
 
 interface RequestBody {
   environment: 'homolog' | 'prod';
+  webhookUrl: string;
   filters: Filters;
   specialRankings: SpecialRankings;
   image: string; // Base64 image data
@@ -42,13 +43,11 @@ serve(async (req) => {
     const body: RequestBody = await req.json();
     console.log('Received request to post ranking to Discord');
     
-    // Get Discord webhook URL based on environment
-    const webhookUrl = body.environment === 'prod' 
-      ? Deno.env.get('DISCORD_WEBHOOK_URL_PROD')
-      : Deno.env.get('DISCORD_WEBHOOK_URL');
+    // Get Discord webhook URL from request body
+    const webhookUrl = body.webhookUrl;
     
     if (!webhookUrl) {
-      throw new Error(`DISCORD_WEBHOOK_URL${body.environment === 'prod' ? '_PROD' : ''} is not configured`);
+      throw new Error(`Webhook URL not provided for ${body.environment} environment`);
     }
     
     console.log(`Publishing to ${body.environment} environment`);
