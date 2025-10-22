@@ -226,6 +226,11 @@ export const RankingGeral = () => {
       if (kdaMedioCard) kdaMedioCard.style.display = 'none';
       if (kdaMedioHeader) kdaMedioHeader.style.display = 'none';
       kdaMedioCells.forEach(cell => (cell as HTMLElement).style.display = 'none');
+      
+      // Ajustar grid para 3 colunas quando KDA/Médio estiver escondido
+      if (specialCardsRef.current) {
+        specialCardsRef.current.className = 'grid grid-cols-1 md:grid-cols-3 gap-4';
+      }
 
       // Capturar os cards especiais como imagem
       const specialCardsCanvas = await html2canvas(specialCardsRef.current, {
@@ -342,6 +347,11 @@ export const RankingGeral = () => {
       if (kdaMedioCard) kdaMedioCard.style.display = '';
       if (kdaMedioHeader) kdaMedioHeader.style.display = '';
       kdaMedioCells.forEach(cell => (cell as HTMLElement).style.display = '');
+      
+      // Restaurar grid original
+      if (specialCardsRef.current) {
+        specialCardsRef.current.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4';
+      }
       
       setIsPublishing(false);
     }
