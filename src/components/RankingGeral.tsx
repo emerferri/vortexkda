@@ -144,7 +144,13 @@ export const RankingGeral = () => {
   const topPlayer = sortedPlayers[0];
 
   const reiDoPVP = useMemo(() => {
-    return [...sortedPlayers].sort((a, b) => b.kills - a.kills)[0];
+    return [...sortedPlayers].sort((a, b) => {
+      // Matar mais E morrer menos
+      const killsDiff = b.kills - a.kills;
+      if (killsDiff !== 0) return killsDiff;
+      // Se kills são iguais, menor deaths ganha
+      return a.deaths - b.deaths;
+    })[0];
   }, [sortedPlayers]);
 
   const brabissimo = useMemo(() => {
@@ -163,7 +169,7 @@ export const RankingGeral = () => {
     const worksheetData = [
       ['Ranking Geral - PVP'],
       [''],
-      ['Rank', 'Jogador', 'Classe', 'Kills', 'Deaths', 'KDA', 'KDA/Médio', 'Boss'],
+      ['Rank', 'Jogador', 'Classe', 'Kills', 'Deaths', 'KDA', 'Boss'],
       ...sortedPlayers.map((player, index) => [
         index + 1,
         player.name,
@@ -171,7 +177,6 @@ export const RankingGeral = () => {
         player.kills,
         player.deaths,
         player.kda.toFixed(2),
-        player.weightedKda.toFixed(2),
         player.matches
       ]),
       [''],
@@ -277,17 +282,13 @@ export const RankingGeral = () => {
           reiDoPVP: {
             name: reiDoPVP?.name || '',
             kills: reiDoPVP?.kills || 0,
+            deaths: reiDoPVP?.deaths || 0,
             matches: reiDoPVP?.matches || 0
           },
           brabissimo: {
             name: brabissimo?.name || '',
             kda: brabissimo?.kda || 0,
             matches: brabissimo?.matches || 0
-          },
-          melhorPonderado: {
-            name: melhorPonderado?.name || '',
-            weightedKda: melhorPonderado?.weightedKda || 0,
-            matches: melhorPonderado?.matches || 0
           },
           coneMonodedo: {
             name: coneMonodedo?.name || '',
@@ -484,12 +485,12 @@ export const RankingGeral = () => {
 
       {/* Classificações Especiais */}
       <div ref={specialCardsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-warning/10 border-2 border-warning rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
-          <Trophy className="w-10 h-10 text-warning mx-auto mb-3 animate-pulse" />
-          <h3 className="text-lg font-bold text-warning mb-2">👑 Rei do PVP</h3>
+        <div className="bg-success/10 border-2 border-success rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
+          <Trophy className="w-10 h-10 text-success mx-auto mb-3 animate-pulse" />
+          <h3 className="text-lg font-bold text-success mb-2">👑 Rei do PVP</h3>
           <p className="text-2xl font-bold text-foreground text-glow mb-1">{reiDoPVP?.name}</p>
           <p className="text-sm text-muted-foreground">
-            <span className="text-success font-bold">{reiDoPVP?.kills}</span> kills
+            <span className="text-success font-bold">{reiDoPVP?.kills}</span> kills • <span className="text-destructive font-bold">{reiDoPVP?.deaths}</span> deaths
           </p>
           <p className="text-xs text-muted-foreground mt-1">{reiDoPVP?.matches} boss(es)</p>
         </div>
@@ -600,9 +601,8 @@ export const RankingGeral = () => {
             <div className="bg-primary/10 p-4 rounded-lg space-y-2">
               <p className="text-sm font-semibold">Destaques:</p>
               <ul className="text-sm space-y-1">
-                <li>👑 <strong>Rei do PVP:</strong> {reiDoPVP?.name} ({reiDoPVP?.kills} kills)</li>
+                <li>👑 <strong>Rei do PVP:</strong> {reiDoPVP?.name} ({reiDoPVP?.kills} kills, {reiDoPVP?.deaths} deaths)</li>
                 <li>⚡ <strong>Brabissimo:</strong> {brabissimo?.name} (KDA: {brabissimo?.kda.toFixed(2)})</li>
-                <li>📊 <strong>KDA/Médio:</strong> {melhorPonderado?.name} ({melhorPonderado?.weightedKda.toFixed(2)})</li>
                 <li>🍦 <strong>Cone Monodedo:</strong> {coneMonodedo?.name} ({coneMonodedo?.deaths} deaths)</li>
               </ul>
             </div>

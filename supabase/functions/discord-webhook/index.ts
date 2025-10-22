@@ -6,9 +6,8 @@ const corsHeaders = {
 };
 
 interface SpecialRankings {
-  reiDoPVP: { name: string; kills: number; matches: number };
+  reiDoPVP: { name: string; kills: number; deaths: number; matches: number };
   brabissimo: { name: string; kda: number; matches: number };
-  melhorPonderado: { name: string; weightedKda: number; matches: number };
   coneMonodedo: { name: string; deaths: number; matches: number };
 }
 
@@ -134,17 +133,12 @@ serve(async (req) => {
         },
         {
           name: '👑 Rei do PVP',
-          value: `**${body.specialRankings.reiDoPVP.name}**\n${body.specialRankings.reiDoPVP.kills} kills`,
+          value: `**${body.specialRankings.reiDoPVP.name}**\n${body.specialRankings.reiDoPVP.kills} kills • ${body.specialRankings.reiDoPVP.deaths} deaths`,
           inline: true
         },
         {
           name: '⚡ Brabissimo',
           value: `**${body.specialRankings.brabissimo.name}**\nKDA: ${body.specialRankings.brabissimo.kda.toFixed(2)}`,
-          inline: true
-        },
-        {
-          name: '📊 KDA/Médio',
-          value: `**${body.specialRankings.melhorPonderado.name}**\n${body.specialRankings.melhorPonderado.weightedKda.toFixed(2)}`,
           inline: true
         },
         {
