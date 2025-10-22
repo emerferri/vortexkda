@@ -164,12 +164,14 @@ serve(async (req) => {
       }
     };
 
-    // Mensagem final customizada
-    const finalMessage = `Essas foram as kill's de Hoje pessoal @Hard ! ${body.specialRankings.reiDoPVP.name} Amassou hoje, já nosso amigo ${body.specialRankings.coneMonodedo.name} passou fome.`;
+    // Terceiro embed com a mensagem final (aparece abaixo das imagens)
+    const embed3 = {
+      description: `Essas foram as kill's de Hoje pessoal <@Hard> ! **${body.specialRankings.reiDoPVP.name}** Amassou hoje, já nosso amigo **${body.specialRankings.coneMonodedo.name}** passou fome.`,
+      color: 0x9b87f5
+    };
 
     formData.append('payload_json', JSON.stringify({ 
-      content: finalMessage,
-      embeds: [embed, embed2] 
+      embeds: [embed, embed2, embed3] 
     }));
 
     console.log('Sending to Discord...');
