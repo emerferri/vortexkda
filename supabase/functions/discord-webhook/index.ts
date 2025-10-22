@@ -164,7 +164,13 @@ serve(async (req) => {
       }
     };
 
-    formData.append('payload_json', JSON.stringify({ embeds: [embed, embed2] }));
+    // Mensagem final customizada
+    const finalMessage = `Essas foram as kill's de Hoje pessoal @Hard ! ${body.specialRankings.reiDoPVP.name} Amassou hoje, já nosso amigo ${body.specialRankings.coneMonodedo.name} passou fome.`;
+
+    formData.append('payload_json', JSON.stringify({ 
+      content: finalMessage,
+      embeds: [embed, embed2] 
+    }));
 
     console.log('Sending to Discord...');
     const response = await fetch(webhookUrl, {
