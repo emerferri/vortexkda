@@ -39,6 +39,7 @@ export const RankingGeral = () => {
   const [isPublishing, setIsPublishing] = useState(false);
   const [environment, setEnvironment] = useState<'homolog' | 'prod'>('homolog');
   const tableRef = useRef<HTMLDivElement>(null);
+  const specialCardsRef = useRef<HTMLDivElement>(null);
 
   const { data: classes } = useQuery({
     queryKey: ['classes'],
@@ -154,7 +155,7 @@ export const RankingGeral = () => {
     const worksheetData = [
       ['Ranking Geral - PVP'],
       [''],
-      ['Rank', 'Jogador', 'Classe', 'Kills', 'Deaths', 'KDA', 'KDA Ponderado', 'Boss'],
+      ['Rank', 'Jogador', 'Classe', 'Kills', 'Deaths', 'KDA', 'KDA/Médio', 'Boss'],
       ...sortedPlayers.map((player, index) => [
         index + 1,
         player.name,
@@ -200,10 +201,24 @@ export const RankingGeral = () => {
   };
 
   const publishToDiscord = async () => {
-    if (!tableRef.current) return;
+    if (!tableRef.current || !specialCardsRef.current) return;
     
     setIsPublishing(true);
     try {
+      // Capturar os cards especiais como imagem
+      const specialCardsCanvas = await html2canvas(specialCardsRef.current, {
+        backgroundColor: '#1a1a1a',
+        scale: 1.5,
+        logging: false,
+        useCORS: true
+      });
+
+      let specialCardsImage = specialCardsCanvas.toDataURL('image/jpeg', 0.85);
+      if (specialCardsImage.length > 7 * 1024 * 1024) {
+        console.log('Special cards image too large, reducing quality...');
+        specialCardsImage = specialCardsCanvas.toDataURL('image/jpeg', 0.7);
+      }
+
       // Capturar a tabela como imagem com qualidade otimizada
       const canvas = await html2canvas(tableRef.current, {
         backgroundColor: '#1a1a1a',
@@ -221,7 +236,8 @@ export const RankingGeral = () => {
         imageData = canvas.toDataURL('image/jpeg', 0.7);
       }
 
-      console.log('Image size:', (imageData.length / 1024 / 1024).toFixed(2), 'MB (as base64)');
+      console.log('Table image size:', (imageData.length / 1024 / 1024).toFixed(2), 'MB (as base64)');
+      console.log('Special cards image size:', (specialCardsImage.length / 1024 / 1024).toFixed(2), 'MB (as base64)');
 
       // Get webhooks from localStorage
       const webhookHomolog = localStorage.getItem('DISCORD_WEBHOOK_URL');
@@ -271,6 +287,7 @@ export const RankingGeral = () => {
             matches: coneMonodedo?.matches || 0
           }
         },
+        specialCardsImage,
         image: imageData,
         totals: {
           kills: sortedPlayers.reduce((sum, p) => sum + p.kills, 0),
@@ -458,7 +475,7 @@ export const RankingGeral = () => {
       </div>
 
       {/* Classificações Especiais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div ref={specialCardsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-warning/10 border-2 border-warning rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
           <Trophy className="w-10 h-10 text-warning mx-auto mb-3 animate-pulse" />
           <h3 className="text-lg font-bold text-warning mb-2">👑 Rei do PVP</h3>
@@ -481,10 +498,10 @@ export const RankingGeral = () => {
 
         <div className="bg-accent/10 border-2 border-accent rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
           <TrendingUp className="w-10 h-10 text-accent mx-auto mb-3 animate-pulse" />
-          <h3 className="text-lg font-bold text-accent mb-2">📊 KDA/Participação</h3>
+          <h3 className="text-lg font-bold text-accent mb-2">📊 KDA/Médio</h3>
           <p className="text-2xl font-bold text-foreground text-glow mb-1">{melhorPonderado?.name}</p>
           <p className="text-sm text-muted-foreground">
-            KDA Pond.: <span className="text-accent font-bold">{melhorPonderado?.weightedKda.toFixed(2)}</span>
+            KDA/Médio: <span className="text-accent font-bold">{melhorPonderado?.weightedKda.toFixed(2)}</span>
           </p>
           <p className="text-xs text-muted-foreground mt-1">{melhorPonderado?.matches} boss(es)</p>
         </div>
@@ -505,7 +522,7 @@ export const RankingGeral = () => {
         <SortButton label="Kills" sortKey="kills" icon={Crosshair} />
         <SortButton label="Deaths" sortKey="deaths" icon={Skull} />
         <SortButton label="KDA" sortKey="kda" icon={TrendingUp} />
-        <SortButton label="KDA Ponderado" sortKey="weightedKda" icon={TrendingUp} />
+        <SortButton label="KDA/Médio" sortKey="weightedKda" icon={TrendingUp} />
         
         <div className="w-px h-8 bg-border mx-2" />
         
@@ -558,7 +575,7 @@ export const RankingGeral = () => {
                   sortBy === 'kills' ? 'Kills' :
                   sortBy === 'deaths' ? 'Deaths' :
                   sortBy === 'kda' ? 'KDA' :
-                  'KDA Ponderado'
+                  'KDA/Médio'
                 }</strong></li>
                 {classFilter !== 'all' && <li>• Classe: <strong>{classFilter}</strong></li>}
                 {(dateFrom || dateTo) && (
@@ -577,7 +594,7 @@ export const RankingGeral = () => {
               <ul className="text-sm space-y-1">
                 <li>👑 <strong>Rei do PVP:</strong> {reiDoPVP?.name} ({reiDoPVP?.kills} kills)</li>
                 <li>⚡ <strong>Brabissimo:</strong> {brabissimo?.name} (KDA: {brabissimo?.kda.toFixed(2)})</li>
-                <li>📊 <strong>Melhor Ponderado:</strong> {melhorPonderado?.name} ({melhorPonderado?.weightedKda.toFixed(2)})</li>
+                <li>📊 <strong>KDA/Médio:</strong> {melhorPonderado?.name} ({melhorPonderado?.weightedKda.toFixed(2)})</li>
                 <li>🍦 <strong>Cone Monodedo:</strong> {coneMonodedo?.name} ({coneMonodedo?.deaths} deaths)</li>
               </ul>
             </div>
@@ -655,7 +672,7 @@ export const RankingGeral = () => {
                 <th className="px-6 py-4 text-center text-sm font-bold text-accent uppercase tracking-wider">
                   <div className="flex items-center justify-center gap-2">
                     <TrendingUp className="w-4 h-4" />
-                    KDA Pond.
+                    KDA/Médio
                   </div>
                 </th>
                 <th className="px-6 py-4 text-center text-sm font-bold text-primary uppercase tracking-wider">

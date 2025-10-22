@@ -27,6 +27,7 @@ interface RequestBody {
   filters: Filters;
   specialRankings: SpecialRankings;
   image: string; // Base64 image data
+  specialCardsImage: string; // Base64 image data for special cards
   totals: {
     kills: number;
     deaths: number;
@@ -52,14 +53,18 @@ serve(async (req) => {
     
     console.log(`Publishing to ${body.environment} environment`);
 
-    // Validar se a imagem existe
+    // Validar se as imagens existem
     if (!body.image || typeof body.image !== 'string') {
-      throw new Error('Image data is missing or invalid');
+      throw new Error('Table image data is missing or invalid');
+    }
+    if (!body.specialCardsImage || typeof body.specialCardsImage !== 'string') {
+      throw new Error('Special cards image data is missing or invalid');
     }
 
-    console.log('Image data size:', body.image.length, 'characters');
+    console.log('Table image data size:', body.image.length, 'characters');
+    console.log('Special cards image data size:', body.specialCardsImage.length, 'characters');
 
-    // Converter base64 para blob com validação
+    // Converter base64 para blob - Tabela
     let base64Data: string;
     let imageBuffer: Uint8Array;
     
@@ -70,28 +75,56 @@ serve(async (req) => {
         throw new Error('Base64 data is empty after removing prefix');
       }
       
-      console.log('Base64 data size:', base64Data.length, 'characters');
+      console.log('Table base64 data size:', base64Data.length, 'characters');
       
       imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-      console.log('Image buffer size:', imageBuffer.length, 'bytes', `(${(imageBuffer.length / 1024 / 1024).toFixed(2)}MB)`);
+      console.log('Table image buffer size:', imageBuffer.length, 'bytes', `(${(imageBuffer.length / 1024 / 1024).toFixed(2)}MB)`);
       
       // Verificar se não ultrapassa 8MB (limite do Discord)
       if (imageBuffer.length > 8 * 1024 * 1024) {
-        throw new Error(`Image too large: ${(imageBuffer.length / 1024 / 1024).toFixed(2)}MB (max 8MB)`);
+        throw new Error(`Table image too large: ${(imageBuffer.length / 1024 / 1024).toFixed(2)}MB (max 8MB)`);
       }
     } catch (conversionError: any) {
-      console.error('Error converting image:', conversionError);
-      throw new Error(`Failed to process image: ${conversionError.message}`);
+      console.error('Error converting table image:', conversionError);
+      throw new Error(`Failed to process table image: ${conversionError.message}`);
+    }
+
+    // Converter base64 para blob - Cards Especiais
+    let specialCardsBase64Data: string;
+    let specialCardsImageBuffer: Uint8Array;
+    
+    try {
+      specialCardsBase64Data = body.specialCardsImage.replace(/^data:image\/\w+;base64,/, '');
+      
+      if (!specialCardsBase64Data || specialCardsBase64Data.length === 0) {
+        throw new Error('Special cards base64 data is empty after removing prefix');
+      }
+      
+      console.log('Special cards base64 data size:', specialCardsBase64Data.length, 'characters');
+      
+      specialCardsImageBuffer = Uint8Array.from(atob(specialCardsBase64Data), c => c.charCodeAt(0));
+      console.log('Special cards image buffer size:', specialCardsImageBuffer.length, 'bytes', `(${(specialCardsImageBuffer.length / 1024 / 1024).toFixed(2)}MB)`);
+      
+      // Verificar se não ultrapassa 8MB (limite do Discord)
+      if (specialCardsImageBuffer.length > 8 * 1024 * 1024) {
+        throw new Error(`Special cards image too large: ${(specialCardsImageBuffer.length / 1024 / 1024).toFixed(2)}MB (max 8MB)`);
+      }
+    } catch (conversionError: any) {
+      console.error('Error converting special cards image:', conversionError);
+      throw new Error(`Failed to process special cards image: ${conversionError.message}`);
     }
     
-    // Criar FormData para enviar a imagem
+    // Criar FormData para enviar as imagens
     const formData = new FormData();
     const blob = new Blob([imageBuffer as unknown as BlobPart], { type: 'image/jpeg' });
-    formData.append('file', blob, 'ranking.jpg');
+    formData.append('file1', blob, 'ranking.jpg');
+    
+    const specialCardsBlob = new Blob([specialCardsImageBuffer as unknown as BlobPart], { type: 'image/jpeg' });
+    formData.append('file2', specialCardsBlob, 'special-rankings.jpg');
 
     // Criar embed com informações resumidas
     const embed = {
-      title: '📊 Ranking Geral PVP',
+      title: '📊 Ranking BOSS Diário',
       color: 0x10B981,
       fields: [
         {
@@ -110,7 +143,7 @@ serve(async (req) => {
           inline: true
         },
         {
-          name: '📊 Melhor KDA Ponderado',
+          name: '📊 KDA/Médio',
           value: `**${body.specialRankings.melhorPonderado.name}**\n${body.specialRankings.melhorPonderado.weightedKda.toFixed(2)}`,
           inline: true
         },
@@ -126,12 +159,18 @@ serve(async (req) => {
         }
       ],
       image: {
-        url: 'attachment://ranking.jpg'
+        url: 'attachment://special-rankings.jpg'
       },
       timestamp: new Date().toISOString()
     };
 
-    formData.append('payload_json', JSON.stringify({ embeds: [embed] }));
+    const embed2 = {
+      image: {
+        url: 'attachment://ranking.jpg'
+      }
+    };
+
+    formData.append('payload_json', JSON.stringify({ embeds: [embed, embed2] }));
 
     console.log('Sending to Discord...');
     const response = await fetch(webhookUrl, {
@@ -196,7 +235,7 @@ function formatFilters(filters: Filters): string {
     kills: 'Kills',
     deaths: 'Deaths',
     kda: 'KDA',
-    weightedKda: 'KDA Ponderado'
+    weightedKda: 'KDA/Médio'
   };
   parts.push(`Ordenação: **${sortLabels[filters.sortBy] || filters.sortBy}**`);
   
