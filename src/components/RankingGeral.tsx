@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef } from 'react';
-import { Trophy, Skull, Crosshair, TrendingUp, Calendar as CalendarIcon, Download, FileImage } from 'lucide-react';
+import { Trophy, Skull, Crosshair, TrendingUp, Calendar as CalendarIcon, Download, FileImage, Send } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 import { cn } from '@/lib/utils';
@@ -7,10 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface AggregatedPlayer {
   name: string;
@@ -31,6 +33,8 @@ export const RankingGeral = () => {
   const [hourFrom, setHourFrom] = useState<number>();
   const [hourTo, setHourTo] = useState<number>();
   const [classFilter, setClassFilter] = useState<string>('all');
+  const [showDiscordModal, setShowDiscordModal] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
 
   const { data: classes } = useQuery({
@@ -189,6 +193,72 @@ export const RankingGeral = () => {
       link.click();
     } catch (error) {
       console.error('Erro ao exportar imagem:', error);
+    }
+  };
+
+  const publishToDiscord = async () => {
+    setIsPublishing(true);
+    try {
+      const payload = {
+        filters: {
+          class: classFilter,
+          dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
+          dateTo: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,
+          hourFrom,
+          hourTo,
+          sortBy
+        },
+        specialRankings: {
+          reiDoPVP: {
+            name: reiDoPVP?.name || '',
+            kills: reiDoPVP?.kills || 0,
+            matches: reiDoPVP?.matches || 0
+          },
+          brabissimo: {
+            name: brabissimo?.name || '',
+            kda: brabissimo?.kda || 0,
+            matches: brabissimo?.matches || 0
+          },
+          melhorPonderado: {
+            name: melhorPonderado?.name || '',
+            weightedKda: melhorPonderado?.weightedKda || 0,
+            matches: melhorPonderado?.matches || 0
+          },
+          coneMonodedo: {
+            name: coneMonodedo?.name || '',
+            deaths: coneMonodedo?.deaths || 0,
+            matches: coneMonodedo?.matches || 0
+          }
+        },
+        players: sortedPlayers,
+        totals: {
+          kills: sortedPlayers.reduce((sum, p) => sum + p.kills, 0),
+          deaths: sortedPlayers.reduce((sum, p) => sum + p.deaths, 0),
+          playerCount: sortedPlayers.length
+        }
+      };
+
+      const { data, error } = await supabase.functions.invoke('discord-webhook', {
+        body: payload
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Sucesso!',
+        description: `Ranking publicado no Discord com ${data.playersCount} jogadores.`,
+      });
+      
+      setShowDiscordModal(false);
+    } catch (error: any) {
+      console.error('Erro ao publicar no Discord:', error);
+      toast({
+        title: 'Erro',
+        description: error.message || 'Falha ao publicar no Discord',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -415,7 +485,80 @@ export const RankingGeral = () => {
           <FileImage className="w-4 h-4" />
           JPG
         </Button>
+
+        <div className="w-px h-8 bg-border mx-2" />
+
+        <Button
+          onClick={() => setShowDiscordModal(true)}
+          variant="default"
+          className="flex items-center gap-2"
+        >
+          <Send className="w-4 h-4" />
+          Publicar no Discord
+        </Button>
       </div>
+
+      {/* Modal de Confirmação do Discord */}
+      <Dialog open={showDiscordModal} onOpenChange={setShowDiscordModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Publicar Ranking no Discord</DialogTitle>
+            <DialogDescription>
+              Confirme a publicação do ranking completo no canal do Discord.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="bg-secondary/50 p-4 rounded-lg space-y-2">
+              <p className="text-sm font-semibold">Resumo:</p>
+              <ul className="text-sm space-y-1 text-muted-foreground">
+                <li>• <strong>{sortedPlayers.length}</strong> jogadores serão enviados</li>
+                <li>• Ordenação: <strong>{
+                  sortBy === 'kills' ? 'Kills' :
+                  sortBy === 'deaths' ? 'Deaths' :
+                  sortBy === 'kda' ? 'KDA' :
+                  'KDA Ponderado'
+                }</strong></li>
+                {classFilter !== 'all' && <li>• Classe: <strong>{classFilter}</strong></li>}
+                {(dateFrom || dateTo) && (
+                  <li>• Período: {dateFrom && format(dateFrom, 'dd/MM/yyyy', { locale: ptBR })} 
+                    {dateFrom && dateTo && ' - '} 
+                    {dateTo && format(dateTo, 'dd/MM/yyyy', { locale: ptBR })}</li>
+                )}
+                {(hourFrom !== undefined || hourTo !== undefined) && (
+                  <li>• Horário: {hourFrom !== undefined ? `${hourFrom}:00` : 'Início'} - {hourTo !== undefined ? `${hourTo}:00` : 'Fim'}</li>
+                )}
+              </ul>
+            </div>
+
+            <div className="bg-primary/10 p-4 rounded-lg space-y-2">
+              <p className="text-sm font-semibold">Destaques:</p>
+              <ul className="text-sm space-y-1">
+                <li>👑 <strong>Rei do PVP:</strong> {reiDoPVP?.name} ({reiDoPVP?.kills} kills)</li>
+                <li>⚡ <strong>Brabissimo:</strong> {brabissimo?.name} (KDA: {brabissimo?.kda.toFixed(2)})</li>
+                <li>📊 <strong>Melhor Ponderado:</strong> {melhorPonderado?.name} ({melhorPonderado?.weightedKda.toFixed(2)})</li>
+                <li>🍦 <strong>Cone Monodedo:</strong> {coneMonodedo?.name} ({coneMonodedo?.deaths} deaths)</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDiscordModal(false)}
+              disabled={isPublishing}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={publishToDiscord}
+              disabled={isPublishing}
+            >
+              {isPublishing ? 'Publicando...' : 'Confirmar Publicação'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Tabela de Rankings */}
       <div ref={tableRef} className="overflow-hidden rounded-xl border border-border bg-card/50 backdrop-blur">
