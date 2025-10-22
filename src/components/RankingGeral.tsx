@@ -66,6 +66,7 @@ export const RankingGeral = () => {
           kills,
           deaths,
           kda,
+          match_id,
           pvp_matches!inner(match_date, match_hour)
         `);
 
@@ -92,6 +93,10 @@ export const RankingGeral = () => {
 
       const characterMap = new Map(characters?.map(c => [c.name, c.class]) || []);
 
+      // Calcular total de matches únicos no período (total de boss eventos)
+      const uniqueMatches = new Set(data?.map((record: any) => record.match_id) || []);
+      const totalBossEvents = uniqueMatches.size;
+
       // Aggregate by player
       const playerMap = new Map<string, { kills: number; deaths: number; matches: number }>();
       
@@ -106,7 +111,10 @@ export const RankingGeral = () => {
 
       const aggregated: AggregatedPlayer[] = Array.from(playerMap.entries()).map(([name, stats]) => {
         const kda = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
-        const weightedKda = kda * Math.log10(stats.matches + 1);
+        // Nova fórmula: (kills / deaths) × (participações / total de boss eventos)
+        const weightedKda = totalBossEvents > 0 
+          ? kda * (stats.matches / totalBossEvents)
+          : 0;
         return {
           name,
           class: characterMap.get(name) || null,
