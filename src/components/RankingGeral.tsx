@@ -8,6 +8,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
@@ -35,6 +37,7 @@ export const RankingGeral = () => {
   const [classFilter, setClassFilter] = useState<string>('all');
   const [showDiscordModal, setShowDiscordModal] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [environment, setEnvironment] = useState<'homolog' | 'prod'>('homolog');
   const tableRef = useRef<HTMLDivElement>(null);
 
   const { data: classes } = useQuery({
@@ -221,6 +224,7 @@ export const RankingGeral = () => {
       console.log('Image size:', (imageData.length / 1024 / 1024).toFixed(2), 'MB (as base64)');
 
       const payload = {
+        environment,
         filters: {
           class: classFilter,
           dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
@@ -560,6 +564,24 @@ export const RankingGeral = () => {
                 <li>📊 <strong>Melhor Ponderado:</strong> {melhorPonderado?.name} ({melhorPonderado?.weightedKda.toFixed(2)})</li>
                 <li>🍦 <strong>Cone Monodedo:</strong> {coneMonodedo?.name} ({coneMonodedo?.deaths} deaths)</li>
               </ul>
+            </div>
+
+            <div className="bg-card/50 p-4 rounded-lg border border-border space-y-3">
+              <Label className="text-sm font-semibold">Ambiente de Publicação</Label>
+              <RadioGroup value={environment} onValueChange={(value: 'homolog' | 'prod') => setEnvironment(value)}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="homolog" id="homolog" />
+                  <Label htmlFor="homolog" className="flex items-center gap-2 cursor-pointer font-normal">
+                    🧪 Homologação (testes)
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="prod" id="prod" />
+                  <Label htmlFor="prod" className="flex items-center gap-2 cursor-pointer font-normal">
+                    🚀 Produção (oficial)
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
           </div>
 

@@ -22,6 +22,7 @@ interface Filters {
 }
 
 interface RequestBody {
+  environment: 'homolog' | 'prod';
   filters: Filters;
   specialRankings: SpecialRankings;
   image: string; // Base64 image data
@@ -38,13 +39,19 @@ serve(async (req) => {
   }
 
   try {
-    const webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL');
-    if (!webhookUrl) {
-      throw new Error('DISCORD_WEBHOOK_URL not configured');
-    }
-
     const body: RequestBody = await req.json();
     console.log('Received request to post ranking to Discord');
+    
+    // Get Discord webhook URL based on environment
+    const webhookUrl = body.environment === 'prod' 
+      ? Deno.env.get('DISCORD_WEBHOOK_URL_PROD')
+      : Deno.env.get('DISCORD_WEBHOOK_URL');
+    
+    if (!webhookUrl) {
+      throw new Error(`DISCORD_WEBHOOK_URL${body.environment === 'prod' ? '_PROD' : ''} is not configured`);
+    }
+    
+    console.log(`Publishing to ${body.environment} environment`);
 
     // Validar se a imagem existe
     if (!body.image || typeof body.image !== 'string') {
