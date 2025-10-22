@@ -495,9 +495,9 @@ export const RankingGeral = () => {
           <p className="text-xs text-muted-foreground mt-1">{reiDoPVP?.matches} boss(es)</p>
         </div>
 
-        <div className="bg-primary/10 border-2 border-primary rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
-          <TrendingUp className="w-10 h-10 text-primary mx-auto mb-3 animate-pulse" />
-          <h3 className="text-lg font-bold text-primary mb-2">⚡ Brabissimo</h3>
+        <div className="bg-warning/10 border-2 border-warning rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
+          <TrendingUp className="w-10 h-10 text-warning mx-auto mb-3 animate-pulse" />
+          <h3 className="text-lg font-bold text-warning mb-2">⚡ Brabissimo</h3>
           <p className="text-2xl font-bold text-foreground text-glow mb-1">{brabissimo?.name}</p>
           <p className="text-sm text-muted-foreground">
             KDA: <span className="text-warning font-bold">{brabissimo?.kda.toFixed(2)}</span>
