@@ -201,14 +201,24 @@ export const RankingGeral = () => {
     
     setIsPublishing(true);
     try {
-      // Capturar a tabela como imagem
+      // Capturar a tabela como imagem com qualidade otimizada
       const canvas = await html2canvas(tableRef.current, {
         backgroundColor: '#1a1a1a',
-        scale: 2,
-        logging: false
+        scale: 1.5, // Reduzido de 2 para 1.5
+        logging: false,
+        useCORS: true
       });
 
-      const imageData = canvas.toDataURL('image/jpeg', 0.95);
+      // Tentar com qualidade menor se a imagem for muito grande
+      let imageData = canvas.toDataURL('image/jpeg', 0.85); // Reduzido de 0.95 para 0.85
+
+      // Se ainda for muito grande (>7MB em base64), reduzir mais
+      if (imageData.length > 7 * 1024 * 1024) {
+        console.log('Image too large, reducing quality...');
+        imageData = canvas.toDataURL('image/jpeg', 0.7);
+      }
+
+      console.log('Image size:', (imageData.length / 1024 / 1024).toFixed(2), 'MB (as base64)');
 
       const payload = {
         filters: {
