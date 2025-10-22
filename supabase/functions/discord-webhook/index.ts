@@ -12,16 +12,6 @@ interface SpecialRankings {
   coneMonodedo: { name: string; deaths: number; matches: number };
 }
 
-interface Player {
-  name: string;
-  class: string | null;
-  kills: number;
-  deaths: number;
-  kda: number;
-  weightedKda: number;
-  matches: number;
-}
-
 interface Filters {
   class: string;
   dateFrom?: string;
@@ -34,7 +24,7 @@ interface Filters {
 interface RequestBody {
   filters: Filters;
   specialRankings: SpecialRankings;
-  players: Player[];
+  image: string; // Base64 image data
   totals: {
     kills: number;
     deaths: number;
@@ -55,12 +45,20 @@ serve(async (req) => {
 
     const body: RequestBody = await req.json();
     console.log('Received request to post ranking to Discord');
-    console.log('Player count:', body.players.length);
 
-    // Criar embed principal com informações especiais
-    const mainEmbed = {
+    // Converter base64 para blob
+    const base64Data = body.image.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+    
+    // Criar FormData para enviar a imagem
+    const formData = new FormData();
+    const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
+    formData.append('file', blob, 'ranking.jpg');
+
+    // Criar embed com informações resumidas
+    const embed = {
       title: '📊 Ranking Geral PVP',
-      color: 0x10B981, // Verde
+      color: 0x10B981,
       fields: [
         {
           name: '🔍 Filtros Aplicados',
@@ -68,97 +66,57 @@ serve(async (req) => {
           inline: false
         },
         {
-          name: '👑 Rei do PVP (Mais Kills)',
-          value: `**${body.specialRankings.reiDoPVP.name}**\n${body.specialRankings.reiDoPVP.kills} kills • ${body.specialRankings.reiDoPVP.matches} boss(es)`,
+          name: '👑 Rei do PVP',
+          value: `**${body.specialRankings.reiDoPVP.name}**\n${body.specialRankings.reiDoPVP.kills} kills`,
           inline: true
         },
         {
-          name: '⚡ Brabissimo (Melhor KDA)',
-          value: `**${body.specialRankings.brabissimo.name}**\nKDA: ${body.specialRankings.brabissimo.kda.toFixed(2)} • ${body.specialRankings.brabissimo.matches} boss(es)`,
+          name: '⚡ Brabissimo',
+          value: `**${body.specialRankings.brabissimo.name}**\nKDA: ${body.specialRankings.brabissimo.kda.toFixed(2)}`,
           inline: true
         },
         {
           name: '📊 Melhor KDA Ponderado',
-          value: `**${body.specialRankings.melhorPonderado.name}**\nKDA Pond.: ${body.specialRankings.melhorPonderado.weightedKda.toFixed(2)} • ${body.specialRankings.melhorPonderado.matches} boss(es)`,
+          value: `**${body.specialRankings.melhorPonderado.name}**\n${body.specialRankings.melhorPonderado.weightedKda.toFixed(2)}`,
           inline: true
         },
         {
-          name: '🍦 Cone Monodedo (Mais Deaths)',
-          value: `**${body.specialRankings.coneMonodedo.name}**\n${body.specialRankings.coneMonodedo.deaths} deaths • ${body.specialRankings.coneMonodedo.matches} boss(es)`,
+          name: '🍦 Cone Monodedo',
+          value: `**${body.specialRankings.coneMonodedo.name}**\n${body.specialRankings.coneMonodedo.deaths} deaths`,
           inline: true
+        },
+        {
+          name: '📈 Totais',
+          value: `${body.totals.playerCount} jogadores • ${body.totals.kills} kills • ${body.totals.deaths} deaths`,
+          inline: false
         }
       ],
+      image: {
+        url: 'attachment://ranking.jpg'
+      },
       timestamp: new Date().toISOString()
     };
 
-    // Criar embeds com os jogadores (máximo 25 por embed devido ao limite do Discord)
-    const playerEmbeds = [];
-    const playersPerEmbed = 25;
-    
-    for (let i = 0; i < body.players.length; i += playersPerEmbed) {
-      const chunk = body.players.slice(i, i + playersPerEmbed);
-      const startRank = i + 1;
-      
-      // Formatar jogadores em uma tabela
-      const playersText = chunk.map((player, idx) => {
-        const rank = startRank + idx;
-        const className = player.class || 'N/A';
-        return `\`${rank.toString().padStart(3, ' ')}.\` **${player.name}** (${className})\n` +
-               `      ⚔️ ${player.kills} | 💀 ${player.deaths} | 📈 ${player.kda.toFixed(2)}`;
-      }).join('\n\n');
+    formData.append('payload_json', JSON.stringify({ embeds: [embed] }));
 
-      playerEmbeds.push({
-        title: i === 0 ? '🏆 Ranking Completo' : `🏆 Ranking (continuação)`,
-        description: playersText,
-        color: 0x3B82F6, // Azul
-        footer: i + playersPerEmbed >= body.players.length ? {
-          text: `Total: ${body.totals.playerCount} jogadores • ${body.totals.kills} kills • ${body.totals.deaths} deaths`
-        } : undefined
-      });
-    }
+    console.log('Sending to Discord...');
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      body: formData,
+    });
 
-    // Discord limita a 10 embeds por mensagem
-    // Se tiver mais que 10 embeds, precisamos enviar múltiplas mensagens
-    const allEmbeds = [mainEmbed, ...playerEmbeds];
-    const messages = [];
-    
-    for (let i = 0; i < allEmbeds.length; i += 10) {
-      messages.push({
-        embeds: allEmbeds.slice(i, i + 10)
-      });
-    }
-
-    // Enviar todas as mensagens
-    for (let i = 0; i < messages.length; i++) {
-      console.log(`Sending message ${i + 1}/${messages.length}`);
-      
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(messages[i]),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Discord API error:', errorText);
-        throw new Error(`Discord API error: ${response.status} ${errorText}`);
-      }
-
-      // Aguardar 1 segundo entre mensagens para evitar rate limit
-      if (i < messages.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Discord API error:', errorText);
+      throw new Error(`Discord API error: ${response.status} ${errorText}`);
     }
 
     console.log('Successfully posted ranking to Discord');
 
     return new Response(
       JSON.stringify({ 
-        success: true, 
-        messagesCount: messages.length,
-        playersCount: body.players.length 
+        success: true,
+        playerCount: body.totals.playerCount 
       }),
       {
         status: 200,

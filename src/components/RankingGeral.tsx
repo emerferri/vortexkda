@@ -197,8 +197,19 @@ export const RankingGeral = () => {
   };
 
   const publishToDiscord = async () => {
+    if (!tableRef.current) return;
+    
     setIsPublishing(true);
     try {
+      // Capturar a tabela como imagem
+      const canvas = await html2canvas(tableRef.current, {
+        backgroundColor: '#1a1a1a',
+        scale: 2,
+        logging: false
+      });
+
+      const imageData = canvas.toDataURL('image/jpeg', 0.95);
+
       const payload = {
         filters: {
           class: classFilter,
@@ -230,7 +241,7 @@ export const RankingGeral = () => {
             matches: coneMonodedo?.matches || 0
           }
         },
-        players: sortedPlayers,
+        image: imageData,
         totals: {
           kills: sortedPlayers.reduce((sum, p) => sum + p.kills, 0),
           deaths: sortedPlayers.reduce((sum, p) => sum + p.deaths, 0),
@@ -246,7 +257,7 @@ export const RankingGeral = () => {
 
       toast({
         title: 'Sucesso!',
-        description: `Ranking publicado no Discord com ${data.playersCount} jogadores.`,
+        description: `Ranking publicado no Discord com imagem.`,
       });
       
       setShowDiscordModal(false);
