@@ -26,7 +26,7 @@ interface AggregatedPlayer {
   matches: number;
 }
 
-type SortKey = 'kills' | 'deaths' | 'kda' | 'weightedKda';
+type SortKey = 'kills' | 'deaths' | 'kda' | 'weightedKda' | 'efficiency';
 
 export const RankingGeral = () => {
   const [sortBy, setSortBy] = useState<SortKey>('kills');
@@ -138,7 +138,16 @@ export const RankingGeral = () => {
       filtered = aggregatedData.filter(p => p.class === classFilter);
     }
     
-    return [...filtered].sort((a, b) => b[sortBy] - a[sortBy]);
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'efficiency') {
+        // Matar mais E morrer menos
+        const killsDiff = b.kills - a.kills;
+        if (killsDiff !== 0) return killsDiff;
+        // Se kills são iguais, menor deaths ganha
+        return a.deaths - b.deaths;
+      }
+      return b[sortBy] - a[sortBy];
+    });
   }, [aggregatedData, sortBy, classFilter]);
 
   const topPlayer = sortedPlayers[0];
@@ -559,6 +568,7 @@ export const RankingGeral = () => {
         <SortButton label="Kills" sortKey="kills" icon={Crosshair} />
         <SortButton label="Deaths" sortKey="deaths" icon={Skull} />
         <SortButton label="KDA" sortKey="kda" icon={TrendingUp} />
+        <SortButton label="+ Matou - Morreu" sortKey="efficiency" icon={Trophy} />
         <SortButton label="KDA/Médio" sortKey="weightedKda" icon={TrendingUp} />
         
         <div className="w-px h-8 bg-border mx-2" />
