@@ -11,28 +11,49 @@ interface SpecialRankings {
   coneMonodedo: { name: string; deaths: number; matches: number };
 }
 
+interface StreakRankings {
+  first: { name: string; streak: number; type: string; emoji: string } | null;
+  second: { name: string; streak: number; type: string; emoji: string } | null;
+  third: { name: string; streak: number; type: string; emoji: string } | null;
+}
+
 interface Filters {
-  class: string;
+  class?: string;
   dateFrom?: string;
   dateTo?: string;
   hourFrom?: number;
   hourTo?: number;
-  sortBy: string;
+  sortBy?: string;
 }
 
-interface RequestBody {
+interface GeneralRankingBody {
+  type?: 'general';
   environment: 'homolog' | 'prod';
   webhookUrl: string;
   filters: Filters;
   specialRankings: SpecialRankings;
-  image: string; // Base64 image data
-  specialCardsImage: string; // Base64 image data for special cards
+  image: string;
+  specialCardsImage: string;
   totals: {
     kills: number;
     deaths: number;
     playerCount: number;
   };
 }
+
+interface KillStreakBody {
+  type: 'killstreak';
+  environment: 'homolog' | 'prod';
+  webhookUrl: string;
+  filters: Filters;
+  streakRankings: StreakRankings;
+  image: string;
+  totals: {
+    playerCount: number;
+  };
+}
+
+type RequestBody = GeneralRankingBody | KillStreakBody;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -41,7 +62,8 @@ serve(async (req) => {
 
   try {
     const body: RequestBody = await req.json();
-    console.log('Received request to post ranking to Discord');
+    const rankingType = body.type || 'general';
+    console.log(`Received request to post ${rankingType} ranking to Discord`);
     
     // Get Discord webhook URL from request body
     const webhookUrl = body.webhookUrl;
@@ -54,16 +76,20 @@ serve(async (req) => {
 
     // Validar se as imagens existem
     if (!body.image || typeof body.image !== 'string') {
-      throw new Error('Table image data is missing or invalid');
-    }
-    if (!body.specialCardsImage || typeof body.specialCardsImage !== 'string') {
-      throw new Error('Special cards image data is missing or invalid');
+      throw new Error('Image data is missing or invalid');
     }
 
-    console.log('Table image data size:', body.image.length, 'characters');
-    console.log('Special cards image data size:', body.specialCardsImage.length, 'characters');
+    // Para ranking geral, validar cards especiais
+    if (rankingType === 'general') {
+      const generalBody = body as GeneralRankingBody;
+      if (!generalBody.specialCardsImage || typeof generalBody.specialCardsImage !== 'string') {
+        throw new Error('Special cards image data is missing or invalid');
+      }
+    }
 
-    // Converter base64 para blob - Tabela
+    console.log('Image data size:', body.image.length, 'characters');
+
+    // Converter base64 para blob - Imagem principal
     let base64Data: string;
     let imageBuffer: Uint8Array;
     
@@ -74,105 +100,170 @@ serve(async (req) => {
         throw new Error('Base64 data is empty after removing prefix');
       }
       
-      console.log('Table base64 data size:', base64Data.length, 'characters');
+      console.log('Base64 data size:', base64Data.length, 'characters');
       
       imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-      console.log('Table image buffer size:', imageBuffer.length, 'bytes', `(${(imageBuffer.length / 1024 / 1024).toFixed(2)}MB)`);
+      console.log('Image buffer size:', imageBuffer.length, 'bytes', `(${(imageBuffer.length / 1024 / 1024).toFixed(2)}MB)`);
       
-      // Verificar se não ultrapassa 8MB (limite do Discord)
       if (imageBuffer.length > 8 * 1024 * 1024) {
-        throw new Error(`Table image too large: ${(imageBuffer.length / 1024 / 1024).toFixed(2)}MB (max 8MB)`);
+        throw new Error(`Image too large: ${(imageBuffer.length / 1024 / 1024).toFixed(2)}MB (max 8MB)`);
       }
     } catch (conversionError: any) {
-      console.error('Error converting table image:', conversionError);
-      throw new Error(`Failed to process table image: ${conversionError.message}`);
+      console.error('Error converting image:', conversionError);
+      throw new Error(`Failed to process image: ${conversionError.message}`);
     }
 
-    // Converter base64 para blob - Cards Especiais
-    let specialCardsBase64Data: string;
-    let specialCardsImageBuffer: Uint8Array;
-    
-    try {
-      specialCardsBase64Data = body.specialCardsImage.replace(/^data:image\/\w+;base64,/, '');
-      
-      if (!specialCardsBase64Data || specialCardsBase64Data.length === 0) {
-        throw new Error('Special cards base64 data is empty after removing prefix');
-      }
-      
-      console.log('Special cards base64 data size:', specialCardsBase64Data.length, 'characters');
-      
-      specialCardsImageBuffer = Uint8Array.from(atob(specialCardsBase64Data), c => c.charCodeAt(0));
-      console.log('Special cards image buffer size:', specialCardsImageBuffer.length, 'bytes', `(${(specialCardsImageBuffer.length / 1024 / 1024).toFixed(2)}MB)`);
-      
-      // Verificar se não ultrapassa 8MB (limite do Discord)
-      if (specialCardsImageBuffer.length > 8 * 1024 * 1024) {
-        throw new Error(`Special cards image too large: ${(specialCardsImageBuffer.length / 1024 / 1024).toFixed(2)}MB (max 8MB)`);
-      }
-    } catch (conversionError: any) {
-      console.error('Error converting special cards image:', conversionError);
-      throw new Error(`Failed to process special cards image: ${conversionError.message}`);
-    }
-    
-    // Criar FormData para enviar as imagens
+    // Criar FormData
     const formData = new FormData();
     const blob = new Blob([imageBuffer as unknown as BlobPart], { type: 'image/jpeg' });
-    formData.append('file1', blob, 'ranking.jpg');
     
-    const specialCardsBlob = new Blob([specialCardsImageBuffer as unknown as BlobPart], { type: 'image/jpeg' });
-    formData.append('file2', specialCardsBlob, 'special-rankings.jpg');
-
-    // Criar embed com informações resumidas
-    const embed = {
-      title: '📊 Ranking BOSS Diário',
-      color: 0x10B981,
-      fields: [
-        {
-          name: '🔍 Filtros Aplicados',
-          value: formatFilters(body.filters),
-          inline: false
-        },
-        {
-          name: '👑 Rei do PVP',
-          value: `**${body.specialRankings.reiDoPVP.name}**\n${body.specialRankings.reiDoPVP.kills} kills • ${body.specialRankings.reiDoPVP.deaths} deaths`,
+    // Criar embeds baseado no tipo
+    let embeds: any[];
+    
+    if (rankingType === 'killstreak') {
+      const killStreakBody = body as KillStreakBody;
+      formData.append('file1', blob, 'kill-streak-ranking.jpg');
+      
+      const fields = [];
+      fields.push({
+        name: '🔍 Filtros Aplicados',
+        value: formatFilters(body.filters),
+        inline: false
+      });
+      
+      if (killStreakBody.streakRankings.first) {
+        fields.push({
+          name: `${killStreakBody.streakRankings.first.emoji} 1º Lugar - ${killStreakBody.streakRankings.first.type}`,
+          value: `**${killStreakBody.streakRankings.first.name}**\n${killStreakBody.streakRankings.first.streak} kills seguidos`,
           inline: true
-        },
-        {
-          name: '⚡ Brabissimo',
-          value: `**${body.specialRankings.brabissimo.name}**\n${body.specialRankings.brabissimo.singleMatchKills} kills em 1 partida`,
-          inline: true
-        },
-        {
-          name: '🍦 Cone Monodedo',
-          value: `**${body.specialRankings.coneMonodedo.name}**\n${body.specialRankings.coneMonodedo.deaths} deaths`,
-          inline: true
-        },
-        {
-          name: '📈 Totais',
-          value: `${body.totals.playerCount} jogadores • ${body.totals.kills} kills • ${body.totals.deaths} deaths`,
-          inline: false
-        }
-      ],
-      image: {
-        url: 'attachment://special-rankings.jpg'
-      },
-      timestamp: new Date().toISOString()
-    };
-
-    const embed2 = {
-      image: {
-        url: 'attachment://ranking.jpg'
+        });
       }
-    };
+      
+      if (killStreakBody.streakRankings.second) {
+        fields.push({
+          name: `${killStreakBody.streakRankings.second.emoji} 2º Lugar - ${killStreakBody.streakRankings.second.type}`,
+          value: `**${killStreakBody.streakRankings.second.name}**\n${killStreakBody.streakRankings.second.streak} kills seguidos`,
+          inline: true
+        });
+      }
+      
+      if (killStreakBody.streakRankings.third) {
+        fields.push({
+          name: `${killStreakBody.streakRankings.third.emoji} 3º Lugar - ${killStreakBody.streakRankings.third.type}`,
+          value: `**${killStreakBody.streakRankings.third.name}**\n${killStreakBody.streakRankings.third.streak} kills seguidos`,
+          inline: true
+        });
+      }
+      
+      fields.push({
+        name: '📈 Total',
+        value: `${killStreakBody.totals.playerCount} jogadores com streaks`,
+        inline: false
+      });
+      
+      const embed1 = {
+        title: '🏆 Ranking de Kill Streak',
+        description: 'Maiores sequências de kills sem morrer',
+        color: 0xF59E0B,
+        fields,
+        timestamp: new Date().toISOString()
+      };
+      
+      const embed2 = {
+        image: {
+          url: 'attachment://kill-streak-ranking.jpg'
+        }
+      };
+      
+      const firstPlayer = killStreakBody.streakRankings.first;
+      const embed3 = {
+        description: firstPlayer 
+          ? `🔥 **${firstPlayer.name}** dominou com ${firstPlayer.streak} kills seguidos! ${firstPlayer.emoji} ${firstPlayer.type}!`
+          : 'Ninguém conseguiu fazer uma sequência de kills neste período.',
+        color: 0x9b87f5
+      };
+      
+      embeds = [embed1, embed2, embed3];
+    } else {
+      // Ranking Geral
+      const generalBody = body as GeneralRankingBody;
+      
+      // Converter special cards image
+      let specialCardsBase64Data: string;
+      let specialCardsImageBuffer: Uint8Array;
+      
+      try {
+        specialCardsBase64Data = generalBody.specialCardsImage.replace(/^data:image\/\w+;base64,/, '');
+        
+        if (!specialCardsBase64Data || specialCardsBase64Data.length === 0) {
+          throw new Error('Special cards base64 data is empty');
+        }
+        
+        specialCardsImageBuffer = Uint8Array.from(atob(specialCardsBase64Data), c => c.charCodeAt(0));
+        
+        if (specialCardsImageBuffer.length > 8 * 1024 * 1024) {
+          throw new Error(`Special cards image too large: ${(specialCardsImageBuffer.length / 1024 / 1024).toFixed(2)}MB`);
+        }
+      } catch (conversionError: any) {
+        console.error('Error converting special cards image:', conversionError);
+        throw new Error(`Failed to process special cards image: ${conversionError.message}`);
+      }
+      
+      formData.append('file1', blob, 'ranking.jpg');
+      const specialCardsBlob = new Blob([specialCardsImageBuffer as unknown as BlobPart], { type: 'image/jpeg' });
+      formData.append('file2', specialCardsBlob, 'special-rankings.jpg');
+      
+      const embed1 = {
+        title: '📊 Ranking BOSS Diário',
+        color: 0x10B981,
+        fields: [
+          {
+            name: '🔍 Filtros Aplicados',
+            value: formatFilters(body.filters),
+            inline: false
+          },
+          {
+            name: '👑 Rei do PVP',
+            value: `**${generalBody.specialRankings.reiDoPVP.name}**\n${generalBody.specialRankings.reiDoPVP.kills} kills • ${generalBody.specialRankings.reiDoPVP.deaths} deaths`,
+            inline: true
+          },
+          {
+            name: '⚡ Brabissimo',
+            value: `**${generalBody.specialRankings.brabissimo.name}**\n${generalBody.specialRankings.brabissimo.singleMatchKills} kills em 1 partida`,
+            inline: true
+          },
+          {
+            name: '🍦 Cone Monodedo',
+            value: `**${generalBody.specialRankings.coneMonodedo.name}**\n${generalBody.specialRankings.coneMonodedo.deaths} deaths`,
+            inline: true
+          },
+          {
+            name: '📈 Totais',
+            value: `${generalBody.totals.playerCount} jogadores • ${generalBody.totals.kills} kills • ${generalBody.totals.deaths} deaths`,
+            inline: false
+          }
+        ],
+        image: {
+          url: 'attachment://special-rankings.jpg'
+        },
+        timestamp: new Date().toISOString()
+      };
+      
+      const embed2 = {
+        image: {
+          url: 'attachment://ranking.jpg'
+        }
+      };
+      
+      const embed3 = {
+        description: `Essas foram as kill's de Hoje pessoal <@Hard> ! **${generalBody.specialRankings.reiDoPVP.name}** Amassou hoje, já nosso amigo **${generalBody.specialRankings.coneMonodedo.name}** passou fome.`,
+        color: 0x9b87f5
+      };
+      
+      embeds = [embed1, embed2, embed3];
+    }
 
-    // Terceiro embed com a mensagem final (aparece abaixo das imagens)
-    const embed3 = {
-      description: `Essas foram as kill's de Hoje pessoal <@Hard> ! **${body.specialRankings.reiDoPVP.name}** Amassou hoje, já nosso amigo **${body.specialRankings.coneMonodedo.name}** passou fome.`,
-      color: 0x9b87f5
-    };
-
-    formData.append('payload_json', JSON.stringify({ 
-      embeds: [embed, embed2, embed3] 
-    }));
+    formData.append('payload_json', JSON.stringify({ embeds }));
 
     console.log('Sending to Discord...');
     const response = await fetch(webhookUrl, {
@@ -213,7 +304,7 @@ serve(async (req) => {
 function formatFilters(filters: Filters): string {
   const parts = [];
   
-  if (filters.class !== 'all') {
+  if (filters.class && filters.class !== 'all') {
     parts.push(`Classe: **${filters.class}**`);
   }
   
@@ -233,13 +324,15 @@ function formatFilters(filters: Filters): string {
     parts.push(`Hora final: **${filters.hourTo}:00**`);
   }
   
-  const sortLabels: Record<string, string> = {
-    kills: 'Kills',
-    deaths: 'Deaths',
-    kda: 'KDA',
-    weightedKda: 'KDA/Médio'
-  };
-  parts.push(`Ordenação: **${sortLabels[filters.sortBy] || filters.sortBy}**`);
+  if (filters.sortBy) {
+    const sortLabels: Record<string, string> = {
+      kills: 'Kills',
+      deaths: 'Deaths',
+      kda: 'KDA',
+      weightedKda: 'KDA/Médio'
+    };
+    parts.push(`Ordenação: **${sortLabels[filters.sortBy] || filters.sortBy}**`);
+  }
   
   return parts.length > 0 ? parts.join('\n') : 'Sem filtros aplicados';
 }

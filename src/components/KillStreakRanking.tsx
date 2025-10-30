@@ -6,7 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarIcon, X, Download } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { CalendarIcon, X, Download, Send } from 'lucide-react';
 import { format } from 'date-fns';
 import html2canvas from 'html2canvas';
 import { toast } from 'sonner';
@@ -47,6 +50,9 @@ export const KillStreakRanking = () => {
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
   const [hourTo, setHourTo] = useState<number>();
+  const [showDiscordModal, setShowDiscordModal] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [environment, setEnvironment] = useState<'homolog' | 'prod'>('homolog');
   const rankingRef = useRef<HTMLDivElement>(null);
 
   const { data: killLogs = [], isLoading } = useQuery({
@@ -160,6 +166,89 @@ export const KillStreakRanking = () => {
     }
   };
 
+  const publishToDiscord = async () => {
+    if (!rankingRef.current) return;
+    
+    setIsPublishing(true);
+    try {
+      const canvas = await html2canvas(rankingRef.current, {
+        backgroundColor: '#0a0a0b',
+        scale: 1.5,
+        logging: false,
+        useCORS: true
+      });
+
+      let imageData = canvas.toDataURL('image/jpeg', 0.85);
+      
+      if (imageData.length > 7 * 1024 * 1024) {
+        console.log('Image too large, reducing quality...');
+        imageData = canvas.toDataURL('image/jpeg', 0.7);
+      }
+
+      const webhookHomolog = localStorage.getItem('DISCORD_WEBHOOK_URL');
+      const webhookProd = localStorage.getItem('DISCORD_WEBHOOK_URL_PROD');
+      
+      const selectedWebhook = environment === 'prod' ? webhookProd : webhookHomolog;
+      
+      if (!selectedWebhook) {
+        toast.error(`Webhook de ${environment === 'prod' ? 'Produção' : 'Homologação'} não configurado. Configure na aba Admin.`);
+        return;
+      }
+
+      const top3 = streakRankings.slice(0, 3);
+      
+      const payload = {
+        type: 'killstreak',
+        environment,
+        webhookUrl: selectedWebhook,
+        filters: {
+          dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
+          dateTo: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,
+          hourFrom,
+          hourTo,
+        },
+        streakRankings: {
+          first: top3[0] ? {
+            name: top3[0].player,
+            streak: top3[0].maxStreak,
+            type: top3[0].streakType,
+            emoji: top3[0].emoji
+          } : null,
+          second: top3[1] ? {
+            name: top3[1].player,
+            streak: top3[1].maxStreak,
+            type: top3[1].streakType,
+            emoji: top3[1].emoji
+          } : null,
+          third: top3[2] ? {
+            name: top3[2].player,
+            streak: top3[2].maxStreak,
+            type: top3[2].streakType,
+            emoji: top3[2].emoji
+          } : null,
+        },
+        image: imageData,
+        totals: {
+          playerCount: streakRankings.length
+        }
+      };
+
+      const { error } = await supabase.functions.invoke('discord-webhook', {
+        body: payload
+      });
+
+      if (error) throw error;
+
+      toast.success('Ranking publicado no Discord com sucesso!');
+      setShowDiscordModal(false);
+    } catch (error: any) {
+      console.error('Erro ao publicar no Discord:', error);
+      toast.error(error.message || 'Falha ao publicar no Discord');
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card className="glass-card">
@@ -171,16 +260,29 @@ export const KillStreakRanking = () => {
                 Maiores sequências de kills sem morrer
               </p>
             </div>
-            <Button
-              onClick={exportToJPG}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              disabled={streakRankings.length === 0}
-            >
-              <Download className="w-4 h-4" />
-              Exportar JPG
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={exportToJPG}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                disabled={streakRankings.length === 0}
+              >
+                <Download className="w-4 h-4" />
+                Exportar JPG
+              </Button>
+              
+              <Button
+                onClick={() => setShowDiscordModal(true)}
+                variant="default"
+                size="sm"
+                className="gap-2"
+                disabled={streakRankings.length === 0}
+              >
+                <Send className="w-4 h-4" />
+                Discord
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -375,6 +477,53 @@ export const KillStreakRanking = () => {
           </Card>
         </CardContent>
       </Card>
+
+      {/* Modal de Confirmação do Discord */}
+      <Dialog open={showDiscordModal} onOpenChange={setShowDiscordModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Publicar Ranking no Discord</DialogTitle>
+            <DialogDescription>
+              Selecione o ambiente onde deseja publicar o ranking de Kill Streak
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <div className="space-y-4">
+              <RadioGroup value={environment} onValueChange={(value) => setEnvironment(value as 'homolog' | 'prod')}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="homolog" id="homolog" />
+                  <Label htmlFor="homolog" className="cursor-pointer">
+                    Homologação (Testes)
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="prod" id="prod" />
+                  <Label htmlFor="prod" className="cursor-pointer">
+                    Produção (Canal Principal)
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDiscordModal(false)}
+              disabled={isPublishing}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={publishToDiscord}
+              disabled={isPublishing}
+            >
+              {isPublishing ? 'Publicando...' : 'Confirmar Publicação'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
