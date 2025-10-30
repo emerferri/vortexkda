@@ -256,7 +256,7 @@ serve(async (req) => {
       };
       
       const embed3 = {
-        description: `Essas foram as kill's de Hoje pessoal <@Hard> ! **${generalBody.specialRankings.reiDoPVP.name}** Amassou hoje, já nosso amigo **${generalBody.specialRankings.coneMonodedo.name}** passou fome.`,
+        description: `Esse é o resultado do BOSSx2 diário! **${generalBody.specialRankings.reiDoPVP.name}** Amassou hoje, já nosso amigo **${generalBody.specialRankings.coneMonodedo.name}** passou fome!`,
         color: 0x9b87f5
       };
       
