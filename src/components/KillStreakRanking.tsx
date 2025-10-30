@@ -286,29 +286,6 @@ export const KillStreakRanking = () => {
             </div>
           </div>
 
-          {/* Legenda */}
-          <Card className="mb-6 bg-muted/50">
-            <CardHeader>
-              <CardTitle className="text-lg">Níveis de Streak</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-2 text-sm">
-                {STREAK_LEVELS.map((level) => (
-                  <div key={level.name} className="flex items-start gap-3">
-                    <span className="text-xl mt-0.5">{level.emoji}</span>
-                    <div className="flex-1">
-                      <div className="font-semibold">{level.name}</div>
-                      <div className="text-muted-foreground">{level.description}</div>
-                    </div>
-                    <span className="text-xs text-muted-foreground mt-1">
-                      ({level.max === Infinity ? `${level.min}+` : level.min === level.max ? level.min : `${level.min}-${level.max}`} kills)
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Rankings */}
           <div ref={rankingRef} className="bg-background p-6 rounded-lg">
             <div className="text-center mb-6">
@@ -373,6 +350,29 @@ export const KillStreakRanking = () => {
               </div>
             )}
           </div>
+
+          {/* Legenda */}
+          <Card className="mt-6 bg-muted/50">
+            <CardHeader>
+              <CardTitle className="text-lg">Níveis de Streak</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-2 text-sm">
+                {STREAK_LEVELS.map((level) => (
+                  <div key={level.name} className="flex items-start gap-3">
+                    <span className="text-xl mt-0.5">{level.emoji}</span>
+                    <div className="flex-1">
+                      <div className="font-semibold">{level.name}</div>
+                      <div className="text-muted-foreground">{level.description}</div>
+                    </div>
+                    <span className="text-xs text-muted-foreground mt-1">
+                      ({level.max === Infinity ? `${level.min}+` : level.min === level.max ? level.min : `${level.min}-${level.max}`} kills)
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </CardContent>
       </Card>
     </div>
