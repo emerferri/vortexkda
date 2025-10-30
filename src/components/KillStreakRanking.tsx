@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarIcon, X } from 'lucide-react';
+import { CalendarIcon, X, Download } from 'lucide-react';
 import { format } from 'date-fns';
+import html2canvas from 'html2canvas';
+import { toast } from 'sonner';
 
 interface KillLog {
   killer_name: string;
@@ -24,16 +26,16 @@ interface StreakData {
 }
 
 const STREAK_LEVELS = [
-  { min: 2, max: 2, name: 'Double Kill', emoji: '🟠' },
-  { min: 3, max: 3, name: 'Triple Kill', emoji: '🔥' },
-  { min: 4, max: 4, name: 'Quadra Kill', emoji: '⚔️' },
-  { min: 5, max: 5, name: 'Penta Kill', emoji: '💥' },
-  { min: 6, max: 7, name: 'Killing Spree', emoji: '🔪' },
-  { min: 8, max: 10, name: 'Rampage', emoji: '💣' },
-  { min: 11, max: 14, name: 'Dominating', emoji: '⚡' },
-  { min: 15, max: 19, name: 'Unstoppable', emoji: '🚀' },
-  { min: 20, max: 24, name: 'Godlike', emoji: '👑' },
-  { min: 25, max: Infinity, name: 'Legendary', emoji: '💀' },
+  { min: 2, max: 2, name: 'Double Kill', emoji: '🟠', description: 'Matou 2 inimigos sem morrer' },
+  { min: 3, max: 3, name: 'Triple Kill', emoji: '🔥', description: 'Matou 3 inimigos sem morrer' },
+  { min: 4, max: 4, name: 'Quadra Kill', emoji: '⚔️', description: 'Matou 4 inimigos sem morrer' },
+  { min: 5, max: 5, name: 'Penta Kill', emoji: '💥', description: 'Matou 5 inimigos sem morrer' },
+  { min: 6, max: 7, name: 'Killing Spree', emoji: '🔪', description: 'Continua matando sem morrer' },
+  { min: 8, max: 10, name: 'Rampage', emoji: '💣', description: 'Está em uma sequência destruidora' },
+  { min: 11, max: 14, name: 'Dominating', emoji: '⚡', description: 'Dominando o campo de batalha' },
+  { min: 15, max: 19, name: 'Unstoppable', emoji: '🚀', description: 'Ninguém consegue parar' },
+  { min: 20, max: 24, name: 'Godlike', emoji: '👑', description: 'Verdadeiro deus da arena' },
+  { min: 25, max: Infinity, name: 'Legendary', emoji: '💀', description: 'Lenda viva – sequência absurda' },
 ];
 
 const getStreakLevel = (streak: number) => {
@@ -45,6 +47,7 @@ export const KillStreakRanking = () => {
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
   const [hourTo, setHourTo] = useState<number>();
+  const rankingRef = useRef<HTMLDivElement>(null);
 
   const { data: killLogs = [], isLoading } = useQuery({
     queryKey: ['kill-streak-logs', dateFrom, dateTo, hourFrom, hourTo],
@@ -135,14 +138,50 @@ export const KillStreakRanking = () => {
 
   const hasFilters = dateFrom || dateTo || hourFrom !== undefined || hourTo !== undefined;
 
+  const exportToJPG = async () => {
+    if (!rankingRef.current) return;
+    
+    try {
+      toast.info('Gerando imagem...');
+      const canvas = await html2canvas(rankingRef.current, {
+        backgroundColor: '#0a0a0b',
+        scale: 2,
+      });
+      
+      const link = document.createElement('a');
+      link.download = `kill-streak-ranking-${format(new Date(), 'yyyy-MM-dd')}.jpg`;
+      link.href = canvas.toDataURL('image/jpeg', 0.95);
+      link.click();
+      
+      toast.success('Ranking exportado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao exportar:', error);
+      toast.error('Erro ao exportar ranking');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card className="glass-card">
         <CardHeader>
-          <CardTitle className="text-2xl text-center">🏆 Ranking de Kill Streak</CardTitle>
-          <p className="text-center text-muted-foreground">
-            Maiores sequências de kills sem morrer
-          </p>
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <CardTitle className="text-2xl text-center">🏆 Ranking de Kill Streak</CardTitle>
+              <p className="text-center text-muted-foreground">
+                Maiores sequências de kills sem morrer
+              </p>
+            </div>
+            <Button
+              onClick={exportToJPG}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              disabled={streakRankings.length === 0}
+            >
+              <Download className="w-4 h-4" />
+              Exportar JPG
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {/* Filtros */}
@@ -253,12 +292,15 @@ export const KillStreakRanking = () => {
               <CardTitle className="text-lg">Níveis de Streak</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+              <div className="grid grid-cols-1 gap-2 text-sm">
                 {STREAK_LEVELS.map((level) => (
-                  <div key={level.name} className="flex items-center gap-2">
-                    <span className="text-xl">{level.emoji}</span>
-                    <span className="font-semibold">{level.name}</span>
-                    <span className="text-muted-foreground">
+                  <div key={level.name} className="flex items-start gap-3">
+                    <span className="text-xl mt-0.5">{level.emoji}</span>
+                    <div className="flex-1">
+                      <div className="font-semibold">{level.name}</div>
+                      <div className="text-muted-foreground">{level.description}</div>
+                    </div>
+                    <span className="text-xs text-muted-foreground mt-1">
                       ({level.max === Infinity ? `${level.min}+` : level.min === level.max ? level.min : `${level.min}-${level.max}`} kills)
                     </span>
                   </div>
@@ -268,54 +310,62 @@ export const KillStreakRanking = () => {
           </Card>
 
           {/* Rankings */}
-          {isLoading ? (
-            <div className="text-center py-8">Carregando...</div>
-          ) : streakRankings.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Nenhuma streak encontrada para os filtros selecionados
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {streakRankings.map((streak, index) => (
-                <Card
-                  key={streak.player}
-                  className={`transition-all hover:scale-[1.02] ${
-                    index === 0 ? 'border-yellow-500 bg-yellow-500/10' :
-                    index === 1 ? 'border-gray-400 bg-gray-400/10' :
-                    index === 2 ? 'border-orange-600 bg-orange-600/10' :
-                    'glass-card'
-                  }`}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <span className="text-3xl font-bold text-muted-foreground">
-                          #{index + 1}
-                        </span>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-2xl">{streak.emoji}</span>
-                            <span className="font-bold text-lg">{streak.player}</span>
+          <div ref={rankingRef}>
+            {isLoading ? (
+              <div className="text-center py-8">Carregando...</div>
+            ) : streakRankings.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhuma streak encontrada para os filtros selecionados
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {streakRankings.map((streak, index) => {
+                  const level = STREAK_LEVELS.find(l => l.name === streak.streakType);
+                  return (
+                    <Card
+                      key={streak.player}
+                      className={`transition-all hover:scale-[1.02] ${
+                        index === 0 ? 'border-yellow-500 bg-yellow-500/10' :
+                        index === 1 ? 'border-gray-400 bg-gray-400/10' :
+                        index === 2 ? 'border-orange-600 bg-orange-600/10' :
+                        'glass-card'
+                      }`}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <span className="text-3xl font-bold text-muted-foreground">
+                              #{index + 1}
+                            </span>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-2xl">{streak.emoji}</span>
+                                <span className="font-bold text-lg">{streak.player}</span>
+                              </div>
+                              <div className="text-sm font-semibold text-primary">
+                                {streak.streakType}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {level?.description}
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            {streak.streakType}
+                          <div className="text-right">
+                            <div className="text-3xl font-bold text-primary">
+                              {streak.maxStreak}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              kills seguidos
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-3xl font-bold text-primary">
-                          {streak.maxStreak}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          kills seguidos
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
