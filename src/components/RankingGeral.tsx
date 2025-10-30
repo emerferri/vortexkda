@@ -98,18 +98,7 @@ export const RankingGeral = () => {
       const uniqueMatches = new Set(data?.map((record: any) => record.match_id) || []);
       const totalBossEvents = uniqueMatches.size;
 
-      // Encontrar o recorde de kills em uma única partida (para Brabissimo)
-      let brabissimoRecord = { name: '', kills: 0 };
-      data?.forEach((record: any) => {
-        if (record.kills > brabissimoRecord.kills) {
-          brabissimoRecord = {
-            name: record.player_name,
-            kills: record.kills
-          };
-        }
-      });
-
-      // Aggregate by player
+      // Aggregate by player para identificar cone monodedo
       const playerMap = new Map<string, { kills: number; deaths: number; matches: number }>();
       
       data?.forEach((record: any) => {
@@ -120,6 +109,25 @@ export const RankingGeral = () => {
           matches: existing.matches + 1
         });
       });
+
+      // Identificar cone monodedo (quem mais morreu no total)
+      let coneMonodedoName = '';
+      let maxDeaths = 0;
+      playerMap.forEach((stats, name) => {
+        if (stats.deaths > maxDeaths) {
+          maxDeaths = stats.deaths;
+          coneMonodedoName = name;
+        }
+      });
+
+      // Encontrar recordes de kills em partidas únicas, excluindo cone monodedo
+      const killRecords = data
+        ?.filter((record: any) => record.player_name !== coneMonodedoName)
+        .sort((a: any, b: any) => b.kills - a.kills) || [];
+      
+      const brabissimoRecord = killRecords.length > 0 
+        ? { name: killRecords[0].player_name, kills: killRecords[0].kills }
+        : { name: '', kills: 0 };
 
       const aggregated: AggregatedPlayer[] = Array.from(playerMap.entries()).map(([name, stats]) => {
         const kda = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
@@ -141,7 +149,7 @@ export const RankingGeral = () => {
         };
       });
 
-      return { aggregated, brabissimoRecord };
+      return { aggregated, brabissimoRecord, coneMonodedoName };
     }
   });
 
@@ -170,10 +178,10 @@ export const RankingGeral = () => {
   const reiDoPVP = useMemo(() => {
     // Rei do PVP usa MVP score: kills * 3 + kda * 2 - deaths * 1.5
     // Exclui o cone monodedo do cálculo
-    const coneMonodedoPlayer = [...sortedPlayers].sort((a, b) => b.deaths - a.deaths)[0];
-    const eligiblePlayers = sortedPlayers.filter(p => p.name !== coneMonodedoPlayer?.name);
+    const coneMonodedoName = aggregatedData?.coneMonodedoName;
+    const eligiblePlayers = sortedPlayers.filter(p => p.name !== coneMonodedoName);
     return [...eligiblePlayers].sort((a, b) => b.mvpScore - a.mvpScore)[0];
-  }, [sortedPlayers]);
+  }, [sortedPlayers, aggregatedData]);
 
   const brabissimo = useMemo(() => {
     // Brabissimo é o player que mais matou em uma única partida
@@ -183,8 +191,9 @@ export const RankingGeral = () => {
   }, [aggregatedData, sortedPlayers]);
 
   const coneMonodedo = useMemo(() => {
-    return [...sortedPlayers].sort((a, b) => b.deaths - a.deaths)[0];
-  }, [sortedPlayers]);
+    const coneMonodedoName = aggregatedData?.coneMonodedoName;
+    return sortedPlayers.find(p => p.name === coneMonodedoName);
+  }, [sortedPlayers, aggregatedData]);
 
   const melhorPonderado = useMemo(() => {
     return [...sortedPlayers].sort((a, b) => b.weightedKda - a.weightedKda)[0];
