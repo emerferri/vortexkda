@@ -98,6 +98,17 @@ export const RankingGeral = () => {
       const uniqueMatches = new Set(data?.map((record: any) => record.match_id) || []);
       const totalBossEvents = uniqueMatches.size;
 
+      // Encontrar o recorde de kills em uma única partida (para Brabissimo)
+      let brabissimoRecord = { name: '', kills: 0 };
+      data?.forEach((record: any) => {
+        if (record.kills > brabissimoRecord.kills) {
+          brabissimoRecord = {
+            name: record.player_name,
+            kills: record.kills
+          };
+        }
+      });
+
       // Aggregate by player
       const playerMap = new Map<string, { kills: number; deaths: number; matches: number }>();
       
@@ -130,16 +141,16 @@ export const RankingGeral = () => {
         };
       });
 
-      return aggregated;
+      return { aggregated, brabissimoRecord };
     }
   });
 
   const sortedPlayers = useMemo(() => {
-    if (!aggregatedData) return [];
+    if (!aggregatedData?.aggregated) return [];
     
-    let filtered = aggregatedData;
+    let filtered = aggregatedData.aggregated;
     if (classFilter !== 'all') {
-      filtered = aggregatedData.filter(p => p.class === classFilter);
+      filtered = aggregatedData.aggregated.filter(p => p.class === classFilter);
     }
     
     return [...filtered].sort((a, b) => {
@@ -165,8 +176,11 @@ export const RankingGeral = () => {
   }, [sortedPlayers]);
 
   const brabissimo = useMemo(() => {
-    return [...sortedPlayers].sort((a, b) => b.kda - a.kda)[0];
-  }, [sortedPlayers]);
+    // Brabissimo é o player que mais matou em uma única partida
+    if (!aggregatedData?.brabissimoRecord) return undefined;
+    const playerData = sortedPlayers.find(p => p.name === aggregatedData.brabissimoRecord.name);
+    return playerData ? { ...playerData, singleMatchKills: aggregatedData.brabissimoRecord.kills } : undefined;
+  }, [aggregatedData, sortedPlayers]);
 
   const coneMonodedo = useMemo(() => {
     return [...sortedPlayers].sort((a, b) => b.deaths - a.deaths)[0];
@@ -312,7 +326,7 @@ export const RankingGeral = () => {
           },
           brabissimo: {
             name: brabissimo?.name || '',
-            kda: brabissimo?.kda || 0,
+            singleMatchKills: brabissimo?.singleMatchKills || 0,
             matches: brabissimo?.matches || 0
           },
           coneMonodedo: {
@@ -539,7 +553,7 @@ export const RankingGeral = () => {
           <h3 className="text-lg font-bold text-warning mb-2">⚡ Brabissimo</h3>
           <p className="text-2xl font-bold text-foreground text-glow mb-1">{brabissimo?.name}</p>
           <p className="text-sm text-muted-foreground">
-            KDA: <span className="text-warning font-bold">{brabissimo?.kda.toFixed(2)}</span>
+            <span className="text-warning font-bold">{brabissimo?.singleMatchKills}</span> kills em 1 partida
           </p>
           <p className="text-xs text-muted-foreground mt-1">{brabissimo?.matches} boss(es)</p>
         </div>
