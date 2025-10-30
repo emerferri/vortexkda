@@ -7,7 +7,7 @@ const corsHeaders = {
 
 interface SpecialRankings {
   reiDoPVP: { name: string; kills: number; deaths: number; matches: number };
-  brabissimo: { name: string; kda: number; matches: number };
+  brabissimo: { name: string; singleMatchKills: number; matches: number };
   coneMonodedo: { name: string; deaths: number; matches: number };
 }
 
@@ -138,7 +138,7 @@ serve(async (req) => {
         },
         {
           name: '⚡ Brabissimo',
-          value: `**${body.specialRankings.brabissimo.name}**\nKDA: ${body.specialRankings.brabissimo.kda.toFixed(2)}`,
+          value: `**${body.specialRankings.brabissimo.name}**\n${body.specialRankings.brabissimo.singleMatchKills} kills em 1 partida`,
           inline: true
         },
         {
