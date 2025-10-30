@@ -91,31 +91,45 @@ export const KillStreakRanking = () => {
   const streakRankings = useMemo(() => {
     if (!killLogs.length) return [];
 
-    // Agrupar logs por jogador e calcular streaks
-    const playerStreaks = new Map<string, number>();
+    // Agrupar logs por match_id
+    const matchGroups = new Map<string, KillLog[]>();
+    killLogs.forEach(log => {
+      if (!matchGroups.has(log.match_id)) {
+        matchGroups.set(log.match_id, []);
+      }
+      matchGroups.get(log.match_id)!.push(log);
+    });
+
+    // Calcular max streak de cada jogador considerando cada partida separadamente
     const playerMaxStreaks = new Map<string, number>();
     
-    // Ordenar logs por tempo
-    const sortedLogs = [...killLogs].sort((a, b) => 
-      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    );
+    // Processar cada partida individualmente
+    matchGroups.forEach((logs) => {
+      // Ordenar logs da partida por tempo
+      const sortedLogs = [...logs].sort((a, b) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
 
-    sortedLogs.forEach(log => {
-      const killer = log.killer_name;
-      const victim = log.victim_name;
+      // Calcular streaks dentro desta partida
+      const playerStreaks = new Map<string, number>();
 
-      // Incrementar streak do killer
-      const currentKillerStreak = (playerStreaks.get(killer) || 0) + 1;
-      playerStreaks.set(killer, currentKillerStreak);
+      sortedLogs.forEach(log => {
+        const killer = log.killer_name;
+        const victim = log.victim_name;
 
-      // Atualizar max streak do killer
-      const currentMax = playerMaxStreaks.get(killer) || 0;
-      if (currentKillerStreak > currentMax) {
-        playerMaxStreaks.set(killer, currentKillerStreak);
-      }
+        // Incrementar streak do killer
+        const currentKillerStreak = (playerStreaks.get(killer) || 0) + 1;
+        playerStreaks.set(killer, currentKillerStreak);
 
-      // Resetar streak da vítima
-      playerStreaks.set(victim, 0);
+        // Atualizar max streak global do killer
+        const globalMax = playerMaxStreaks.get(killer) || 0;
+        if (currentKillerStreak > globalMax) {
+          playerMaxStreaks.set(killer, currentKillerStreak);
+        }
+
+        // Resetar streak da vítima
+        playerStreaks.set(victim, 0);
+      });
     });
 
     // Converter para array e ordenar
