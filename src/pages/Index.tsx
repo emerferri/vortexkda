@@ -3,11 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { FileUpload } from '@/components/FileUpload';
 import { Scoreboard, PlayerStats } from '@/components/Scoreboard';
 import { RankingGeral } from '@/components/RankingGeral';
-import { Characters } from '@/components/Characters';
 import { ClassGuildRanking } from '@/components/ClassGuildRanking';
 import { PutinhaRanking } from '@/components/PutinhaRanking';
 import { MuralDaVergonha } from '@/components/MuralDaVergonha';
-import { ConfrontosDiretos } from '@/components/ConfrontosDiretos';
+import { KillStreakRanking } from '@/components/KillStreakRanking';
 import { DatabaseManager } from '@/components/DatabaseManager';
 import { parseTxtFile } from '@/utils/txtParser';
 import { Swords, LogIn, LogOut, User } from 'lucide-react';
@@ -87,7 +86,7 @@ const Index = () => {
 
         <div className="space-y-8">
           <Tabs defaultValue="placar" className="w-full">
-            <TabsList className={`grid w-full max-w-6xl mx-auto ${user ? 'grid-cols-8' : 'grid-cols-7'} mb-8`}>
+            <TabsList className={`grid w-full max-w-6xl mx-auto ${user ? 'grid-cols-6' : 'grid-cols-5'} mb-8`}>
               <TabsTrigger value="placar" className="text-base font-semibold">
                 Incluir Dados
               </TabsTrigger>
@@ -103,11 +102,8 @@ const Index = () => {
               <TabsTrigger value="vergonha" className="text-base font-semibold">
                 Mural da Vergonha
               </TabsTrigger>
-              <TabsTrigger value="confrontos" className="text-base font-semibold">
-                Confrontos Diretos
-              </TabsTrigger>
-              <TabsTrigger value="personagens" className="text-base font-semibold">
-                Personagens
+              <TabsTrigger value="killstreak" className="text-base font-semibold">
+                Kill Streak
               </TabsTrigger>
               {user && (
                 <TabsTrigger value="admin" className="text-base font-semibold">
@@ -137,17 +133,15 @@ const Index = () => {
               <MuralDaVergonha />
             </TabsContent>
 
-            <TabsContent value="confrontos">
-              <ConfrontosDiretos />
+            <TabsContent value="killstreak">
+              <KillStreakRanking />
             </TabsContent>
 
-            <TabsContent value="personagens">
-              <Characters />
-            </TabsContent>
-
-            <TabsContent value="admin">
-              <DatabaseManager />
-            </TabsContent>
+            {user && (
+              <TabsContent value="admin">
+                <DatabaseManager />
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </div>
