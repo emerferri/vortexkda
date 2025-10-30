@@ -24,12 +24,13 @@ interface AggregatedPlayer {
   kda: number;
   weightedKda: number;
   matches: number;
+  mvpScore: number;
 }
 
 type SortKey = 'kills' | 'deaths' | 'kda' | 'weightedKda' | 'efficiency';
 
 export const RankingGeral = () => {
-  const [sortBy, setSortBy] = useState<SortKey>('kills');
+  const [sortBy, setSortBy] = useState<SortKey>('efficiency');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
@@ -115,6 +116,8 @@ export const RankingGeral = () => {
         const weightedKda = totalBossEvents > 0 
           ? kda * (stats.matches / totalBossEvents)
           : 0;
+        // Cálculo de MVP: kills * 3 + kda * 2 - deaths * 1.5
+        const mvpScore = (stats.kills * 3) + (kda * 2) - (stats.deaths * 1.5);
         return {
           name,
           class: characterMap.get(name) || null,
@@ -122,7 +125,8 @@ export const RankingGeral = () => {
           deaths: stats.deaths,
           kda,
           weightedKda,
-          matches: stats.matches
+          matches: stats.matches,
+          mvpScore
         };
       });
 
@@ -153,13 +157,11 @@ export const RankingGeral = () => {
   const topPlayer = sortedPlayers[0];
 
   const reiDoPVP = useMemo(() => {
-    return [...sortedPlayers].sort((a, b) => {
-      // Matar mais E morrer menos
-      const killsDiff = b.kills - a.kills;
-      if (killsDiff !== 0) return killsDiff;
-      // Se kills são iguais, menor deaths ganha
-      return a.deaths - b.deaths;
-    })[0];
+    // Rei do PVP usa MVP score: kills * 3 + kda * 2 - deaths * 1.5
+    // Exclui o cone monodedo do cálculo
+    const coneMonodedoPlayer = [...sortedPlayers].sort((a, b) => b.deaths - a.deaths)[0];
+    const eligiblePlayers = sortedPlayers.filter(p => p.name !== coneMonodedoPlayer?.name);
+    return [...eligiblePlayers].sort((a, b) => b.mvpScore - a.mvpScore)[0];
   }, [sortedPlayers]);
 
   const brabissimo = useMemo(() => {
