@@ -50,12 +50,22 @@ export const Characters = () => {
       if (charsError) throw charsError;
       console.log('[Characters] registeredChars count:', registeredChars?.length ?? 0);
 
-      // Get all unique player names from matches
-      const { data: matchPlayers, error: matchError } = await supabase
-        .from('pvp_match_players')
-        .select('player_name');
-
-      if (matchError) throw matchError;
+      // Get all player names from matches with pagination (default limit is 1000)
+      const PAGE_SIZE = 1000;
+      let from = 0;
+      let allPlayers: { player_name: string }[] = [];
+      while (true) {
+        const { data, error } = await supabase
+          .from('pvp_match_players')
+          .select('player_name')
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw error;
+        const batch = data || [];
+        allPlayers = allPlayers.concat(batch);
+        if (batch.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+      console.log('[Characters] fetched match players total:', allPlayers.length);
 
       // Strong normalization function (NFKC + collapse spaces + trim + lowercase)
       const normalize = (s?: string) =>
@@ -67,13 +77,13 @@ export const Characters = () => {
 
       // Build a map of normalized names -> display names from match players
       const playersByNorm = new Map<string, string>();
-      for (const p of matchPlayers || []) {
+      for (const p of allPlayers || []) {
         const display = (p.player_name || '').replace(/\s+/g, ' ').trim();
         const key = normalize(display);
         if (key) playersByNorm.set(key, display);
       }
-      console.log('[Characters] matchPlayers unique (normalized) count:', playersByNorm.size);
-      console.log('[Characters] matchPlayers sample (first 20):', Array.from(playersByNorm.values()).slice(0, 20));
+      console.log('[Characters] allPlayers unique (normalized) count:', playersByNorm.size);
+      console.log('[Characters] allPlayers sample (first 20):', Array.from(playersByNorm.values()).slice(0, 20));
 
       // Build a set of normalized registered character names
       const registeredNorm = new Set((registeredChars || []).map(c => normalize(c.name)));
@@ -387,7 +397,7 @@ export const Characters = () => {
               {filteredCharacters.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={user ? 4 : 3} className="text-center text-muted-foreground">
-                    Nenhum personagem encontrado
+                    {showUnregisteredOnly ? 'Nenhum personagem sem cadastro no momento' : 'Nenhum personagem encontrado'}
                   </TableCell>
                 </TableRow>
               ) : (
