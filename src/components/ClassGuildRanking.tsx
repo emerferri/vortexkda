@@ -109,14 +109,27 @@ export const ClassGuildRanking = () => {
 
       if (matchError) throw matchError;
 
-      // Aggregate stats by player name
-      const playerStats = new Map<string, { kills: number; deaths: number }>();
+      // Strong normalization function (NFKC + collapse spaces + trim + lowercase)
+      const normalize = (s?: string) =>
+        (s ?? '')
+          .normalize('NFKC')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase();
+
+      // Aggregate stats by player name (using normalized key + keeping display name)
+      const playerStats = new Map<string, { kills: number; deaths: number; displayName: string }>();
       
       matchPlayers?.forEach((player) => {
-        const existing = playerStats.get(player.player_name) || { kills: 0, deaths: 0 };
-        playerStats.set(player.player_name, {
+        const display = (player.player_name || '').replace(/\s+/g, ' ').trim();
+        const key = normalize(display);
+        if (!key) return;
+        
+        const existing = playerStats.get(key) || { kills: 0, deaths: 0, displayName: display };
+        playerStats.set(key, {
           kills: existing.kills + player.kills,
           deaths: existing.deaths + player.deaths,
+          displayName: display, // Keep the last seen display name
         });
       });
 
@@ -127,17 +140,17 @@ export const ClassGuildRanking = () => {
 
       if (charError) throw charError;
 
-      const normalize = (s: string | null) => (s ?? '').trim().toLowerCase();
+      // Build character map with consistent normalization
       const characterMap = new Map(
         (characters || []).map((char) => [normalize(char.name), { class: char.class, guild: char.guild }])
       );
 
-      // Combine data (normalize names to match regardless of spaces/case)
+      // Combine data using normalized keys but display names
       const result: PlayerWithCharacter[] = Array.from(playerStats.entries()).map(
-        ([playerName, stats]) => {
-          const character = characterMap.get(normalize(playerName));
+        ([normKey, stats]) => {
+          const character = characterMap.get(normKey);
           return {
-            player_name: playerName,
+            player_name: stats.displayName,
             kills: stats.kills,
             deaths: stats.deaths,
             class: character?.class || null,
