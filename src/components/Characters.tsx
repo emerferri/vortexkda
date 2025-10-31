@@ -189,8 +189,12 @@ export const Characters = () => {
     setDialogOpen(true);
   };
 
-  // Considera cadastro incompleto se faltar guild OU classe (vazio ou null)
-  const isIncomplete = (c: Character) => !(c.guild && c.guild.trim()) || !(c.class && c.class.trim());
+  // Considera cadastro incompleto se faltar guild OU classe (vazio, null, '-' ou 'SEMGUILD')
+  const isValueMissing = (val?: string) => {
+    const v = (val ?? '').trim().toLowerCase();
+    return !v || v === '-' || v === 'semguild' || v === 'n/a' || v === 'none';
+  };
+  const isIncomplete = (c: Character) => isValueMissing(c.guild) || isValueMissing(c.class);
   const unregisteredCount = characters.filter(isIncomplete).length;
 
   const normalizedSearch = searchTerm.toLowerCase();
@@ -205,6 +209,13 @@ export const Characters = () => {
 
     return matchesSearch && matchesFilter;
   });
+
+  useEffect(() => {
+    if (showUnregisteredOnly && filteredCharacters.length === 0) {
+      setShowUnregisteredOnly(false);
+      toast({ title: 'Aviso', description: 'Nenhum personagem sem cadastro no momento.' });
+    }
+  }, [showUnregisteredOnly, filteredCharacters.length]);
 
   if (loading) {
     return (
@@ -243,25 +254,24 @@ export const Characters = () => {
               aria-label="Buscar por nome, guild ou classe"
             />
           </div>
-          {unregisteredCount > 0 && (
-            <Button
-              variant={showUnregisteredOnly ? "default" : "outline"}
-              onClick={() => setShowUnregisteredOnly(!showUnregisteredOnly)}
-              className="gap-2"
-            >
-              {showUnregisteredOnly ? (
-                <>
-                  <FilterX className="w-4 h-4" />
-                  Mostrar Todos
-                </>
-              ) : (
-                <>
-                  <Filter className="w-4 h-4" />
-                  Apenas Não Cadastrados
-                </>
-              )}
-            </Button>
-          )}
+          <Button
+            variant={showUnregisteredOnly ? "default" : "outline"}
+            onClick={() => setShowUnregisteredOnly(!showUnregisteredOnly)}
+            className="gap-2"
+            aria-pressed={showUnregisteredOnly}
+          >
+            {showUnregisteredOnly ? (
+              <>
+                <FilterX className="w-4 h-4" />
+                Mostrar Todos
+              </>
+            ) : (
+              <>
+                <Filter className="w-4 h-4" />
+                Apenas Não Cadastrados
+              </>
+            )}
+          </Button>
           {user && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
