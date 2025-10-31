@@ -41,13 +41,14 @@ export const Characters = () => {
 
   const loadCharacters = async () => {
     try {
-      // Get all registered characters
+      // Get all registered characters (explicit columns to avoid reserved-word issues)
       const { data: registeredChars, error: charsError } = await supabase
         .from('characters')
-        .select('*')
+        .select('id, name, guild, class')
         .order('name');
 
       if (charsError) throw charsError;
+      console.log('[Characters] registeredChars count:', registeredChars?.length ?? 0);
 
       // Get all unique player names from matches
       const { data: matchPlayers, error: matchError } = await supabase
@@ -55,12 +56,13 @@ export const Characters = () => {
         .select('player_name');
 
       if (matchError) throw matchError;
+      const uniquePlayerNames = [...new Set((matchPlayers || [])
+        .map(p => (p.player_name || '').trim())
+        .filter(Boolean))];
+      console.log('[Characters] matchPlayers names (unique) count:', uniquePlayerNames.length);
 
-      // Get unique player names
-      const uniquePlayerNames = [...new Set(matchPlayers?.map(p => p.player_name) || [])];
-
-      // Find players not yet registered
-      const registeredNames = new Set(registeredChars?.map(c => c.name) || []);
+      // Find players not yet registered (normalize names with trim)
+      const registeredNames = new Set((registeredChars || []).map(c => (c.name || '').trim()));
       const unregisteredPlayers = uniquePlayerNames
         .filter(name => !registeredNames.has(name))
         .map(name => ({
@@ -71,9 +73,10 @@ export const Characters = () => {
         }));
 
       // Combine registered and unregistered, sort by name
-      const allCharacters = [...(registeredChars || []), ...unregisteredPlayers]
-        .sort((a, b) => a.name.localeCompare(b.name));
+      const allCharacters = [ ...(registeredChars || []), ...unregisteredPlayers ]
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
+      console.log('[Characters] merged counts => registered:', registeredChars?.length ?? 0, 'unregistered:', unregisteredPlayers.length, 'total:', allCharacters.length);
       setCharacters(allCharacters);
     } catch (error) {
       console.error('Error loading characters:', error);
