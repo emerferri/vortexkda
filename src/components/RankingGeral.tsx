@@ -25,9 +25,10 @@ interface AggregatedPlayer {
   weightedKda: number;
   matches: number;
   mvpScore: number;
+  eventScore: number;
 }
 
-type SortKey = 'kills' | 'deaths' | 'kda' | 'weightedKda' | 'efficiency';
+type SortKey = 'kills' | 'deaths' | 'kda' | 'weightedKda' | 'eventScore';
 
 export const RankingGeral = () => {
   const [sortBy, setSortBy] = useState<SortKey>('kda');
@@ -137,6 +138,8 @@ export const RankingGeral = () => {
           : 0;
         // Cálculo de MVP: kills * 3 + kda * 2 - deaths * 1.5
         const mvpScore = (stats.kills * 3) + (kda * 2) - (stats.deaths * 1.5);
+        // Pontuação do evento: kills * 3 + kda * 2 - deaths * 1.5
+        const eventScore = (stats.kills * 3) + (kda * 2) - (stats.deaths * 1.5);
         return {
           name,
           class: characterMap.get(name) || null,
@@ -145,7 +148,8 @@ export const RankingGeral = () => {
           kda,
           weightedKda,
           matches: stats.matches,
-          mvpScore
+          mvpScore,
+          eventScore
         };
       });
 
@@ -162,13 +166,6 @@ export const RankingGeral = () => {
     }
     
     return [...filtered].sort((a, b) => {
-      if (sortBy === 'efficiency') {
-        // Matar mais E morrer menos
-        const killsDiff = b.kills - a.kills;
-        if (killsDiff !== 0) return killsDiff;
-        // Se kills são iguais, menor deaths ganha
-        return a.deaths - b.deaths;
-      }
       return b[sortBy] - a[sortBy];
     });
   }, [aggregatedData, sortBy, classFilter]);
@@ -203,7 +200,7 @@ export const RankingGeral = () => {
     const worksheetData = [
       ['Ranking Geral - PVP'],
       [''],
-      ['Rank', 'Jogador', 'Classe', 'Kills', 'Deaths', 'KDA', 'Boss'],
+      ['Rank', 'Jogador', 'Classe', 'Kills', 'Deaths', 'KDA', 'Pontuação', 'Boss'],
       ...sortedPlayers.map((player, index) => [
         index + 1,
         player.name,
@@ -211,6 +208,7 @@ export const RankingGeral = () => {
         player.kills,
         player.deaths,
         player.kda.toFixed(2),
+        player.eventScore.toFixed(2),
         player.matches
       ]),
       [''],
@@ -593,7 +591,7 @@ export const RankingGeral = () => {
         <SortButton label="Kills" sortKey="kills" icon={Crosshair} />
         <SortButton label="Deaths" sortKey="deaths" icon={Skull} />
         <SortButton label="KDA" sortKey="kda" icon={TrendingUp} />
-        <SortButton label="+ Matou - Morreu" sortKey="efficiency" icon={Trophy} />
+        <SortButton label="Pontuação" sortKey="eventScore" icon={Trophy} />
         <SortButton label="KDA/Médio" sortKey="weightedKda" icon={TrendingUp} />
         
         <div className="w-px h-8 bg-border mx-2" />
@@ -647,6 +645,7 @@ export const RankingGeral = () => {
                   sortBy === 'kills' ? 'Kills' :
                   sortBy === 'deaths' ? 'Deaths' :
                   sortBy === 'kda' ? 'KDA' :
+                  sortBy === 'eventScore' ? 'Pontuação' :
                   'KDA/Médio'
                 }</strong></li>
                 {classFilter !== 'all' && <li>• Classe: <strong>{classFilter}</strong></li>}
@@ -740,10 +739,10 @@ export const RankingGeral = () => {
                     KDA
                   </div>
                 </th>
-                <th data-hide-on-export="kda-medio-header" className="px-6 py-4 text-center text-sm font-bold text-accent uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-sm font-bold text-accent uppercase tracking-wider">
                   <div className="flex items-center justify-center gap-2">
-                    <TrendingUp className="w-4 h-4" />
-                    KDA/Médio
+                    <Trophy className="w-4 h-4" />
+                    Pontuação
                   </div>
                 </th>
                 <th className="px-6 py-4 text-center text-sm font-bold text-primary uppercase tracking-wider">
@@ -803,9 +802,9 @@ export const RankingGeral = () => {
                         {player.kda.toFixed(2)}
                       </span>
                     </td>
-                    <td data-hide-on-export="kda-medio-cell" className="px-6 py-4 text-center">
+                    <td className="px-6 py-4 text-center">
                       <span className="font-bold text-accent text-lg">
-                        {player.weightedKda.toFixed(2)}
+                        {player.eventScore.toFixed(2)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
