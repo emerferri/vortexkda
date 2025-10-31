@@ -186,21 +186,20 @@ export const Characters = () => {
     setDialogOpen(true);
   };
 
-  const unregisteredCount = characters.filter(c => !c.guild && !c.class).length;
+  // Considera cadastro incompleto se faltar guild OU classe (vazio ou null)
+  const isIncomplete = (c: Character) => !(c.guild && c.guild.trim()) || !(c.class && c.class.trim());
+  const unregisteredCount = characters.filter(isIncomplete).length;
 
+  const normalizedSearch = searchTerm.toLowerCase();
   const filteredCharacters = characters.filter((char) => {
-    const matchesSearch =
-      char.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      char.guild?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      char.class?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Check if character is unregistered (no guild AND no class)
-    const isUnregistered = (!char.guild || char.guild === '') && (!char.class || char.class === '');
-    
-    // Apply unregistered filter
+    const nameMatch = (char.name ?? '').toLowerCase().includes(normalizedSearch);
+    const guildMatch = (char.guild ?? '').toLowerCase().includes(normalizedSearch);
+    const classMatch = (char.class ?? '').toLowerCase().includes(normalizedSearch);
+    const matchesSearch = nameMatch || guildMatch || classMatch;
+
+    const isUnregistered = isIncomplete(char);
     const matchesFilter = showUnregisteredOnly ? isUnregistered : true;
-    
-    // Apply both search and filter
+
     return matchesSearch && matchesFilter;
   });
 
@@ -238,6 +237,7 @@ export const Characters = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
+              aria-label="Buscar por nome, guild ou classe"
             />
           </div>
           {unregisteredCount > 0 && (
@@ -349,9 +349,9 @@ export const Characters = () => {
                   <TableRow key={character.id}>
                     <TableCell className="font-medium">
                       {character.name}
-                      {!character.guild && !character.class && (
+                      {(!character.guild?.trim() || !character.class?.trim()) && (
                         <span className="ml-2 text-xs text-yellow-600 font-semibold">
-                          (Não cadastrado)
+                          (Cadastro incompleto)
                         </span>
                       )}
                     </TableCell>

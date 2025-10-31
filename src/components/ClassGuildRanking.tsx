@@ -8,6 +8,7 @@ import { Crosshair, Users, Sword, AlertCircle, Calendar as CalendarIcon, Downloa
 import { Alert, AlertDescription } from './ui/alert';
 import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
@@ -72,6 +73,7 @@ export const ClassGuildRanking = () => {
   const [hourFrom, setHourFrom] = useState<number>();
   const [hourTo, setHourTo] = useState<number>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const chartRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -436,7 +438,7 @@ export const ClassGuildRanking = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate('/?tab=admin&subtab=personagens&filter=unregistered')}
+              onClick={() => user ? navigate('/?tab=admin&subtab=personagens&filter=unregistered') : navigate('/auth')}
             >
               Gerenciar Personagens
             </Button>
