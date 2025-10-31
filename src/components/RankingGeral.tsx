@@ -31,7 +31,7 @@ interface AggregatedPlayer {
 type SortKey = 'kills' | 'deaths' | 'kda' | 'weightedKda' | 'eventScore';
 
 export const RankingGeral = () => {
-  const [sortBy, setSortBy] = useState<SortKey>('kda');
+  const [sortBy, setSortBy] = useState<SortKey>('eventScore');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
