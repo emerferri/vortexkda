@@ -56,29 +56,47 @@ export const Characters = () => {
         .select('player_name');
 
       if (matchError) throw matchError;
-      const normalize = (s: string) => (s || '').trim().toLowerCase();
-      const uniquePlayerNames = [...new Set((matchPlayers || [])
-        .map(p => (p.player_name || '').trim())
-        .filter(Boolean))];
-      console.log('[Characters] matchPlayers names (unique) count:', uniquePlayerNames.length);
 
-      // Find players not yet registered (normalize names with trim + lowercase)
-      const registeredNamesNorm = new Set((registeredChars || []).map(c => normalize(c.name || '')));
-      const unregisteredPlayers = uniquePlayerNames
-        .filter(name => !registeredNamesNorm.has(normalize(name)))
-        .map(name => ({
-          id: `unregistered-${name}`,
-          name,
+      // Strong normalization function (NFKC + collapse spaces + trim + lowercase)
+      const normalize = (s?: string) =>
+        (s ?? '')
+          .normalize('NFKC')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase();
+
+      // Build a map of normalized names -> display names from match players
+      const playersByNorm = new Map<string, string>();
+      for (const p of matchPlayers || []) {
+        const display = (p.player_name || '').replace(/\s+/g, ' ').trim();
+        const key = normalize(display);
+        if (key) playersByNorm.set(key, display);
+      }
+      console.log('[Characters] matchPlayers unique (normalized) count:', playersByNorm.size);
+      console.log('[Characters] matchPlayers sample (first 20):', Array.from(playersByNorm.values()).slice(0, 20));
+
+      // Build a set of normalized registered character names
+      const registeredNorm = new Set((registeredChars || []).map(c => normalize(c.name)));
+      console.log('[Characters] registeredNorm count:', registeredNorm.size);
+      console.log('[Characters] registeredNorm sample (first 20):', Array.from(registeredNorm).slice(0, 20));
+
+      // Find unregistered players (present in matches but not in characters)
+      const unregisteredPlayers = [...playersByNorm.entries()]
+        .filter(([key]) => !registeredNorm.has(key))
+        .map(([_, display]) => ({
+          id: `unregistered-${display}`,
+          name: display,
           guild: '',
           class: '',
         }));
-      console.log('[Characters] unregistered from matches:', unregisteredPlayers.map(u => u.name));
+      console.log('[Characters] unregistered count:', unregisteredPlayers.length);
+      console.log('[Characters] unregistered sample (first 20):', unregisteredPlayers.map(u => u.name).slice(0, 20));
 
       // Combine registered and unregistered, sort by name
       const allCharacters = [ ...(registeredChars || []), ...unregisteredPlayers ]
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-      console.log('[Characters] merged counts => registered:', registeredChars?.length ?? 0, 'unregistered:', unregisteredPlayers.length, 'total:', allCharacters.length);
+      console.log('[Characters] final counts => registered:', registeredChars?.length ?? 0, 'unregistered:', unregisteredPlayers.length, 'total:', allCharacters.length);
       setCharacters(allCharacters);
     } catch (error) {
       console.error('Error loading characters:', error);
@@ -191,12 +209,31 @@ export const Characters = () => {
     setDialogOpen(true);
   };
 
-  // Considera cadastro incompleto se faltar guild OU classe (vazio, null, '-' ou marcadores genéricos)
+  // Helper to normalize strings (for checking special values)
+  const normalize = (s?: string) =>
+    (s ?? '')
+      .normalize('NFKC')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+
+  // Check if a value looks like "sem guild" placeholder (ignore case/accents/spaces)
+  const isSemGuild = (val?: string) => {
+    const normalized = normalize(val).replace(/[^a-z]/g, '');
+    return normalized === 'semguild';
+  };
+
+  // Check if a value is missing (empty, null, '-', 'n/a', 'none', but NOT "sem guild")
   const isValueMissing = (val?: string) => {
-    const v = (val ?? '').trim().toLowerCase();
+    if (isSemGuild(val)) return false; // "sem guild" is not considered missing
+    const v = normalize(val);
     return !v || v === '-' || v === 'n/a' || v === 'none';
   };
-  const isIncomplete = (c: Character) => isValueMissing(c.guild) && isValueMissing(c.class);
+
+  // A character is incomplete if it's unregistered OR both guild and class are missing
+  const isIncomplete = (c: Character) =>
+    c.id.startsWith('unregistered-') || (isValueMissing(c.guild) && isValueMissing(c.class));
+
   const unregisteredCount = characters.filter(isIncomplete).length;
 
   const normalizedSearch = searchTerm.toLowerCase();
@@ -358,7 +395,7 @@ export const Characters = () => {
                   <TableRow key={character.id}>
                     <TableCell className="font-medium">
                       {character.name}
-                      {(!character.guild?.trim() || !character.class?.trim()) && (
+                      {isIncomplete(character) && (
                         <span className="ml-2 text-xs text-yellow-600 font-semibold">
                           (Cadastro incompleto)
                         </span>

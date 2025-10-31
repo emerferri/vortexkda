@@ -187,7 +187,30 @@ export const ClassGuildRanking = () => {
 
   const unregisteredPlayers = useMemo(() => {
     if (!playersData) return [];
-    return playersData.filter((p) => !p.class || !p.guild);
+    
+    // Normalize function for consistent comparisons
+    const normalize = (s?: string) =>
+      (s ?? '')
+        .normalize('NFKC')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+
+    // Check if a value looks like "sem guild" placeholder
+    const isSemGuild = (val?: string) => {
+      const normalized = normalize(val).replace(/[^a-z]/g, '');
+      return normalized === 'semguild';
+    };
+
+    // Check if a value is missing (but "sem guild" is not considered missing)
+    const isMissing = (val?: string) => {
+      if (isSemGuild(val)) return false;
+      const v = normalize(val);
+      return !v || v === '-' || v === 'n/a' || v === 'none';
+    };
+
+    // A player is unregistered if both guild and class are missing
+    return playersData.filter((p) => isMissing(p.guild) && isMissing(p.class));
   }, [playersData]);
 
   const chartData = useMemo(() => {
