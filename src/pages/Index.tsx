@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FileUpload } from '@/components/FileUpload';
 import { Scoreboard, PlayerStats } from '@/components/Scoreboard';
 import { RankingGeral } from '@/components/RankingGeral';
@@ -27,8 +27,17 @@ const Index = () => {
   const [players, setPlayers] = useState<PlayerStats[]>([]);
   const [bossLabel, setBossLabel] = useState<string | null>(null);
   const [killLogs, setKillLogs] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState('placar');
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   const handleFileUpload = (content: string) => {
     const result = parseTxtFile(content);
@@ -85,8 +94,8 @@ const Index = () => {
         </header>
 
         <div className="space-y-8">
-          <Tabs defaultValue="placar" className="w-full">
-            <TabsList className={`grid w-full max-w-6xl mx-auto ${user ? 'grid-cols-6' : 'grid-cols-5'} mb-8`}>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className={`grid w-full max-w-6xl mx-auto ${user ? 'grid-cols-7' : 'grid-cols-6'} mb-8`}>
               <TabsTrigger value="placar" className="text-base font-semibold">
                 Incluir Dados
               </TabsTrigger>

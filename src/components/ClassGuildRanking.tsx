@@ -436,7 +436,7 @@ export const ClassGuildRanking = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate('/?tab=personagens&filter=unregistered')}
+              onClick={() => navigate('/?tab=admin&subtab=personagens&filter=unregistered')}
             >
               Gerenciar Personagens
             </Button>

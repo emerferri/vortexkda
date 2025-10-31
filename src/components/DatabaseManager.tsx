@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { WebhookManager } from './WebhookManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConfrontosDiretos } from './ConfrontosDiretos';
@@ -24,8 +24,17 @@ import { Characters } from './Characters';
 
 export const DatabaseManager = () => {
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('management');
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const subtab = searchParams.get('subtab');
+    if (subtab === 'personagens') {
+      setActiveTab('personagens');
+    }
+  }, [searchParams]);
 
   const clearAllPvpData = async () => {
     if (!user) {
@@ -71,7 +80,7 @@ export const DatabaseManager = () => {
   };
 
   return (
-    <Tabs defaultValue="management" className="w-full">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
       <TabsList className="grid w-full grid-cols-3 mb-6">
         <TabsTrigger value="management">Gerenciamento</TabsTrigger>
         <TabsTrigger value="confrontos">Confrontos Diretos</TabsTrigger>
