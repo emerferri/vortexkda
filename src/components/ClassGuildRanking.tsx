@@ -127,14 +127,15 @@ export const ClassGuildRanking = () => {
 
       if (charError) throw charError;
 
+      const normalize = (s: string | null) => (s ?? '').trim().toLowerCase();
       const characterMap = new Map(
-        characters?.map((char) => [char.name, { class: char.class, guild: char.guild }]) || []
+        (characters || []).map((char) => [normalize(char.name), { class: char.class, guild: char.guild }])
       );
 
-      // Combine data
+      // Combine data (normalize names to match regardless of spaces/case)
       const result: PlayerWithCharacter[] = Array.from(playerStats.entries()).map(
         ([playerName, stats]) => {
-          const character = characterMap.get(playerName);
+          const character = characterMap.get(normalize(playerName));
           return {
             player_name: playerName,
             kills: stats.kills,

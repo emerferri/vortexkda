@@ -56,21 +56,23 @@ export const Characters = () => {
         .select('player_name');
 
       if (matchError) throw matchError;
+      const normalize = (s: string) => (s || '').trim().toLowerCase();
       const uniquePlayerNames = [...new Set((matchPlayers || [])
         .map(p => (p.player_name || '').trim())
         .filter(Boolean))];
       console.log('[Characters] matchPlayers names (unique) count:', uniquePlayerNames.length);
 
-      // Find players not yet registered (normalize names with trim)
-      const registeredNames = new Set((registeredChars || []).map(c => (c.name || '').trim()));
+      // Find players not yet registered (normalize names with trim + lowercase)
+      const registeredNamesNorm = new Set((registeredChars || []).map(c => normalize(c.name || '')));
       const unregisteredPlayers = uniquePlayerNames
-        .filter(name => !registeredNames.has(name))
+        .filter(name => !registeredNamesNorm.has(normalize(name)))
         .map(name => ({
           id: `unregistered-${name}`,
           name,
           guild: '',
           class: '',
         }));
+      console.log('[Characters] unregistered from matches:', unregisteredPlayers.map(u => u.name));
 
       // Combine registered and unregistered, sort by name
       const allCharacters = [ ...(registeredChars || []), ...unregisteredPlayers ]
@@ -211,11 +213,11 @@ export const Characters = () => {
   });
 
   useEffect(() => {
-    if (showUnregisteredOnly && filteredCharacters.length === 0) {
+    if (!loading && showUnregisteredOnly && filteredCharacters.length === 0 && characters.length > 0) {
       setShowUnregisteredOnly(false);
       toast({ title: 'Aviso', description: 'Nenhum personagem sem cadastro no momento.' });
     }
-  }, [showUnregisteredOnly, filteredCharacters.length]);
+  }, [loading, showUnregisteredOnly, filteredCharacters.length, characters.length]);
 
   if (loading) {
     return (
