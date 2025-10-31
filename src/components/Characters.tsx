@@ -189,10 +189,10 @@ export const Characters = () => {
     setDialogOpen(true);
   };
 
-  // Considera cadastro incompleto se faltar guild OU classe (vazio, null, '-' ou 'SEMGUILD')
+  // Considera cadastro incompleto se faltar guild OU classe (vazio, null, '-' ou marcadores genéricos)
   const isValueMissing = (val?: string) => {
     const v = (val ?? '').trim().toLowerCase();
-    return !v || v === '-' || v === 'semguild' || v === 'n/a' || v === 'none';
+    return !v || v === '-' || v === 'n/a' || v === 'none';
   };
   const isIncomplete = (c: Character) => isValueMissing(c.guild) || isValueMissing(c.class);
   const unregisteredCount = characters.filter(isIncomplete).length;
