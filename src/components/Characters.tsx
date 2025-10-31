@@ -194,15 +194,14 @@ export const Characters = () => {
       char.guild?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       char.class?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // If searching, show all matching results regardless of filter
-    if (searchTerm.trim()) {
-      return matchesSearch;
-    }
+    // Check if character is unregistered (no guild AND no class)
+    const isUnregistered = (!char.guild || char.guild === '') && (!char.class || char.class === '');
     
-    // Otherwise apply the unregistered filter
-    const matchesFilter = showUnregisteredOnly ? (!char.guild || char.guild === '') && (!char.class || char.class === '') : true;
+    // Apply unregistered filter
+    const matchesFilter = showUnregisteredOnly ? isUnregistered : true;
     
-    return matchesFilter;
+    // Apply both search and filter
+    return matchesSearch && matchesFilter;
   });
 
   if (loading) {
