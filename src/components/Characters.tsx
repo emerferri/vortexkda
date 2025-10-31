@@ -196,7 +196,7 @@ export const Characters = () => {
     const v = (val ?? '').trim().toLowerCase();
     return !v || v === '-' || v === 'n/a' || v === 'none';
   };
-  const isIncomplete = (c: Character) => isValueMissing(c.guild) || isValueMissing(c.class);
+  const isIncomplete = (c: Character) => isValueMissing(c.guild) && isValueMissing(c.class);
   const unregisteredCount = characters.filter(isIncomplete).length;
 
   const normalizedSearch = searchTerm.toLowerCase();
@@ -212,12 +212,6 @@ export const Characters = () => {
     return matchesSearch && matchesFilter;
   });
 
-  useEffect(() => {
-    if (!loading && showUnregisteredOnly && filteredCharacters.length === 0 && characters.length > 0) {
-      setShowUnregisteredOnly(false);
-      toast({ title: 'Aviso', description: 'Nenhum personagem sem cadastro no momento.' });
-    }
-  }, [loading, showUnregisteredOnly, filteredCharacters.length, characters.length]);
 
   if (loading) {
     return (
