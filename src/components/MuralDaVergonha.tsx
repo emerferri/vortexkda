@@ -248,13 +248,13 @@ export const MuralDaVergonha = () => {
             </PopoverContent>
           </Popover>
 
-          <Select value={hourFrom?.toString()} onValueChange={(v) => setHourFrom(v ? parseInt(v) : undefined)}>
+          <Select value={hourFrom?.toString() || "all"} onValueChange={(v) => setHourFrom(v === "all" ? undefined : parseInt(v))}>
             <SelectTrigger className="w-[140px]">
               <Clock className="mr-2 h-4 w-4" />
               <SelectValue placeholder="Hora Início" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todas</SelectItem>
+              <SelectItem value="all">Todas</SelectItem>
               {Array.from({ length: 24 }, (_, i) => (
                 <SelectItem key={i} value={i.toString()}>
                   {i}:00
@@ -263,13 +263,13 @@ export const MuralDaVergonha = () => {
             </SelectContent>
           </Select>
 
-          <Select value={hourTo?.toString()} onValueChange={(v) => setHourTo(v ? parseInt(v) : undefined)}>
+          <Select value={hourTo?.toString() || "all"} onValueChange={(v) => setHourTo(v === "all" ? undefined : parseInt(v))}>
             <SelectTrigger className="w-[140px]">
               <Clock className="mr-2 h-4 w-4" />
               <SelectValue placeholder="Hora Fim" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todas</SelectItem>
+              <SelectItem value="all">Todas</SelectItem>
               {Array.from({ length: 24 }, (_, i) => (
                 <SelectItem key={i} value={i.toString()}>
                   {i}:00
