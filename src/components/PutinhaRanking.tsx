@@ -4,9 +4,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Skull, Target, Download } from 'lucide-react';
+import { Loader2, Skull, Target, Download, Calendar, Clock } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface PutinhaRelation {
   victim: string;
@@ -20,17 +25,47 @@ export const PutinhaRanking = () => {
   const [relations, setRelations] = useState<PutinhaRelation[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [dateFrom, setDateFrom] = useState<Date>();
+  const [dateTo, setDateTo] = useState<Date>();
+  const [hourFrom, setHourFrom] = useState<number>();
+  const [hourTo, setHourTo] = useState<number>();
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadPutinhaRanking();
-  }, []);
+  }, [dateFrom, dateTo, hourFrom, hourTo]);
 
   const loadPutinhaRanking = async () => {
     try {
       setLoading(true);
 
-      // 1) Fetch all kill logs with pagination to avoid row caps
+      // 1) Fetch match IDs based on date/hour filters
+      let matchQuery = supabase.from('pvp_matches').select('id');
+
+      if (dateFrom) {
+        matchQuery = matchQuery.gte('match_date', format(dateFrom, 'yyyy-MM-dd'));
+      }
+      if (dateTo) {
+        matchQuery = matchQuery.lte('match_date', format(dateTo, 'yyyy-MM-dd'));
+      }
+      if (hourFrom !== undefined) {
+        matchQuery = matchQuery.gte('match_hour', hourFrom);
+      }
+      if (hourTo !== undefined) {
+        matchQuery = matchQuery.lte('match_hour', hourTo);
+      }
+
+      const { data: matches, error: matchError } = await matchQuery;
+      if (matchError) throw matchError;
+
+      const matchIds = matches?.map(m => m.id) || [];
+      if (matchIds.length === 0) {
+        setRelations([]);
+        setLoading(false);
+        return;
+      }
+
+      // 2) Fetch kill logs filtered by match IDs with pagination
       const pageSize = 1000;
       let from = 0;
       let allKillLogs: { killer_name: string; victim_name: string }[] = [];
@@ -38,17 +73,18 @@ export const PutinhaRanking = () => {
       while (true) {
         const { data, error } = await supabase
           .from('pvp_kill_logs')
-          .select('killer_name, victim_name')
+          .select('killer_name, victim_name, match_id')
+          .in('match_id', matchIds)
           .order('created_at', { ascending: false })
           .range(from, from + pageSize - 1);
 
         if (error) throw error;
         if (data && data.length > 0) allKillLogs = allKillLogs.concat(data);
-        if (!data || data.length < pageSize) break; // no more pages
+        if (!data || data.length < pageSize) break;
         from += pageSize;
       }
 
-      // 2) Fetch character guild info
+      // 3) Fetch character guild info
       const { data: characters, error: charsError } = await supabase
         .from('characters')
         .select('name, guild');
@@ -59,7 +95,7 @@ export const PutinhaRanking = () => {
         (characters || []).map((c) => [c.name, c.guild])
       );
 
-      // 3) Count deaths per exact killer->victim pair across ALL logs
+      // 4) Count deaths per exact killer->victim pair
       const deathCount = new Map<string, { killer: string; victim: string; count: number }>();
 
       for (const log of allKillLogs) {
@@ -76,9 +112,24 @@ export const PutinhaRanking = () => {
         }
       }
 
-      // 4) Keep only relations with 10 or more deaths and sort desc
-      const putinhaRelations: PutinhaRelation[] = Array.from(deathCount.values())
-        .filter((r) => r.count >= 10)
+      // 5) Filter out mutual domination (both are putinhas of each other)
+      const filteredRelations = Array.from(deathCount.values()).filter((r) => {
+        if (r.count < 10) return false;
+        
+        // Check if reverse relation also exists with 10+ deaths
+        const reverseKey = `${r.killer}->${r.victim}`;
+        const reverseRelation = deathCount.get(reverseKey);
+        
+        // If both kill each other 10+ times, exclude this relation
+        if (reverseRelation && reverseRelation.count >= 10) {
+          return false;
+        }
+        
+        return true;
+      });
+
+      // 6) Map to final format and sort by deaths
+      const putinhaRelations: PutinhaRelation[] = filteredRelations
         .map((r) => ({
           victim: r.victim,
           killer: r.killer,
@@ -162,6 +213,88 @@ export const PutinhaRanking = () => {
             <Download className="w-4 h-4" />
             Exportar
           </Button>
+        </div>
+        
+        {/* Date and Hour Filters */}
+        <div className="flex flex-wrap gap-2 mt-4">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Calendar className="mr-2 h-4 w-4" />
+                {dateFrom ? format(dateFrom, 'dd/MM/yyyy', { locale: ptBR }) : 'Data Início'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <CalendarComponent
+                mode="single"
+                selected={dateFrom}
+                onSelect={setDateFrom}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Calendar className="mr-2 h-4 w-4" />
+                {dateTo ? format(dateTo, 'dd/MM/yyyy', { locale: ptBR }) : 'Data Fim'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <CalendarComponent
+                mode="single"
+                selected={dateTo}
+                onSelect={setDateTo}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+
+          <Select value={hourFrom?.toString()} onValueChange={(v) => setHourFrom(v ? parseInt(v) : undefined)}>
+            <SelectTrigger className="w-[140px]">
+              <Clock className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Hora Início" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todas</SelectItem>
+              {Array.from({ length: 24 }, (_, i) => (
+                <SelectItem key={i} value={i.toString()}>
+                  {i}:00
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={hourTo?.toString()} onValueChange={(v) => setHourTo(v ? parseInt(v) : undefined)}>
+            <SelectTrigger className="w-[140px]">
+              <Clock className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Hora Fim" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todas</SelectItem>
+              {Array.from({ length: 24 }, (_, i) => (
+                <SelectItem key={i} value={i.toString()}>
+                  {i}:00
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {(dateFrom || dateTo || hourFrom !== undefined || hourTo !== undefined) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setDateFrom(undefined);
+                setDateTo(undefined);
+                setHourFrom(undefined);
+                setHourTo(undefined);
+              }}
+            >
+              Limpar Filtros
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>

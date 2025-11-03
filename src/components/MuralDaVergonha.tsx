@@ -3,11 +3,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Skull, Download, Image as ImageIcon } from 'lucide-react';
+import { Skull, Download, Image as ImageIcon, Calendar, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface PlayerDeathStats {
   playerName: string;
@@ -22,20 +27,51 @@ interface PlayerDeathStats {
 export const MuralDaVergonha = () => {
   const [deathStats, setDeathStats] = useState<PlayerDeathStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dateFrom, setDateFrom] = useState<Date>();
+  const [dateTo, setDateTo] = useState<Date>();
+  const [hourFrom, setHourFrom] = useState<number>();
+  const [hourTo, setHourTo] = useState<number>();
   const tableRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadDeathStats();
-  }, []);
+  }, [dateFrom, dateTo, hourFrom, hourTo]);
 
   const loadDeathStats = async () => {
     try {
       setLoading(true);
 
-      // Buscar todos os dados de jogadores
+      // Build match query with filters
+      let matchQuery = supabase.from('pvp_matches').select('id');
+
+      if (dateFrom) {
+        matchQuery = matchQuery.gte('match_date', format(dateFrom, 'yyyy-MM-dd'));
+      }
+      if (dateTo) {
+        matchQuery = matchQuery.lte('match_date', format(dateTo, 'yyyy-MM-dd'));
+      }
+      if (hourFrom !== undefined) {
+        matchQuery = matchQuery.gte('match_hour', hourFrom);
+      }
+      if (hourTo !== undefined) {
+        matchQuery = matchQuery.lte('match_hour', hourTo);
+      }
+
+      const { data: matches, error: matchError } = await matchQuery;
+      if (matchError) throw matchError;
+
+      const matchIds = matches?.map(m => m.id) || [];
+      if (matchIds.length === 0) {
+        setDeathStats([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch player data filtered by match IDs
       const { data: matchPlayers, error: playersError } = await supabase
         .from('pvp_match_players')
-        .select('player_name, kills, deaths');
+        .select('player_name, kills, deaths, match_id')
+        .in('match_id', matchIds);
 
       if (playersError) throw playersError;
 
@@ -174,6 +210,88 @@ export const MuralDaVergonha = () => {
               Imagem
             </Button>
           </div>
+        </div>
+        
+        {/* Date and Hour Filters */}
+        <div className="flex flex-wrap gap-2 mt-4">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Calendar className="mr-2 h-4 w-4" />
+                {dateFrom ? format(dateFrom, 'dd/MM/yyyy', { locale: ptBR }) : 'Data Início'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <CalendarComponent
+                mode="single"
+                selected={dateFrom}
+                onSelect={setDateFrom}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Calendar className="mr-2 h-4 w-4" />
+                {dateTo ? format(dateTo, 'dd/MM/yyyy', { locale: ptBR }) : 'Data Fim'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <CalendarComponent
+                mode="single"
+                selected={dateTo}
+                onSelect={setDateTo}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+
+          <Select value={hourFrom?.toString()} onValueChange={(v) => setHourFrom(v ? parseInt(v) : undefined)}>
+            <SelectTrigger className="w-[140px]">
+              <Clock className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Hora Início" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todas</SelectItem>
+              {Array.from({ length: 24 }, (_, i) => (
+                <SelectItem key={i} value={i.toString()}>
+                  {i}:00
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={hourTo?.toString()} onValueChange={(v) => setHourTo(v ? parseInt(v) : undefined)}>
+            <SelectTrigger className="w-[140px]">
+              <Clock className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Hora Fim" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todas</SelectItem>
+              {Array.from({ length: 24 }, (_, i) => (
+                <SelectItem key={i} value={i.toString()}>
+                  {i}:00
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {(dateFrom || dateTo || hourFrom !== undefined || hourTo !== undefined) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setDateFrom(undefined);
+                setDateTo(undefined);
+                setHourFrom(undefined);
+                setHourTo(undefined);
+              }}
+            >
+              Limpar Filtros
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>
