@@ -83,32 +83,43 @@ export const RankingGeral = () => {
   const { data: aggregatedData, isLoading } = useQuery({
     queryKey: ['ranking-geral', dateFrom, dateTo, hourFrom, hourTo],
     queryFn: async () => {
-      let query = supabase
-        .from('pvp_match_players')
-        .select(`
-          player_name,
-          kills,
-          deaths,
-          kda,
-          match_id,
-          pvp_matches!inner(match_date, match_hour)
-        `);
+      // Fetch all rows in pages (avoid 1000-row cap) and use LEFT join so players without match metadata aren't dropped
+      const pageSize = 1000;
+      let from = 0;
+      let accumulated: any[] = [];
+      while (true) {
+        let q = supabase
+          .from('pvp_match_players')
+          .select(`
+            player_name,
+            kills,
+            deaths,
+            kda,
+            match_id,
+            pvp_matches!left(match_date, match_hour)
+          `);
 
-      if (dateFrom) {
-        query = query.gte('pvp_matches.match_date', format(dateFrom, 'yyyy-MM-dd'));
-      }
-      if (dateTo) {
-        query = query.lte('pvp_matches.match_date', format(dateTo, 'yyyy-MM-dd'));
-      }
-      if (hourFrom !== undefined) {
-        query = query.gte('pvp_matches.match_hour', hourFrom);
-      }
-      if (hourTo !== undefined) {
-        query = query.lte('pvp_matches.match_hour', hourTo);
+        if (dateFrom) {
+          q = q.gte('pvp_matches.match_date', format(dateFrom, 'yyyy-MM-dd'));
+        }
+        if (dateTo) {
+          q = q.lte('pvp_matches.match_date', format(dateTo, 'yyyy-MM-dd'));
+        }
+        if (hourFrom !== undefined) {
+          q = q.gte('pvp_matches.match_hour', hourFrom);
+        }
+        if (hourTo !== undefined) {
+          q = q.lte('pvp_matches.match_hour', hourTo);
+        }
+
+        const { data: page, error } = await q.range(from, from + pageSize - 1);
+        if (error) throw error;
+        if (page && page.length > 0) accumulated = accumulated.concat(page);
+        if (!page || page.length < pageSize) break;
+        from += pageSize;
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const data = accumulated;
 
       // Strong normalization function (remove diacritics, symbols, collapse spaces, lowercase)
       const normalize = (s?: string) =>
