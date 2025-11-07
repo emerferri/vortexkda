@@ -123,14 +123,26 @@ export const RankingGeral = () => {
         .from('characters')
         .select('name, class');
 
-      const characterMap = new Map(
-        (characters || []).map((c) => [normalize(c.name?.trim() || ''), (c.class || '').replace(/\s+/g, ' ').trim()])
-      );
+      const entries = (characters || []).map((c) => {
+        const displayName = (c.name ?? '').trim();
+        const norm = normalize(displayName);
+        const clsStr = ((c.class ?? '') as string).replace(/\s+/g, ' ').trim();
+        return { displayName, norm, cls: clsStr || null };
+      });
 
-      // Prepare entries for fuzzy matching (fallback)
-      const characterEntries = (characters || []).map((c) => ({
-        norm: normalize(c.name?.trim() || ''),
-        class: (c.class || '').replace(/\s+/g, ' ').trim(),
+      // Prefer non-empty class when duplicates exist for the same normalized name
+      const characterMap = new Map<string, string | null>();
+      for (const e of entries) {
+        const current = characterMap.get(e.norm);
+        if (!current || e.cls) {
+          characterMap.set(e.norm, e.cls);
+        }
+      }
+
+      // Prepare entries for fuzzy matching (fallback) using preferred class
+      const characterEntries = Array.from(characterMap.entries()).map(([norm, cls]) => ({
+        norm,
+        class: (cls || '').toString(),
       }));
 
       // Lightweight Levenshtein with early exit (cap at distance 2)
@@ -237,7 +249,19 @@ export const RankingGeral = () => {
         };
       });
 
-      return { aggregated, brabissimoRecord, coneMonodedoName, characters: (characters || []).map((c) => ({ name: (c.name || '').replace(/\s+/g, ' ').trim(), class: ((c.class || '').replace(/\s+/g, ' ').trim() || null) })) };
+      // Debug log for miLena mapping
+      try {
+        const miKey = normalize('miLena');
+        const aggMi = aggregated.find(p => normalize(p.name) === miKey);
+        console.log('[RankingGeral] Debug miLena', { aggMi, mappedClass: characterMap.get(miKey), closestClass: findClosestClass(miKey) });
+      } catch (e) {}
+
+      const dedupCharacters = Array.from(characterMap.entries()).map(([norm, cls]) => {
+        const original = (entries.find(e => e.norm === norm)?.displayName) || '';
+        return { name: original, class: cls || null };
+      });
+
+      return { aggregated, brabissimoRecord, coneMonodedoName, characters: dedupCharacters };
     }
   });
 
@@ -276,6 +300,15 @@ export const RankingGeral = () => {
             mvpScore: 0,
             eventScore: 0,
           })) || [];
+
+      try {
+        console.log('[RankingGeral] Class filter debug', {
+          classFilter,
+          filteredCount: filtered.length,
+          toAddCount: toAdd.length,
+          filteredNames: filtered.map(p => p.name).slice(0, 20),
+        });
+      } catch {}
 
       filtered = [...filtered, ...toAdd];
     }
