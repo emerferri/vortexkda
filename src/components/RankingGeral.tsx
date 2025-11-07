@@ -83,53 +83,18 @@ export const RankingGeral = () => {
   const { data: aggregatedData, isLoading } = useQuery({
     queryKey: ['ranking-geral', dateFrom, dateTo, hourFrom, hourTo],
     queryFn: async () => {
-      // Fetch all rows in pages (avoid 1000-row cap) and use LEFT join so players without match metadata aren't dropped
-      const pageSize = 1000;
-      let from = 0;
-      let accumulated: any[] = [];
-      while (true) {
-        let q = supabase
-          .from('pvp_match_players')
-          .select(`
-            player_name,
-            kills,
-            deaths,
-            kda,
-            match_id,
-            pvp_matches!left(match_date, match_hour)
-          `);
+      // Vamos unificar a fonte com Confrontos Diretos: agregaremos a partir de pvp_kill_logs
+      // e aplicaremos filtros de data/hora através dos match_ids de pvp_matches
 
-        if (dateFrom) {
-          q = q.gte('pvp_matches.match_date', format(dateFrom, 'yyyy-MM-dd'));
-        }
-        if (dateTo) {
-          q = q.lte('pvp_matches.match_date', format(dateTo, 'yyyy-MM-dd'));
-        }
-        if (hourFrom !== undefined) {
-          q = q.gte('pvp_matches.match_hour', hourFrom);
-        }
-        if (hourTo !== undefined) {
-          q = q.lte('pvp_matches.match_hour', hourTo);
-        }
-
-        const { data: page, error } = await q.range(from, from + pageSize - 1);
-        if (error) throw error;
-        if (page && page.length > 0) accumulated = accumulated.concat(page);
-        if (!page || page.length < pageSize) break;
-        from += pageSize;
-      }
-
-      const data = accumulated;
-
-      // Strong normalization function (remove diacritics, symbols, collapse spaces, lowercase)
+      // Normalizador forte (igual ao usado antes, removendo tudo que não é alfanumérico)
       const normalize = (s?: string) =>
         (s ?? '')
-          .normalize('NFKD') // split diacritics
-          .replace(/[\u0300-\u036f]/g, '') // remove diacritics
-          .replace(/[^a-zA-Z0-9]/g, '') // remove ALL non-alphanumeric (including spaces)
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-zA-Z0-9]/g, '')
           .toLowerCase();
 
-      // Get all characters to map names to classes
+      // Buscar classes/personagens para mapear nome -> classe
       const { data: characters } = await supabase
         .from('characters')
         .select('name, class');
@@ -141,25 +106,23 @@ export const RankingGeral = () => {
         return { displayName, norm, cls: clsStr || null };
       });
 
-      // Prefer non-empty class when duplicates exist for the same normalized name
+      // Preferir classe não vazia quando houver duplicatas para o mesmo nome normalizado
       const characterMap = new Map<string, string | null>();
       for (const e of entries) {
         const current = characterMap.get(e.norm);
-        if (!current || e.cls) {
-          characterMap.set(e.norm, e.cls);
-        }
+        if (!current || e.cls) characterMap.set(e.norm, e.cls);
       }
 
-      // Prepare entries for fuzzy matching (fallback) using preferred class
+      // Preparar lista para fuzzy match (fallback)
       const characterEntries = Array.from(characterMap.entries()).map(([norm, cls]) => ({
         norm,
         class: (cls || '').toString(),
       }));
 
-      // Lightweight Levenshtein with early exit (cap at distance 2)
+      // Levenshtein limitado (até distância 1)
       const levenshtein2 = (a: string, b: string) => {
         if (a === b) return 0;
-        if (Math.abs(a.length - b.length) > 2) return 3; // >2 directly
+        if (Math.abs(a.length - b.length) > 2) return 3;
         const dp = Array.from({ length: a.length + 1 }, (_, i) => Array(b.length + 1).fill(0));
         for (let i = 0; i <= a.length; i++) dp[i][0] = i;
         for (let j = 0; j <= b.length; j++) dp[0][j] = j;
@@ -175,7 +138,7 @@ export const RankingGeral = () => {
             );
             if (dp[i][j] < minInRow) minInRow = dp[i][j];
           }
-          if (minInRow > 2) return 3; // early exit
+          if (minInRow > 2) return 3;
         }
         return dp[a.length][b.length];
       };
@@ -187,65 +150,118 @@ export const RankingGeral = () => {
           if (d < best.dist) best = { dist: d, cls: entry.class };
           if (best.dist === 0) break;
         }
-        return best.dist <= 1 ? best.cls : null; // accept distance 0-1 only
+        return best.dist <= 1 ? best.cls : null;
       };
 
-      // Calcular total de matches únicos no período (total de boss eventos)
-      const uniqueMatches = new Set(data?.map((record: any) => record.match_id) || []);
-      const totalBossEvents = uniqueMatches.size;
+      // Se houver filtros de data/hora, filtramos pelos match_ids de pvp_matches
+      const matchFilterActive = !!(dateFrom || dateTo || hourFrom !== undefined || hourTo !== undefined);
+      let matchIds: string[] | undefined = undefined;
 
-      // Aggregate by player para identificar cone monodedo
-      // Using normalized keys for matching but keeping display names
-      const playerMap = new Map<string, { kills: number; deaths: number; matches: number; displayName: string }>();
-      
-      data?.forEach((record: any) => {
-        const display = (record.player_name || '').trim();
-        const key = normalize(display);
-        if (!key) return;
-        
-        const existing = playerMap.get(key) || { kills: 0, deaths: 0, matches: 0, displayName: display };
-        playerMap.set(key, {
-          kills: existing.kills + (record.kills || 0),
-          deaths: existing.deaths + (record.deaths || 0),
-          matches: existing.matches + 1,
-          displayName: display
-        });
-      });
+      if (matchFilterActive) {
+        const pageSize = 1000;
+        let from = 0;
+        let matchesAccum: any[] = [];
+        while (true) {
+          let mq = supabase
+            .from('pvp_matches')
+            .select('id, match_date, match_hour');
+          if (dateFrom) mq = mq.gte('match_date', format(dateFrom, 'yyyy-MM-dd'));
+          if (dateTo) mq = mq.lte('match_date', format(dateTo, 'yyyy-MM-dd'));
+          if (hourFrom !== undefined) mq = mq.gte('match_hour', hourFrom);
+          if (hourTo !== undefined) mq = mq.lte('match_hour', hourTo);
+          const { data: page, error } = await mq.range(from, from + pageSize - 1);
+          if (error) throw error;
+          if (page && page.length > 0) matchesAccum = matchesAccum.concat(page);
+          if (!page || page.length < pageSize) break;
+          from += pageSize;
+        }
+        matchIds = (matchesAccum || []).map((m: any) => m.id);
+        if (!matchIds.length) {
+          return { aggregated: [], brabissimoRecord: undefined, coneMonodedoName: '', characters: [] };
+        }
+      }
 
-      // Identificar cone monodedo (quem mais morreu no total)
+      // Buscar todos os logs (paginado) e opcionalmente filtrar por match_ids
+      const pageSizeLogs = 1000;
+      let fromLogs = 0;
+      let logs: any[] = [];
+      while (true) {
+        let ql = supabase
+          .from('pvp_kill_logs')
+          .select('killer_name, victim_name, match_id, created_at')
+          .order('created_at', { ascending: false });
+        if (matchIds) {
+          ql = ql.in('match_id', matchIds);
+        }
+        const { data: page, error } = await ql.range(fromLogs, fromLogs + pageSizeLogs - 1);
+        if (error) throw error;
+        if (page && page.length > 0) logs = logs.concat(page as any[]);
+        if (!page || page.length < pageSizeLogs) break;
+        fromLogs += pageSizeLogs;
+      }
+
+      // Agregar kills/deaths a partir dos logs (mesma lógica do Confrontos Diretos)
+      type Stat = { kills: number; deaths: number; displayName: string; matches: Set<string> };
+      const playerMap = new Map<string, Stat>();
+      const perMatchKills = new Map<string, number>(); // key: `${match_id}|${normKey}`
+      const uniqueMatches = new Set<string>();
+
+      for (const log of logs) {
+        const matchId = log.match_id as string;
+        if (matchId) uniqueMatches.add(matchId);
+
+        const killerDisplay = (log.killer_name || '').trim();
+        const victimDisplay = (log.victim_name || '').trim();
+        const killerKey = normalize(killerDisplay);
+        const victimKey = normalize(victimDisplay);
+
+        if (killerKey) {
+          const kstats = playerMap.get(killerKey) || { kills: 0, deaths: 0, displayName: killerDisplay, matches: new Set<string>() };
+          kstats.kills += 1;
+          if (matchId) kstats.matches.add(matchId);
+          playerMap.set(killerKey, kstats);
+
+          if (matchId) {
+            const pmkKey = `${matchId}|${killerKey}`;
+            perMatchKills.set(pmkKey, (perMatchKills.get(pmkKey) || 0) + 1);
+          }
+        }
+        if (victimKey) {
+          const vstats = playerMap.get(victimKey) || { kills: 0, deaths: 0, displayName: victimDisplay, matches: new Set<string>() };
+          vstats.deaths += 1;
+          if (matchId) vstats.matches.add(matchId);
+          playerMap.set(victimKey, vstats);
+        }
+      }
+
+      // Cone monodedo = quem mais morreu no período
       let coneMonodedoName = '';
       let maxDeaths = 0;
-      playerMap.forEach((stats, normKey) => {
+      playerMap.forEach((stats) => {
         if (stats.deaths > maxDeaths) {
           maxDeaths = stats.deaths;
           coneMonodedoName = stats.displayName;
         }
       });
 
-      // Encontrar recordes de kills em partidas únicas, excluindo cone monodedo
-      const killRecords = data
-        ?.filter((record: any) => {
-          const display = (record.player_name || '').replace(/\s+/g, ' ').trim();
-          return display !== coneMonodedoName;
-        })
-        .sort((a: any, b: any) => b.kills - a.kills) || [];
-      
-      const brabissimoRecord = killRecords.length > 0 
-        ? { 
-            name: (killRecords[0].player_name || '').replace(/\s+/g, ' ').trim(), 
-            kills: killRecords[0].kills 
-          }
-        : { name: '', kills: 0 };
+      // Brabíssimo = maior nº de kills em uma única partida (exclui cone monodedo)
+      let brabissimoRecord: { name: string; kills: number } | undefined = undefined;
+      for (const [key, count] of perMatchKills.entries()) {
+        const [matchId, normKey] = key.split('|');
+        const stats = playerMap.get(normKey);
+        if (!stats) continue;
+        if (stats.displayName === coneMonodedoName) continue;
+        if (!brabissimoRecord || count > brabissimoRecord.kills) {
+          brabissimoRecord = { name: stats.displayName, kills: count };
+        }
+      }
+
+      const totalBossEvents = uniqueMatches.size;
 
       const aggregated: AggregatedPlayer[] = Array.from(playerMap.entries()).map(([normKey, stats]) => {
         const kda = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
-        // Nova fórmula: (kills / deaths) × (participações / total de boss eventos)
-        const weightedKda = totalBossEvents > 0 
-          ? kda * (stats.matches / totalBossEvents)
-          : 0;
-        // Cálculo de MVP: kills * 3 + kda * 2 - deaths * 1.5
+        const weightedKda = totalBossEvents > 0 ? kda * (stats.matches.size / totalBossEvents) : 0;
         const mvpScore = (stats.kills * 3) + (kda * 2) - (stats.deaths * 1.5);
-        // Pontuação do evento: kills * 3 + kda * 2 - deaths * 1.5
         const eventScore = (stats.kills * 3) + (kda * 2) - (stats.deaths * 1.5);
         return {
           name: stats.displayName,
@@ -254,18 +270,20 @@ export const RankingGeral = () => {
           deaths: stats.deaths,
           kda,
           weightedKda,
-          matches: stats.matches,
+          matches: stats.matches.size,
           mvpScore,
-          eventScore
+          eventScore,
         };
       });
 
-      // Debug log for miLena mapping
+      // Logs de conferência para KOMBAT e Melisandre
       try {
-        const miKey = normalize('miLena');
-        const aggMi = aggregated.find(p => normalize(p.name) === miKey);
-        console.log('[RankingGeral] Debug miLena', { aggMi, mappedClass: characterMap.get(miKey), closestClass: findClosestClass(miKey) });
-      } catch (e) {}
+        const kKey = normalize('KOMBAT');
+        const mKey = normalize('Melisandre');
+        const aggK = aggregated.find(p => normalize(p.name) === kKey);
+        const aggM = aggregated.find(p => normalize(p.name) === mKey);
+        console.log('[RankingGeral] Check KOMBAT/Melisandre', { aggK, aggM, totalLogs: logs.length });
+      } catch {}
 
       const dedupCharacters = Array.from(characterMap.entries()).map(([norm, cls]) => {
         const original = (entries.find(e => e.norm === norm)?.displayName) || '';
