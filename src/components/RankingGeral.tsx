@@ -88,49 +88,72 @@ export const RankingGeral = () => {
       const { data, error } = await query;
       if (error) throw error;
 
+      // Strong normalization function (NFKC + collapse spaces + trim + lowercase)
+      const normalize = (s?: string) =>
+        (s ?? '')
+          .normalize('NFKC')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase();
+
       // Get all characters to map names to classes
       const { data: characters } = await supabase
         .from('characters')
         .select('name, class');
 
-      const characterMap = new Map(characters?.map(c => [c.name, c.class]) || []);
+      // Build character map with consistent normalization
+      const characterMap = new Map(
+        (characters || []).map((c) => [normalize(c.name), c.class])
+      );
 
       // Calcular total de matches únicos no período (total de boss eventos)
       const uniqueMatches = new Set(data?.map((record: any) => record.match_id) || []);
       const totalBossEvents = uniqueMatches.size;
 
       // Aggregate by player para identificar cone monodedo
-      const playerMap = new Map<string, { kills: number; deaths: number; matches: number }>();
+      // Using normalized keys for matching but keeping display names
+      const playerMap = new Map<string, { kills: number; deaths: number; matches: number; displayName: string }>();
       
       data?.forEach((record: any) => {
-        const existing = playerMap.get(record.player_name) || { kills: 0, deaths: 0, matches: 0 };
-        playerMap.set(record.player_name, {
+        const display = (record.player_name || '').replace(/\s+/g, ' ').trim();
+        const key = normalize(display);
+        if (!key) return;
+        
+        const existing = playerMap.get(key) || { kills: 0, deaths: 0, matches: 0, displayName: display };
+        playerMap.set(key, {
           kills: existing.kills + record.kills,
           deaths: existing.deaths + record.deaths,
-          matches: existing.matches + 1
+          matches: existing.matches + 1,
+          displayName: display
         });
       });
 
       // Identificar cone monodedo (quem mais morreu no total)
       let coneMonodedoName = '';
       let maxDeaths = 0;
-      playerMap.forEach((stats, name) => {
+      playerMap.forEach((stats, normKey) => {
         if (stats.deaths > maxDeaths) {
           maxDeaths = stats.deaths;
-          coneMonodedoName = name;
+          coneMonodedoName = stats.displayName;
         }
       });
 
       // Encontrar recordes de kills em partidas únicas, excluindo cone monodedo
       const killRecords = data
-        ?.filter((record: any) => record.player_name !== coneMonodedoName)
+        ?.filter((record: any) => {
+          const display = (record.player_name || '').replace(/\s+/g, ' ').trim();
+          return display !== coneMonodedoName;
+        })
         .sort((a: any, b: any) => b.kills - a.kills) || [];
       
       const brabissimoRecord = killRecords.length > 0 
-        ? { name: killRecords[0].player_name, kills: killRecords[0].kills }
+        ? { 
+            name: (killRecords[0].player_name || '').replace(/\s+/g, ' ').trim(), 
+            kills: killRecords[0].kills 
+          }
         : { name: '', kills: 0 };
 
-      const aggregated: AggregatedPlayer[] = Array.from(playerMap.entries()).map(([name, stats]) => {
+      const aggregated: AggregatedPlayer[] = Array.from(playerMap.entries()).map(([normKey, stats]) => {
         const kda = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
         // Nova fórmula: (kills / deaths) × (participações / total de boss eventos)
         const weightedKda = totalBossEvents > 0 
@@ -141,8 +164,8 @@ export const RankingGeral = () => {
         // Pontuação do evento: kills * 3 + kda * 2 - deaths * 1.5
         const eventScore = (stats.kills * 3) + (kda * 2) - (stats.deaths * 1.5);
         return {
-          name,
-          class: characterMap.get(name) || null,
+          name: stats.displayName,
+          class: characterMap.get(normKey) || null,
           kills: stats.kills,
           deaths: stats.deaths,
           kda,
