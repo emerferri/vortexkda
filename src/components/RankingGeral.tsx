@@ -53,7 +53,7 @@ export const RankingGeral = () => {
       
       if (error) throw error;
       
-      const uniqueClasses = [...new Set(data?.map(c => c.class).filter(Boolean))];
+      const uniqueClasses = [...new Set(data?.map(c => (c.class || '').replace(/\s+/g, ' ').trim()).filter(Boolean))];
       return uniqueClasses.sort();
     }
   });
@@ -88,10 +88,12 @@ export const RankingGeral = () => {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Strong normalization function (NFKC + collapse spaces + trim + lowercase)
+      // Strong normalization function (remove diacritics, symbols, collapse spaces, lowercase)
       const normalize = (s?: string) =>
         (s ?? '')
-          .normalize('NFKC')
+          .normalize('NFKD') // split diacritics
+          .replace(/[\u0300-\u036f]/g, '') // remove diacritics
+          .replace(/[^a-zA-Z0-9\s]/g, ' ') // remove non-word symbols (e.g., tags/emojis)
           .replace(/\s+/g, ' ')
           .trim()
           .toLowerCase();
@@ -101,10 +103,49 @@ export const RankingGeral = () => {
         .from('characters')
         .select('name, class');
 
-      // Build character map with consistent normalization
       const characterMap = new Map(
-        (characters || []).map((c) => [normalize(c.name), c.class])
+        (characters || []).map((c) => [normalize(c.name), (c.class || '').replace(/\s+/g, ' ').trim()])
       );
+
+      // Prepare entries for fuzzy matching (fallback)
+      const characterEntries = (characters || []).map((c) => ({
+        norm: normalize(c.name),
+        class: (c.class || '').replace(/\s+/g, ' ').trim(),
+      }));
+
+      // Lightweight Levenshtein with early exit (cap at distance 2)
+      const levenshtein2 = (a: string, b: string) => {
+        if (a === b) return 0;
+        if (Math.abs(a.length - b.length) > 2) return 3; // >2 directly
+        const dp = Array.from({ length: a.length + 1 }, (_, i) => Array(b.length + 1).fill(0));
+        for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+        for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+        let minInRow = 0;
+        for (let i = 1; i <= a.length; i++) {
+          minInRow = Number.MAX_SAFE_INTEGER;
+          for (let j = 1; j <= b.length; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            dp[i][j] = Math.min(
+              dp[i - 1][j] + 1,
+              dp[i][j - 1] + 1,
+              dp[i - 1][j - 1] + cost
+            );
+            if (dp[i][j] < minInRow) minInRow = dp[i][j];
+          }
+          if (minInRow > 2) return 3; // early exit
+        }
+        return dp[a.length][b.length];
+      };
+
+      const findClosestClass = (normName: string): string | null => {
+        let best: { dist: number; cls: string | null } = { dist: 3, cls: null };
+        for (const entry of characterEntries) {
+          const d = levenshtein2(normName, entry.norm);
+          if (d < best.dist) best = { dist: d, cls: entry.class };
+          if (best.dist === 0) break;
+        }
+        return best.dist <= 1 ? best.cls : null; // accept distance 0-1 only
+      };
 
       // Calcular total de matches únicos no período (total de boss eventos)
       const uniqueMatches = new Set(data?.map((record: any) => record.match_id) || []);
@@ -165,7 +206,7 @@ export const RankingGeral = () => {
         const eventScore = (stats.kills * 3) + (kda * 2) - (stats.deaths * 1.5);
         return {
           name: stats.displayName,
-          class: characterMap.get(normKey) || null,
+          class: characterMap.get(normKey) || findClosestClass(normKey),
           kills: stats.kills,
           deaths: stats.deaths,
           kda,
