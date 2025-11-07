@@ -239,21 +239,50 @@ export const RankingGeral = () => {
         };
       });
 
-      return { aggregated, brabissimoRecord, coneMonodedoName };
+      return { aggregated, brabissimoRecord, coneMonodedoName, characters: (characters || []).map((c) => ({ name: (c.name || '').replace(/\s+/g, ' ').trim(), class: ((c.class || '').replace(/\s+/g, ' ').trim() || null) })) };
     }
   });
 
   const sortedPlayers = useMemo(() => {
     if (!aggregatedData?.aggregated) return [];
     
-    let filtered = aggregatedData.aggregated;
+    // Normalizador local para nomes (consistente com o usado no fetch)
+    const normalizeNameKey = (s?: string) =>
+      (s ?? '')
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+
+    const base = aggregatedData.aggregated;
+    let filtered = base;
+
     if (classFilter !== 'all') {
-      filtered = aggregatedData.aggregated.filter(p => normalizeClassKey(p.class || '') === classFilter);
+      filtered = base.filter(p => normalizeClassKey(p.class || '') === classFilter);
+
+      // Adiciona jogadores cadastrados na classe selecionada mesmo sem partidas (0 stats)
+      const existing = new Set(filtered.map(p => normalizeNameKey(p.name)));
+      const toAdd =
+        (aggregatedData as any)?.characters
+          ?.filter((c: any) => normalizeClassKey(c.class || '') === classFilter)
+          ?.filter((c: any) => !existing.has(normalizeNameKey(c.name)))
+          ?.map((c: any) => ({
+            name: c.name,
+            class: c.class || null,
+            kills: 0,
+            deaths: 0,
+            kda: 0,
+            weightedKda: 0,
+            matches: 0,
+            mvpScore: 0,
+            eventScore: 0,
+          })) || [];
+
+      filtered = [...filtered, ...toAdd];
     }
     
-    return [...filtered].sort((a, b) => {
-      return b[sortBy] - a[sortBy];
-    });
+    return [...filtered].sort((a, b) => b[sortBy] - a[sortBy]);
   }, [aggregatedData, sortBy, classFilter]);
 
   const topPlayer = sortedPlayers[0];
