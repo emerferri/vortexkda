@@ -115,9 +115,7 @@ export const RankingGeral = () => {
         (s ?? '')
           .normalize('NFKD') // split diacritics
           .replace(/[\u0300-\u036f]/g, '') // remove diacritics
-          .replace(/[^a-zA-Z0-9\s]/g, ' ') // remove non-word symbols (e.g., tags/emojis)
-          .replace(/\s+/g, ' ')
-          .trim()
+          .replace(/[^a-zA-Z0-9]/g, '') // remove ALL non-alphanumeric (including spaces)
           .toLowerCase();
 
       // Get all characters to map names to classes
@@ -126,12 +124,12 @@ export const RankingGeral = () => {
         .select('name, class');
 
       const characterMap = new Map(
-        (characters || []).map((c) => [normalize(c.name), (c.class || '').replace(/\s+/g, ' ').trim()])
+        (characters || []).map((c) => [normalize(c.name?.trim() || ''), (c.class || '').replace(/\s+/g, ' ').trim()])
       );
 
       // Prepare entries for fuzzy matching (fallback)
       const characterEntries = (characters || []).map((c) => ({
-        norm: normalize(c.name),
+        norm: normalize(c.name?.trim() || ''),
         class: (c.class || '').replace(/\s+/g, ' ').trim(),
       }));
 
@@ -178,14 +176,14 @@ export const RankingGeral = () => {
       const playerMap = new Map<string, { kills: number; deaths: number; matches: number; displayName: string }>();
       
       data?.forEach((record: any) => {
-        const display = (record.player_name || '').replace(/\s+/g, ' ').trim();
+        const display = (record.player_name || '').trim();
         const key = normalize(display);
         if (!key) return;
         
         const existing = playerMap.get(key) || { kills: 0, deaths: 0, matches: 0, displayName: display };
         playerMap.set(key, {
-          kills: existing.kills + record.kills,
-          deaths: existing.deaths + record.deaths,
+          kills: existing.kills + (record.kills || 0),
+          deaths: existing.deaths + (record.deaths || 0),
           matches: existing.matches + 1,
           displayName: display
         });
