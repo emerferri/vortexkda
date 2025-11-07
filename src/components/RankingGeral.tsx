@@ -58,6 +58,28 @@ export const RankingGeral = () => {
     }
   });
 
+  // Normalização de classe e opções deduplicadas por chave canônica
+  const normalizeClassKey = (s?: string) =>
+    (s ?? '')
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase()
+      .replace(/(.)\1+/g, '$1'); // comprime letras repetidas (ex: wizzard -> wizard)
+
+  const classOptions = useMemo(() => {
+    const map = new Map<string, { key: string; label: string }>();
+    (classes || []).forEach((cls) => {
+      const key = normalizeClassKey(cls);
+      if (!map.has(key)) {
+        map.set(key, { key, label: (cls || '').replace(/\s+/g, ' ').trim() });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [classes]);
+
   const { data: aggregatedData, isLoading } = useQuery({
     queryKey: ['ranking-geral', dateFrom, dateTo, hourFrom, hourTo],
     queryFn: async () => {
@@ -226,7 +248,7 @@ export const RankingGeral = () => {
     
     let filtered = aggregatedData.aggregated;
     if (classFilter !== 'all') {
-      filtered = aggregatedData.aggregated.filter(p => p.class === classFilter);
+      filtered = aggregatedData.aggregated.filter(p => normalizeClassKey(p.class || '') === classFilter);
     }
     
     return [...filtered].sort((a, b) => {
@@ -498,9 +520,9 @@ export const RankingGeral = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
-                {classes?.map((className) => (
-                  <SelectItem key={className} value={className}>
-                    {className}
+                {classOptions?.map((opt) => (
+                  <SelectItem key={opt.key} value={opt.key}>
+                    {opt.label}
                   </SelectItem>
                 ))}
               </SelectContent>
