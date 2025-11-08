@@ -234,27 +234,8 @@ export const RankingGeral = () => {
         }
       }
 
-      // Cone monodedo = quem mais morreu no período
+      // Cone monodedo = jogador com pior pontuação (calculado após agregar)
       let coneMonodedoName = '';
-      let maxDeaths = 0;
-      playerMap.forEach((stats) => {
-        if (stats.deaths > maxDeaths) {
-          maxDeaths = stats.deaths;
-          coneMonodedoName = stats.displayName;
-        }
-      });
-
-      // Brabíssimo = maior nº de kills em uma única partida (exclui cone monodedo)
-      let brabissimoRecord: { name: string; kills: number } | undefined = undefined;
-      for (const [key, count] of perMatchKills.entries()) {
-        const [matchId, normKey] = key.split('|');
-        const stats = playerMap.get(normKey);
-        if (!stats) continue;
-        if (stats.displayName === coneMonodedoName) continue;
-        if (!brabissimoRecord || count > brabissimoRecord.kills) {
-          brabissimoRecord = { name: stats.displayName, kills: count };
-        }
-      }
 
       const totalBossEvents = uniqueMatches.size;
 
@@ -275,6 +256,24 @@ export const RankingGeral = () => {
           eventScore,
         };
       });
+
+      // Encontrar o Cone Monodedo = jogador com menor pontuação (eventScore)
+      if (aggregated.length > 0) {
+        const worstPlayer = [...aggregated].sort((a, b) => a.eventScore - b.eventScore)[0];
+        coneMonodedoName = worstPlayer.name;
+      }
+
+      // Brabíssimo = maior nº de kills em uma única partida (exclui cone monodedo)
+      let brabissimoRecord: { name: string; kills: number } | undefined = undefined;
+      for (const [key, count] of perMatchKills.entries()) {
+        const [matchId, normKey] = key.split('|');
+        const stats = playerMap.get(normKey);
+        if (!stats) continue;
+        if (stats.displayName === coneMonodedoName) continue;
+        if (!brabissimoRecord || count > brabissimoRecord.kills) {
+          brabissimoRecord = { name: stats.displayName, kills: count };
+        }
+      }
 
       // Logs de conferência para KOMBAT e Melisandre
       try {
