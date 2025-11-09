@@ -199,22 +199,11 @@ export const KillStreakRanking = () => {
         imageData = canvas.toDataURL('image/jpeg', 0.7);
       }
 
-      const webhookHomolog = localStorage.getItem('DISCORD_WEBHOOK_URL');
-      const webhookProd = localStorage.getItem('DISCORD_WEBHOOK_URL_PROD');
-      
-      const selectedWebhook = environment === 'prod' ? webhookProd : webhookHomolog;
-      
-      if (!selectedWebhook) {
-        toast.error(`Webhook de ${environment === 'prod' ? 'Produção' : 'Homologação'} não configurado. Configure na aba Admin.`);
-        return;
-      }
-
       const top3 = streakRankings.slice(0, 3);
       
       const payload = {
         type: 'killstreak',
         environment,
-        webhookUrl: selectedWebhook,
         filters: {
           dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
           dateTo: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,

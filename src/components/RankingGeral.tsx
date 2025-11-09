@@ -472,24 +472,8 @@ export const RankingGeral = () => {
       console.log('Table image size:', (imageData.length / 1024 / 1024).toFixed(2), 'MB (as base64)');
       console.log('Special cards image size:', (specialCardsImage.length / 1024 / 1024).toFixed(2), 'MB (as base64)');
 
-      // Get webhooks from localStorage
-      const webhookHomolog = localStorage.getItem('DISCORD_WEBHOOK_URL');
-      const webhookProd = localStorage.getItem('DISCORD_WEBHOOK_URL_PROD');
-      
-      const selectedWebhook = environment === 'prod' ? webhookProd : webhookHomolog;
-      
-      if (!selectedWebhook) {
-        toast({
-          title: 'Webhook não configurado',
-          description: `Webhook de ${environment === 'prod' ? 'Produção' : 'Homologação'} não configurado. Configure na aba Admin.`,
-          variant: 'destructive'
-        });
-        return;
-      }
-
       const payload = {
         environment,
-        webhookUrl: selectedWebhook,
         filters: {
           class: classFilter,
           dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,

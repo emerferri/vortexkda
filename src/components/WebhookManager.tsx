@@ -14,29 +14,8 @@ export const WebhookManager = () => {
   const [loading, setLoading] = useState(false);
 
   const handleSave = async () => {
-    if (!webhookHomolog.trim() && !webhookProd.trim()) {
-      toast.error('Preencha pelo menos um webhook');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Save to localStorage for now (edge function will use secrets)
-      if (webhookHomolog.trim()) {
-        localStorage.setItem('DISCORD_WEBHOOK_URL', webhookHomolog.trim());
-      }
-      if (webhookProd.trim()) {
-        localStorage.setItem('DISCORD_WEBHOOK_URL_PROD', webhookProd.trim());
-      }
-      
-      toast.success('Webhooks salvos com sucesso!');
-      toast.info('Nota: Para usar os webhooks salvos, será necessário atualizar os secrets no backend');
-    } catch (error) {
-      console.error('Erro ao salvar webhooks:', error);
-      toast.error('Erro ao salvar webhooks');
-    } finally {
-      setLoading(false);
-    }
+    toast.info('Os webhooks devem ser configurados nos secrets do backend.');
+    toast.info('Acesse a aba Cloud → Secrets para configurar DISCORD_WEBHOOK_URL e DISCORD_WEBHOOK_URL_PROD');
   };
 
   return (
@@ -130,13 +109,19 @@ export const WebhookManager = () => {
 
           {/* Info Box */}
           <div className="bg-muted rounded-lg p-4">
-            <h4 className="font-semibold mb-2">ℹ️ Como usar:</h4>
+            <h4 className="font-semibold mb-2">ℹ️ Como configurar:</h4>
             <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>Cole os URLs dos webhooks do Discord nos campos acima</li>
-              <li>Clique em "Salvar Webhooks"</li>
-              <li>Ao publicar um ranking, selecione o ambiente desejado (Homologação ou Produção)</li>
-              <li>O sistema usará automaticamente o webhook correto</li>
+              <li>Acesse a aba Cloud → Secrets no menu lateral</li>
+              <li>Adicione ou atualize os secrets: DISCORD_WEBHOOK_URL (homologação) e DISCORD_WEBHOOK_URL_PROD (produção)</li>
+              <li>Cole os URLs dos webhooks do Discord diretamente nos secrets</li>
+              <li>Ao publicar um ranking, selecione o ambiente desejado</li>
+              <li>O edge function usará automaticamente o webhook correto de forma segura</li>
             </ol>
+            <div className="mt-3 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded">
+              <p className="text-xs text-yellow-700 dark:text-yellow-400">
+                ⚠️ Por segurança, os webhooks são armazenados apenas no backend e não no navegador.
+              </p>
+            </div>
           </div>
         </div>
       </CardContent>

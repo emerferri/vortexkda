@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,7 +30,6 @@ interface Filters {
 interface GeneralRankingBody {
   type?: 'general';
   environment: 'homolog' | 'prod';
-  webhookUrl: string;
   filters: Filters;
   specialRankings: SpecialRankings;
   image: string;
@@ -44,7 +44,6 @@ interface GeneralRankingBody {
 interface KillStreakBody {
   type: 'killstreak';
   environment: 'homolog' | 'prod';
-  webhookUrl: string;
   filters: Filters;
   streakRankings: StreakRankings;
   image: string;
@@ -61,15 +60,68 @@ serve(async (req) => {
   }
 
   try {
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Authentication required' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Initialize Supabase client to check admin role
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
+    );
+
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Invalid token' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Check if user has admin role
+    const { data: hasAdminRole, error: roleError } = await supabase
+      .rpc('has_role', { _user_id: user.id, _role: 'admin' });
+
+    if (roleError || !hasAdminRole) {
+      console.error('Role check failed:', roleError);
+      return new Response(
+        JSON.stringify({ error: 'Forbidden - Admin access required' }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     const body: RequestBody = await req.json();
     const rankingType = body.type || 'general';
-    console.log(`Received request to post ${rankingType} ranking to Discord`);
+    console.log(`Received request to post ${rankingType} ranking to Discord from user ${user.email}`);
     
-    // Get Discord webhook URL from request body
-    const webhookUrl = body.webhookUrl;
+    // Get Discord webhook URL from environment secrets
+    const webhookUrl = body.environment === 'prod' 
+      ? Deno.env.get('DISCORD_WEBHOOK_URL_PROD')
+      : Deno.env.get('DISCORD_WEBHOOK_URL');
     
     if (!webhookUrl) {
-      throw new Error(`Webhook URL not provided for ${body.environment} environment`);
+      throw new Error(`Webhook URL not configured for ${body.environment} environment`);
     }
     
     console.log(`Publishing to ${body.environment} environment`);
