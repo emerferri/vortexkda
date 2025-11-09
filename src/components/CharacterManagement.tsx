@@ -7,6 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { z } from 'zod';
+
+const characterSchema = z.object({
+  name: z.string().trim().min(1, 'Nome é obrigatório').max(50, 'Nome deve ter no máximo 50 caracteres'),
+  guild: z.string().trim().min(1, 'Guild é obrigatória').max(50, 'Guild deve ter no máximo 50 caracteres'),
+  class: z.string().trim().min(1, 'Classe é obrigatória').max(50, 'Classe deve ter no máximo 50 caracteres'),
+});
 import {
   Dialog,
   DialogContent,
@@ -56,14 +63,24 @@ export const CharacterManagement = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate input with zod
+    const validation = characterSchema.safeParse(formData);
+    if (!validation.success) {
+      const firstError = validation.error.errors[0];
+      toast.error(firstError.message);
+      return;
+    }
+
+    const validatedData = validation.data;
+
     try {
       if (editingCharacter) {
         const { error } = await supabase
           .from('characters')
           .update({
-            name: formData.name,
-            guild: formData.guild,
-            class: formData.class,
+            name: validatedData.name,
+            guild: validatedData.guild,
+            class: validatedData.class,
           })
           .eq('id', editingCharacter.id);
 
@@ -74,9 +91,9 @@ export const CharacterManagement = () => {
           .from('characters')
           .insert([
             {
-              name: formData.name,
-              guild: formData.guild,
-              class: formData.class,
+              name: validatedData.name,
+              guild: validatedData.guild,
+              class: validatedData.class,
             },
           ]);
 

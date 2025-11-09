@@ -8,6 +8,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Swords, Loader2 } from 'lucide-react';
+import { z } from 'zod';
+
+const authSchema = z.object({
+  email: z.string().trim().email('Email inválido').max(255, 'Email deve ter no máximo 255 caracteres'),
+  password: z.string()
+    .min(8, 'Senha deve ter no mínimo 8 caracteres')
+    .regex(/[A-Z]/, 'Senha deve conter pelo menos uma letra maiúscula')
+    .regex(/[a-z]/, 'Senha deve conter pelo menos uma letra minúscula')
+    .regex(/[0-9]/, 'Senha deve conter pelo menos um número'),
+});
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -38,10 +48,23 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
+    // Validate input with zod
+    const validation = authSchema.safeParse({ email, password });
+    if (!validation.success) {
+      const firstError = validation.error.errors[0];
+      toast({
+        title: "Erro de validação",
+        description: firstError.message,
+        variant: "destructive"
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.signUp({
-        email,
-        password,
+        email: validation.data.email,
+        password: validation.data.password,
         options: {
           emailRedirectTo: `${window.location.origin}/`
         }
@@ -76,9 +99,21 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
+    // Validate email format for login
+    const emailValidation = z.string().email('Email inválido').safeParse(email);
+    if (!emailValidation.success) {
+      toast({
+        title: "Erro de validação",
+        description: emailValidation.error.errors[0].message,
+        variant: "destructive"
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.signInWithPassword({
-        email,
+        email: emailValidation.data,
         password
       });
 
@@ -186,11 +221,10 @@ const Auth = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    minLength={6}
                     disabled={loading}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Mínimo de 6 caracteres
+                    Mínimo 8 caracteres, com maiúscula, minúscula e número
                   </p>
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
