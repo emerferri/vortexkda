@@ -136,13 +136,31 @@ export const Scoreboard = ({ players, bossLabel, killLogs = [] }: ScoreboardProp
       const hour = parseInt(match[3]);
       const year = new Date().getFullYear();
       const matchDate = new Date(year, month - 1, day);
+      const formattedDate = matchDate.toISOString().split('T')[0];
+
+      // Check if match already exists
+      const { data: existingMatch } = await supabase
+        .from('pvp_matches')
+        .select('id')
+        .eq('match_date', formattedDate)
+        .eq('match_hour', hour)
+        .maybeSingle();
+
+      if (existingMatch) {
+        toast({
+          title: "Duplicado",
+          description: "Já existe um registro para esta data e hora",
+          variant: "destructive"
+        });
+        return;
+      }
 
       // Insert match
       const { data: matchData, error: matchError } = await supabase
         .from('pvp_matches')
         .insert({
           boss_label: bossLabel,
-          match_date: matchDate.toISOString().split('T')[0],
+          match_date: formattedDate,
           match_hour: hour
         })
         .select()
