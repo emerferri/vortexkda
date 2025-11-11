@@ -4,8 +4,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Swords, Search, X } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Swords, Search, X, Calendar as CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 interface KillLog {
   id: string;
@@ -28,28 +34,72 @@ export const ConfrontosDiretos = () => {
   const [loading, setLoading] = useState(true);
   const [filterName, setFilterName] = useState('');
   const [sortBy, setSortBy] = useState<'killer' | 'victim'>('killer');
+  const [dateFrom, setDateFrom] = useState<Date>();
+  const [dateTo, setDateTo] = useState<Date>();
+  const [hourFrom, setHourFrom] = useState<number>();
+  const [hourTo, setHourTo] = useState<number>();
 
   useEffect(() => {
     loadKillLogs();
-  }, []);
+  }, [dateFrom, dateTo, hourFrom, hourTo]);
 
   const loadKillLogs = async () => {
     try {
       setLoading(true);
-      const pageSize = 1000; // fetch all rows in pages to avoid server max-rows cap
+      
+      // Se houver filtros de data/hora, filtramos pelos match_ids de pvp_matches
+      const matchFilterActive = !!(dateFrom || dateTo || hourFrom !== undefined || hourTo !== undefined);
+      let matchIds: string[] | undefined = undefined;
+
+      if (matchFilterActive) {
+        const pageSize = 1000;
+        let from = 0;
+        let matchesAccum: any[] = [];
+        
+        while (true) {
+          let mq = supabase
+            .from('pvp_matches')
+            .select('id, match_date, match_hour');
+          
+          if (dateFrom) mq = mq.gte('match_date', format(dateFrom, 'yyyy-MM-dd'));
+          if (dateTo) mq = mq.lte('match_date', format(dateTo, 'yyyy-MM-dd'));
+          if (hourFrom !== undefined) mq = mq.gte('match_hour', hourFrom);
+          if (hourTo !== undefined) mq = mq.lte('match_hour', hourTo);
+          
+          const { data: page, error } = await mq.range(from, from + pageSize - 1);
+          if (error) throw error;
+          if (page && page.length > 0) matchesAccum = matchesAccum.concat(page);
+          if (!page || page.length < pageSize) break;
+          from += pageSize;
+        }
+        
+        matchIds = (matchesAccum || []).map((m: any) => m.id);
+        if (!matchIds.length) {
+          setKillLogs([]);
+          setLoading(false);
+          return;
+        }
+      }
+
+      const pageSize = 1000;
       let from = 0;
       let accumulated: KillLog[] = [];
 
       while (true) {
-        const { data, error } = await supabase
+        let query = supabase
           .from('pvp_kill_logs')
           .select('*')
-          .order('created_at', { ascending: false })
-          .range(from, from + pageSize - 1);
+          .order('created_at', { ascending: false });
+        
+        if (matchIds) {
+          query = query.in('match_id', matchIds);
+        }
+        
+        const { data, error } = await query.range(from, from + pageSize - 1);
 
         if (error) throw error;
         if (data && data.length > 0) accumulated = accumulated.concat(data);
-        if (!data || data.length < pageSize) break; // no more pages
+        if (!data || data.length < pageSize) break;
         from += pageSize;
       }
 
@@ -159,39 +209,144 @@ export const ConfrontosDiretos = () => {
             </div>
           </div>
         </div>
-        <div className="flex gap-4 mt-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <Input
-              placeholder="Filtrar por nome do jogador..."
-              value={filterName}
-              onChange={(e) => setFilterName(e.target.value)}
-              className="pl-10 pr-10"
-            />
-            {filterName && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
-                onClick={() => setFilterName('')}
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            )}
+        <div className="space-y-4 mt-4">
+          {/* Filtros de Data e Hora */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "justify-start text-left font-normal",
+                    !dateFrom && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateFrom ? format(dateFrom, "PPP", { locale: ptBR }) : "Data inicial"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateFrom}
+                  onSelect={setDateFrom}
+                  initialFocus
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "justify-start text-left font-normal",
+                    !dateTo && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateTo ? format(dateTo, "PPP", { locale: ptBR }) : "Data final"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateTo}
+                  onSelect={setDateTo}
+                  initialFocus
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Select
+              value={hourFrom?.toString()}
+              onValueChange={(value) => setHourFrom(value ? parseInt(value) : undefined)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Hora inicial" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todas</SelectItem>
+                {Array.from({ length: 24 }, (_, i) => (
+                  <SelectItem key={i} value={i.toString()}>
+                    {i.toString().padStart(2, '0')}:00
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={hourTo?.toString()}
+              onValueChange={(value) => setHourTo(value ? parseInt(value) : undefined)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Hora final" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todas</SelectItem>
+                {Array.from({ length: 24 }, (_, i) => (
+                  <SelectItem key={i} value={i.toString()}>
+                    {i.toString().padStart(2, '0')}:00
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <div className="flex gap-2">
+
+          {/* Botão para limpar filtros */}
+          {(dateFrom || dateTo || hourFrom !== undefined || hourTo !== undefined) && (
             <Button
-              variant={sortBy === 'killer' ? 'default' : 'outline'}
-              onClick={() => setSortBy('killer')}
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setDateFrom(undefined);
+                setDateTo(undefined);
+                setHourFrom(undefined);
+                setHourTo(undefined);
+              }}
             >
-              Ordenar por Nome
+              <X className="w-4 h-4 mr-2" />
+              Limpar filtros de data/hora
             </Button>
-            <Button
-              variant={sortBy === 'victim' ? 'default' : 'outline'}
-              onClick={() => setSortBy('victim')}
-            >
-              Ordenar por Kills
-            </Button>
+          )}
+
+          {/* Filtro de nome e ordenação */}
+          <div className="flex gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                placeholder="Filtrar por nome do jogador..."
+                value={filterName}
+                onChange={(e) => setFilterName(e.target.value)}
+                className="pl-10 pr-10"
+              />
+              {filterName && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
+                  onClick={() => setFilterName('')}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={sortBy === 'killer' ? 'default' : 'outline'}
+                onClick={() => setSortBy('killer')}
+              >
+                Ordenar por Nome
+              </Button>
+              <Button
+                variant={sortBy === 'victim' ? 'default' : 'outline'}
+                onClick={() => setSortBy('victim')}
+              >
+                Ordenar por Kills
+              </Button>
+            </div>
           </div>
         </div>
       </CardHeader>
