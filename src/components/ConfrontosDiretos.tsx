@@ -261,14 +261,14 @@ export const ConfrontosDiretos = () => {
             </Popover>
 
             <Select
-              value={hourFrom?.toString()}
-              onValueChange={(value) => setHourFrom(value ? parseInt(value) : undefined)}
+              value={hourFrom?.toString() || "all"}
+              onValueChange={(value) => setHourFrom(value === "all" ? undefined : parseInt(value))}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Hora inicial" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas</SelectItem>
+                <SelectItem value="all">Todas</SelectItem>
                 {Array.from({ length: 24 }, (_, i) => (
                   <SelectItem key={i} value={i.toString()}>
                     {i.toString().padStart(2, '0')}:00
@@ -278,14 +278,14 @@ export const ConfrontosDiretos = () => {
             </Select>
 
             <Select
-              value={hourTo?.toString()}
-              onValueChange={(value) => setHourTo(value ? parseInt(value) : undefined)}
+              value={hourTo?.toString() || "all"}
+              onValueChange={(value) => setHourTo(value === "all" ? undefined : parseInt(value))}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Hora final" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas</SelectItem>
+                <SelectItem value="all">Todas</SelectItem>
                 {Array.from({ length: 24 }, (_, i) => (
                   <SelectItem key={i} value={i.toString()}>
                     {i.toString().padStart(2, '0')}:00
