@@ -1,4 +1,6 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
+import { debounce } from 'lodash';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -25,36 +27,51 @@ interface PlayerDeathStats {
 }
 
 export const MuralDaVergonha = () => {
-  const [deathStats, setDeathStats] = useState<PlayerDeathStats[]>([]);
-  const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
   const [hourTo, setHourTo] = useState<number>();
+  const [debouncedDateFrom, setDebouncedDateFrom] = useState<Date>();
+  const [debouncedDateTo, setDebouncedDateTo] = useState<Date>();
+  const [debouncedHourFrom, setDebouncedHourFrom] = useState<number>();
+  const [debouncedHourTo, setDebouncedHourTo] = useState<number>();
   const tableRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    loadDeathStats();
-  }, [dateFrom, dateTo, hourFrom, hourTo]);
+  // Debounce filter updates
+  const debouncedSetFilters = useCallback(
+    debounce((from: Date | undefined, to: Date | undefined, hFrom: number | undefined, hTo: number | undefined) => {
+      setDebouncedDateFrom(from);
+      setDebouncedDateTo(to);
+      setDebouncedHourFrom(hFrom);
+      setDebouncedHourTo(hTo);
+    }, 500),
+    []
+  );
 
-  const loadDeathStats = async () => {
-    try {
-      setLoading(true);
+  // Update debounced values when filters change
+  useMemo(() => {
+    debouncedSetFilters(dateFrom, dateTo, hourFrom, hourTo);
+  }, [dateFrom, dateTo, hourFrom, hourTo, debouncedSetFilters]);
+
+  const { data: deathStats = [], isLoading: loading } = useQuery({
+    queryKey: ['mural-vergonha', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    staleTime: 30000,
+    queryFn: async () => {
 
       // Build match query with filters
       let matchQuery = supabase.from('pvp_matches').select('id');
 
-      if (dateFrom) {
-        matchQuery = matchQuery.gte('match_date', format(dateFrom, 'yyyy-MM-dd'));
+      if (debouncedDateFrom) {
+        matchQuery = matchQuery.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
       }
-      if (dateTo) {
-        matchQuery = matchQuery.lte('match_date', format(dateTo, 'yyyy-MM-dd'));
+      if (debouncedDateTo) {
+        matchQuery = matchQuery.lte('match_date', format(debouncedDateTo, 'yyyy-MM-dd'));
       }
-      if (hourFrom !== undefined) {
-        matchQuery = matchQuery.gte('match_hour', hourFrom);
+      if (debouncedHourFrom !== undefined) {
+        matchQuery = matchQuery.gte('match_hour', debouncedHourFrom);
       }
-      if (hourTo !== undefined) {
-        matchQuery = matchQuery.lte('match_hour', hourTo);
+      if (debouncedHourTo !== undefined) {
+        matchQuery = matchQuery.lte('match_hour', debouncedHourTo);
       }
 
       const { data: matches, error: matchError } = await matchQuery;
@@ -62,9 +79,7 @@ export const MuralDaVergonha = () => {
 
       const matchIds = matches?.map(m => m.id) || [];
       if (matchIds.length === 0) {
-        setDeathStats([]);
-        setLoading(false);
-        return;
+        return [];
       }
 
       // Fetch player data filtered by match IDs
@@ -115,14 +130,9 @@ export const MuralDaVergonha = () => {
         }))
         .sort((a, b) => b.totalDeaths - a.totalDeaths);
 
-      setDeathStats(stats);
-    } catch (error) {
-      console.error('Erro ao carregar estatísticas de mortes:', error);
-      toast.error('Erro ao carregar o Mural da Vergonha');
-    } finally {
-      setLoading(false);
+      return stats;
     }
-  };
+  });
 
   const exportToExcel = () => {
     const data = deathStats.map((stat, index) => ({

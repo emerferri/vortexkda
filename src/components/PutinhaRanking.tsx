@@ -1,4 +1,6 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
+import { debounce } from 'lodash';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -22,37 +24,52 @@ interface PutinhaRelation {
 }
 
 export const PutinhaRanking = () => {
-  const [relations, setRelations] = useState<PutinhaRelation[]>([]);
-  const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
   const [hourTo, setHourTo] = useState<number>();
+  const [debouncedDateFrom, setDebouncedDateFrom] = useState<Date>();
+  const [debouncedDateTo, setDebouncedDateTo] = useState<Date>();
+  const [debouncedHourFrom, setDebouncedHourFrom] = useState<number>();
+  const [debouncedHourTo, setDebouncedHourTo] = useState<number>();
   const cardRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    loadPutinhaRanking();
-  }, [dateFrom, dateTo, hourFrom, hourTo]);
+  // Debounce filter updates
+  const debouncedSetFilters = useCallback(
+    debounce((from: Date | undefined, to: Date | undefined, hFrom: number | undefined, hTo: number | undefined) => {
+      setDebouncedDateFrom(from);
+      setDebouncedDateTo(to);
+      setDebouncedHourFrom(hFrom);
+      setDebouncedHourTo(hTo);
+    }, 500),
+    []
+  );
 
-  const loadPutinhaRanking = async () => {
-    try {
-      setLoading(true);
+  // Update debounced values when filters change
+  useMemo(() => {
+    debouncedSetFilters(dateFrom, dateTo, hourFrom, hourTo);
+  }, [dateFrom, dateTo, hourFrom, hourTo, debouncedSetFilters]);
+
+  const { data: relations = [], isLoading: loading } = useQuery({
+    queryKey: ['putinha-ranking', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    staleTime: 30000,
+    queryFn: async () => {
 
       // 1) Fetch match IDs based on date/hour filters
       let matchQuery = supabase.from('pvp_matches').select('id');
 
-      if (dateFrom) {
-        matchQuery = matchQuery.gte('match_date', format(dateFrom, 'yyyy-MM-dd'));
+      if (debouncedDateFrom) {
+        matchQuery = matchQuery.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
       }
-      if (dateTo) {
-        matchQuery = matchQuery.lte('match_date', format(dateTo, 'yyyy-MM-dd'));
+      if (debouncedDateTo) {
+        matchQuery = matchQuery.lte('match_date', format(debouncedDateTo, 'yyyy-MM-dd'));
       }
-      if (hourFrom !== undefined) {
-        matchQuery = matchQuery.gte('match_hour', hourFrom);
+      if (debouncedHourFrom !== undefined) {
+        matchQuery = matchQuery.gte('match_hour', debouncedHourFrom);
       }
-      if (hourTo !== undefined) {
-        matchQuery = matchQuery.lte('match_hour', hourTo);
+      if (debouncedHourTo !== undefined) {
+        matchQuery = matchQuery.lte('match_hour', debouncedHourTo);
       }
 
       const { data: matches, error: matchError } = await matchQuery;
@@ -60,9 +77,7 @@ export const PutinhaRanking = () => {
 
       const matchIds = matches?.map(m => m.id) || [];
       if (matchIds.length === 0) {
-        setRelations([]);
-        setLoading(false);
-        return;
+        return [];
       }
 
       // 2) Fetch kill logs filtered by match IDs with pagination
@@ -139,18 +154,9 @@ export const PutinhaRanking = () => {
         }))
         .sort((a, b) => b.deaths - a.deaths);
 
-      setRelations(putinhaRelations);
-    } catch (error) {
-      console.error('Error loading putinha ranking:', error);
-      toast({
-        title: 'Erro',
-        description: 'Falha ao carregar ranking',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
+      return putinhaRelations;
     }
-  };
+  });
 
   const exportAsImage = async () => {
     if (!cardRef.current) return;

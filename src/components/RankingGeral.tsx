@@ -1,4 +1,5 @@
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useRef, useCallback } from 'react';
+import { debounce } from 'lodash';
 import { Trophy, Skull, Crosshair, TrendingUp, Calendar as CalendarIcon, Download, FileImage, Send } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
@@ -36,12 +37,32 @@ export const RankingGeral = () => {
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
   const [hourTo, setHourTo] = useState<number>();
+  const [debouncedDateFrom, setDebouncedDateFrom] = useState<Date>();
+  const [debouncedDateTo, setDebouncedDateTo] = useState<Date>();
+  const [debouncedHourFrom, setDebouncedHourFrom] = useState<number>();
+  const [debouncedHourTo, setDebouncedHourTo] = useState<number>();
   const [classFilter, setClassFilter] = useState<string>('all');
   const [showDiscordModal, setShowDiscordModal] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [environment, setEnvironment] = useState<'homolog' | 'prod'>('homolog');
   const tableRef = useRef<HTMLDivElement>(null);
   const specialCardsRef = useRef<HTMLDivElement>(null);
+
+  // Debounce filter updates
+  const debouncedSetFilters = useCallback(
+    debounce((from: Date | undefined, to: Date | undefined, hFrom: number | undefined, hTo: number | undefined) => {
+      setDebouncedDateFrom(from);
+      setDebouncedDateTo(to);
+      setDebouncedHourFrom(hFrom);
+      setDebouncedHourTo(hTo);
+    }, 500),
+    []
+  );
+
+  // Update debounced values when filters change
+  useMemo(() => {
+    debouncedSetFilters(dateFrom, dateTo, hourFrom, hourTo);
+  }, [dateFrom, dateTo, hourFrom, hourTo, debouncedSetFilters]);
 
   const { data: classes } = useQuery({
     queryKey: ['classes'],
@@ -81,7 +102,8 @@ export const RankingGeral = () => {
   }, [classes]);
 
   const { data: aggregatedData, isLoading } = useQuery({
-    queryKey: ['ranking-geral', dateFrom, dateTo, hourFrom, hourTo],
+    queryKey: ['ranking-geral', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    staleTime: 30000, // Cache for 30 seconds
     queryFn: async () => {
       // Vamos unificar a fonte com Confrontos Diretos: agregaremos a partir de pvp_kill_logs
       // e aplicaremos filtros de data/hora através dos match_ids de pvp_matches
@@ -154,7 +176,7 @@ export const RankingGeral = () => {
       };
 
       // Se houver filtros de data/hora, filtramos pelos match_ids de pvp_matches
-      const matchFilterActive = !!(dateFrom || dateTo || hourFrom !== undefined || hourTo !== undefined);
+      const matchFilterActive = !!(debouncedDateFrom || debouncedDateTo || debouncedHourFrom !== undefined || debouncedHourTo !== undefined);
       let matchIds: string[] | undefined = undefined;
 
       if (matchFilterActive) {
@@ -165,10 +187,10 @@ export const RankingGeral = () => {
           let mq = supabase
             .from('pvp_matches')
             .select('id, match_date, match_hour');
-          if (dateFrom) mq = mq.gte('match_date', format(dateFrom, 'yyyy-MM-dd'));
-          if (dateTo) mq = mq.lte('match_date', format(dateTo, 'yyyy-MM-dd'));
-          if (hourFrom !== undefined) mq = mq.gte('match_hour', hourFrom);
-          if (hourTo !== undefined) mq = mq.lte('match_hour', hourTo);
+          if (debouncedDateFrom) mq = mq.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
+          if (debouncedDateTo) mq = mq.lte('match_date', format(debouncedDateTo, 'yyyy-MM-dd'));
+          if (debouncedHourFrom !== undefined) mq = mq.gte('match_hour', debouncedHourFrom);
+          if (debouncedHourTo !== undefined) mq = mq.lte('match_hour', debouncedHourTo);
           const { data: page, error } = await mq.range(from, from + pageSize - 1);
           if (error) throw error;
           if (page && page.length > 0) matchesAccum = matchesAccum.concat(page);
@@ -275,14 +297,7 @@ export const RankingGeral = () => {
         }
       }
 
-      // Logs de conferência para KOMBAT e Melisandre
-      try {
-        const kKey = normalize('KOMBAT');
-        const mKey = normalize('Melisandre');
-        const aggK = aggregated.find(p => normalize(p.name) === kKey);
-        const aggM = aggregated.find(p => normalize(p.name) === mKey);
-        console.log('[RankingGeral] Check KOMBAT/Melisandre', { aggK, aggM, totalLogs: logs.length });
-      } catch {}
+      // Remove debug logs in production
 
       const dedupCharacters = Array.from(characterMap.entries()).map(([norm, cls]) => {
         const original = (entries.find(e => e.norm === norm)?.displayName) || '';
@@ -329,14 +344,7 @@ export const RankingGeral = () => {
             eventScore: 0,
           })) || [];
 
-      try {
-        console.log('[RankingGeral] Class filter debug', {
-          classFilter,
-          filteredCount: filtered.length,
-          toAddCount: toAdd.length,
-          filteredNames: filtered.map(p => p.name).slice(0, 20),
-        });
-      } catch {}
+      // Remove debug logs in production
 
       filtered = [...filtered, ...toAdd];
     }

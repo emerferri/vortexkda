@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { debounce } from 'lodash';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -30,25 +32,39 @@ interface PlayerStats {
 }
 
 export const ConfrontosDiretos = () => {
-  const [killLogs, setKillLogs] = useState<KillLog[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filterName, setFilterName] = useState('');
   const [sortBy, setSortBy] = useState<'killer' | 'victim'>('killer');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
   const [hourTo, setHourTo] = useState<number>();
+  const [debouncedDateFrom, setDebouncedDateFrom] = useState<Date>();
+  const [debouncedDateTo, setDebouncedDateTo] = useState<Date>();
+  const [debouncedHourFrom, setDebouncedHourFrom] = useState<number>();
+  const [debouncedHourTo, setDebouncedHourTo] = useState<number>();
 
-  useEffect(() => {
-    loadKillLogs();
-  }, [dateFrom, dateTo, hourFrom, hourTo]);
+  // Debounce filter updates
+  const debouncedSetFilters = useCallback(
+    debounce((from: Date | undefined, to: Date | undefined, hFrom: number | undefined, hTo: number | undefined) => {
+      setDebouncedDateFrom(from);
+      setDebouncedDateTo(to);
+      setDebouncedHourFrom(hFrom);
+      setDebouncedHourTo(hTo);
+    }, 500),
+    []
+  );
 
-  const loadKillLogs = async () => {
-    try {
-      setLoading(true);
-      
+  // Update debounced values when filters change
+  useMemo(() => {
+    debouncedSetFilters(dateFrom, dateTo, hourFrom, hourTo);
+  }, [dateFrom, dateTo, hourFrom, hourTo, debouncedSetFilters]);
+
+  const { data: killLogs = [], isLoading: loading } = useQuery({
+    queryKey: ['confrontos-diretos', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    staleTime: 30000,
+    queryFn: async () => {
       // Se houver filtros de data/hora, filtramos pelos match_ids de pvp_matches
-      const matchFilterActive = !!(dateFrom || dateTo || hourFrom !== undefined || hourTo !== undefined);
+      const matchFilterActive = !!(debouncedDateFrom || debouncedDateTo || debouncedHourFrom !== undefined || debouncedHourTo !== undefined);
       let matchIds: string[] | undefined = undefined;
 
       if (matchFilterActive) {
@@ -61,10 +77,10 @@ export const ConfrontosDiretos = () => {
             .from('pvp_matches')
             .select('id, match_date, match_hour');
           
-          if (dateFrom) mq = mq.gte('match_date', format(dateFrom, 'yyyy-MM-dd'));
-          if (dateTo) mq = mq.lte('match_date', format(dateTo, 'yyyy-MM-dd'));
-          if (hourFrom !== undefined) mq = mq.gte('match_hour', hourFrom);
-          if (hourTo !== undefined) mq = mq.lte('match_hour', hourTo);
+          if (debouncedDateFrom) mq = mq.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
+          if (debouncedDateTo) mq = mq.lte('match_date', format(debouncedDateTo, 'yyyy-MM-dd'));
+          if (debouncedHourFrom !== undefined) mq = mq.gte('match_hour', debouncedHourFrom);
+          if (debouncedHourTo !== undefined) mq = mq.lte('match_hour', debouncedHourTo);
           
           const { data: page, error } = await mq.range(from, from + pageSize - 1);
           if (error) throw error;
@@ -75,9 +91,7 @@ export const ConfrontosDiretos = () => {
         
         matchIds = (matchesAccum || []).map((m: any) => m.id);
         if (!matchIds.length) {
-          setKillLogs([]);
-          setLoading(false);
-          return;
+          return [];
         }
       }
 
@@ -103,14 +117,9 @@ export const ConfrontosDiretos = () => {
         from += pageSize;
       }
 
-      setKillLogs(accumulated);
-    } catch (error) {
-      console.error('Erro ao carregar logs de confrontos:', error);
-      toast.error('Erro ao carregar confrontos diretos');
-    } finally {
-      setLoading(false);
+      return accumulated;
     }
-  };
+  });
 
   const getPlayerStats = (): PlayerStats[] => {
     const statsMap = new Map<string, PlayerStats>();
