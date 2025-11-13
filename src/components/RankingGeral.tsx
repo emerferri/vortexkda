@@ -321,36 +321,43 @@ export const RankingGeral = () => {
         .toLowerCase();
 
     const base = aggregatedData.aggregated;
-    let filtered = base;
+    
+    // Verifica se há filtros de data/hora ativos
+    const hasDateFilters = !!(debouncedDateFrom || debouncedDateTo || debouncedHourFrom !== undefined || debouncedHourTo !== undefined);
+    
+    // Se há filtros de data, remove jogadores sem atividade (sem kills E sem deaths)
+    let filtered = hasDateFilters 
+      ? base.filter(p => p.kills > 0 || p.deaths > 0)
+      : base;
 
     if (classFilter !== 'all') {
-      filtered = base.filter(p => normalizeClassKey(p.class || '') === classFilter);
+      filtered = filtered.filter(p => normalizeClassKey(p.class || '') === classFilter);
 
-      // Adiciona jogadores cadastrados na classe selecionada mesmo sem partidas (0 stats)
-      const existing = new Set(filtered.map(p => normalizeNameKey(p.name)));
-      const toAdd =
-        (aggregatedData as any)?.characters
-          ?.filter((c: any) => normalizeClassKey(c.class || '') === classFilter)
-          ?.filter((c: any) => !existing.has(normalizeNameKey(c.name)))
-          ?.map((c: any) => ({
-            name: c.name,
-            class: c.class || null,
-            kills: 0,
-            deaths: 0,
-            kda: 0,
-            weightedKda: 0,
-            matches: 0,
-            mvpScore: 0,
-            eventScore: 0,
-          })) || [];
+      // Só adiciona jogadores sem partidas se NÃO houver filtros de data
+      if (!hasDateFilters) {
+        const existing = new Set(filtered.map(p => normalizeNameKey(p.name)));
+        const toAdd =
+          (aggregatedData as any)?.characters
+            ?.filter((c: any) => normalizeClassKey(c.class || '') === classFilter)
+            ?.filter((c: any) => !existing.has(normalizeNameKey(c.name)))
+            ?.map((c: any) => ({
+              name: c.name,
+              class: c.class || null,
+              kills: 0,
+              deaths: 0,
+              kda: 0,
+              weightedKda: 0,
+              matches: 0,
+              mvpScore: 0,
+              eventScore: 0,
+            })) || [];
 
-      // Remove debug logs in production
-
-      filtered = [...filtered, ...toAdd];
+        filtered = [...filtered, ...toAdd];
+      }
     }
     
     return [...filtered].sort((a, b) => b[sortBy] - a[sortBy]);
-  }, [aggregatedData, sortBy, classFilter]);
+  }, [aggregatedData, sortBy, classFilter, debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo]);
 
   const topPlayer = sortedPlayers[0];
 
