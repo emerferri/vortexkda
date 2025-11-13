@@ -261,7 +261,8 @@ export const RankingGeral = () => {
 
       const totalBossEvents = uniqueMatches.size;
 
-      const aggregated: AggregatedPlayer[] = Array.from(playerMap.entries()).map(([normKey, stats]) => {
+      // Filtrar personagens sem atividade se houver filtros de data/hora
+      let aggregated: AggregatedPlayer[] = Array.from(playerMap.entries()).map(([normKey, stats]) => {
         const kda = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
         const weightedKda = totalBossEvents > 0 ? kda * (stats.matches.size / totalBossEvents) : 0;
         const mvpScore = (stats.kills * 3) + (kda * 2) - (stats.deaths * 1.5);
@@ -278,6 +279,11 @@ export const RankingGeral = () => {
           eventScore,
         };
       });
+
+      // Se houver filtros de data/hora ativos, remove jogadores sem atividade
+      if (matchFilterActive) {
+        aggregated = aggregated.filter(p => p.kills > 0 || p.deaths > 0);
+      }
 
       // Encontrar o Cone Monodedo = jogador com menor pontuação (eventScore)
       if (aggregated.length > 0) {
@@ -321,19 +327,13 @@ export const RankingGeral = () => {
         .toLowerCase();
 
     const base = aggregatedData.aggregated;
-    
-    // Verifica se há filtros de data/hora ativos
-    const hasDateFilters = !!(debouncedDateFrom || debouncedDateTo || debouncedHourFrom !== undefined || debouncedHourTo !== undefined);
-    
-    // Se há filtros de data, remove jogadores sem atividade (sem kills E sem deaths)
-    let filtered = hasDateFilters 
-      ? base.filter(p => p.kills > 0 || p.deaths > 0)
-      : base;
+    let filtered = base;
 
     if (classFilter !== 'all') {
-      filtered = filtered.filter(p => normalizeClassKey(p.class || '') === classFilter);
+      filtered = base.filter(p => normalizeClassKey(p.class || '') === classFilter);
 
-      // Só adiciona jogadores sem partidas se NÃO houver filtros de data
+      // Só adiciona jogadores cadastrados sem partidas se NÃO houver filtros de data/hora
+      const hasDateFilters = !!(debouncedDateFrom || debouncedDateTo || debouncedHourFrom !== undefined || debouncedHourTo !== undefined);
       if (!hasDateFilters) {
         const existing = new Set(filtered.map(p => normalizeNameKey(p.name)));
         const toAdd =
