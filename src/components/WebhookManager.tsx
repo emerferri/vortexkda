@@ -13,9 +13,8 @@ export const WebhookManager = () => {
   const [showProd, setShowProd] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleSave = async () => {
-    toast.info('Os webhooks devem ser configurados nos secrets do backend.');
-    toast.info('Acesse a aba Cloud → Secrets para configurar DISCORD_WEBHOOK_URL e DISCORD_WEBHOOK_URL_PROD');
+  const handleOpenBackend = () => {
+    toast.info('Você será redirecionado para a área de Secrets do backend.');
   };
 
   return (
@@ -95,28 +94,31 @@ export const WebhookManager = () => {
             </p>
           </div>
 
-          {/* Save Button */}
-          <div className="flex justify-end pt-4 border-t">
-            <Button 
-              onClick={handleSave} 
-              disabled={loading}
-              className="gap-2"
-            >
-              <Save className="w-4 h-4" />
-              {loading ? 'Salvando...' : 'Salvar Webhooks'}
-            </Button>
-          </div>
-
           {/* Info Box */}
           <div className="bg-muted rounded-lg p-4">
-            <h4 className="font-semibold mb-2">ℹ️ Como configurar:</h4>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>Acesse a aba Cloud → Secrets no menu lateral</li>
-              <li>Adicione ou atualize os secrets: DISCORD_WEBHOOK_URL (homologação) e DISCORD_WEBHOOK_URL_PROD (produção)</li>
+            <h4 className="font-semibold mb-3">ℹ️ Como configurar os webhooks:</h4>
+            <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground mb-4">
+              <li>Clique no botão "Configurar Secrets" abaixo para abrir o backend</li>
+              <li>Na área de Secrets, adicione ou atualize:
+                <ul className="list-disc list-inside ml-6 mt-1">
+                  <li><code className="text-xs bg-background px-1 py-0.5 rounded">DISCORD_WEBHOOK_URL</code> (para homologação)</li>
+                  <li><code className="text-xs bg-background px-1 py-0.5 rounded">DISCORD_WEBHOOK_URL_PROD</code> (para produção)</li>
+                </ul>
+              </li>
               <li>Cole os URLs dos webhooks do Discord diretamente nos secrets</li>
               <li>Ao publicar um ranking, selecione o ambiente desejado</li>
               <li>O edge function usará automaticamente o webhook correto de forma segura</li>
             </ol>
+            
+            <Button 
+              onClick={handleOpenBackend}
+              className="w-full gap-2"
+              variant="default"
+            >
+              <Save className="w-4 h-4" />
+              Configurar Secrets no Backend
+            </Button>
+            
             <div className="mt-3 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded">
               <p className="text-xs text-yellow-700 dark:text-yellow-400">
                 ⚠️ Por segurança, os webhooks são armazenados apenas no backend e não no navegador.
