@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useCallback } from 'react';
 import { debounce } from 'lodash';
-import { Trophy, Skull, Crosshair, TrendingUp, Calendar as CalendarIcon, Download, FileImage, Send } from 'lucide-react';
+import { Trophy, Skull, Crosshair, TrendingUp, Calendar as CalendarIcon, Download, FileImage, Send, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 import { cn } from '@/lib/utils';
@@ -45,6 +45,10 @@ export const RankingGeral = () => {
   const [showDiscordModal, setShowDiscordModal] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [environment, setEnvironment] = useState<'homolog' | 'prod'>('homolog');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteDate, setDeleteDate] = useState<Date>();
+  const [deleteHour, setDeleteHour] = useState<number>();
+  const [isDeleting, setIsDeleting] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
   const specialCardsRef = useRef<HTMLDivElement>(null);
 
@@ -434,6 +438,89 @@ export const RankingGeral = () => {
     }
   };
 
+  const handleDeleteData = async () => {
+    if (!deleteDate) {
+      toast({
+        title: "Erro",
+        description: "Selecione uma data para deletar",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      // Buscar matches que correspondem à data e hora selecionadas
+      let query = supabase
+        .from('pvp_matches')
+        .select('id')
+        .eq('match_date', format(deleteDate, 'yyyy-MM-dd'));
+
+      if (deleteHour !== undefined) {
+        query = query.eq('match_hour', deleteHour);
+      }
+
+      const { data: matches, error: fetchError } = await query;
+
+      if (fetchError) throw fetchError;
+
+      if (!matches || matches.length === 0) {
+        toast({
+          title: "Nenhum dado encontrado",
+          description: `Não foram encontrados dados para ${format(deleteDate, 'dd/MM/yyyy')}${deleteHour !== undefined ? ` às ${deleteHour}:00` : ''}`,
+        });
+        setIsDeleting(false);
+        setShowDeleteModal(false);
+        return;
+      }
+
+      const matchIds = matches.map(m => m.id);
+
+      // Deletar kill_logs relacionados
+      const { error: killLogsError } = await supabase
+        .from('pvp_kill_logs')
+        .delete()
+        .in('match_id', matchIds);
+
+      if (killLogsError) throw killLogsError;
+
+      // Deletar match_players relacionados
+      const { error: matchPlayersError } = await supabase
+        .from('pvp_match_players')
+        .delete()
+        .in('match_id', matchIds);
+
+      if (matchPlayersError) throw matchPlayersError;
+
+      // Deletar matches
+      const { error: matchesError } = await supabase
+        .from('pvp_matches')
+        .delete()
+        .in('id', matchIds);
+
+      if (matchesError) throw matchesError;
+
+      toast({
+        title: "Dados deletados com sucesso",
+        description: `${matches.length} partida(s) e todos os registros relacionados foram removidos`,
+      });
+
+      // Resetar filtros e fechar modal
+      setDeleteDate(undefined);
+      setDeleteHour(undefined);
+      setShowDeleteModal(false);
+    } catch (error: any) {
+      console.error('Erro ao deletar dados:', error);
+      toast({
+        title: "Erro ao deletar dados",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const publishToDiscord = async () => {
     if (!tableRef.current || !specialCardsRef.current) return;
     
@@ -713,6 +800,15 @@ export const RankingGeral = () => {
           >
             Limpar Filtros
           </Button>
+
+          <Button
+            variant="destructive"
+            onClick={() => setShowDeleteModal(true)}
+            className="text-sm"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Deletar Dados
+          </Button>
         </div>
       </div>
 
@@ -874,6 +970,96 @@ export const RankingGeral = () => {
               disabled={isPublishing}
             >
               {isPublishing ? 'Publicando...' : 'Confirmar Publicação'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Delete de Dados */}
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Deletar Dados do Ranking</DialogTitle>
+            <DialogDescription>
+              Selecione a data e opcionalmente a hora dos dados que deseja deletar. Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Data *</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !deleteDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {deleteDate ? format(deleteDate, "PPP", { locale: ptBR }) : "Selecione a data"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={deleteDate}
+                    onSelect={setDeleteDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Hora (opcional)</label>
+              <select
+                value={deleteHour ?? ''}
+                onChange={(e) => setDeleteHour(e.target.value ? parseInt(e.target.value) : undefined)}
+                className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">Todas as horas</option>
+                {[20, 21, 22, 23].map((hour) => (
+                  <option key={hour} value={hour}>{hour}:00</option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Se não selecionar hora, todos os dados do dia serão deletados
+              </p>
+            </div>
+
+            {deleteDate && (
+              <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
+                <p className="text-sm font-semibold text-destructive">
+                  ⚠️ Atenção: Você irá deletar dados de:
+                </p>
+                <p className="text-sm mt-2">
+                  📅 {format(deleteDate, "dd/MM/yyyy", { locale: ptBR })}
+                  {deleteHour !== undefined && ` às ${deleteHour}:00`}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteModal(false);
+                setDeleteDate(undefined);
+                setDeleteHour(undefined);
+              }}
+              disabled={isDeleting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteData}
+              disabled={isDeleting || !deleteDate}
+            >
+              {isDeleting ? 'Deletando...' : 'Confirmar Deleção'}
             </Button>
           </DialogFooter>
         </DialogContent>
