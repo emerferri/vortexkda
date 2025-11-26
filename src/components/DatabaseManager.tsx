@@ -2,8 +2,14 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Database, Trash2, AlertTriangle } from 'lucide-react';
+import { Database, Trash2, AlertTriangle, Calendar as CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +31,10 @@ import { Characters } from './Characters';
 export const DatabaseManager = () => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('management');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteDate, setDeleteDate] = useState<Date>();
+  const [deleteHour, setDeleteHour] = useState<number>();
+  const [isDeleting, setIsDeleting] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -35,6 +45,81 @@ export const DatabaseManager = () => {
       setActiveTab('personagens');
     }
   }, [searchParams]);
+
+  const handleDeleteByDate = async () => {
+    if (!user) {
+      toast.error('Você precisa estar logado para executar esta ação');
+      navigate('/auth');
+      return;
+    }
+
+    if (!deleteDate) {
+      toast.error('Selecione uma data para deletar');
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      // Buscar matches que correspondem à data e hora selecionadas
+      let query = supabase
+        .from('pvp_matches')
+        .select('id')
+        .eq('match_date', format(deleteDate, 'yyyy-MM-dd'));
+
+      if (deleteHour !== undefined) {
+        query = query.eq('match_hour', deleteHour);
+      }
+
+      const { data: matches, error: fetchError } = await query;
+
+      if (fetchError) throw fetchError;
+
+      if (!matches || matches.length === 0) {
+        toast.error(`Nenhum dado encontrado para ${format(deleteDate, 'dd/MM/yyyy')}${deleteHour !== undefined ? ` às ${deleteHour}:00` : ''}`);
+        setIsDeleting(false);
+        setShowDeleteModal(false);
+        return;
+      }
+
+      const matchIds = matches.map(m => m.id);
+
+      // Deletar kill_logs relacionados
+      const { error: killLogsError } = await supabase
+        .from('pvp_kill_logs')
+        .delete()
+        .in('match_id', matchIds);
+
+      if (killLogsError) throw killLogsError;
+
+      // Deletar match_players relacionados
+      const { error: matchPlayersError } = await supabase
+        .from('pvp_match_players')
+        .delete()
+        .in('match_id', matchIds);
+
+      if (matchPlayersError) throw matchPlayersError;
+
+      // Deletar matches
+      const { error: matchesError } = await supabase
+        .from('pvp_matches')
+        .delete()
+        .in('id', matchIds);
+
+      if (matchesError) throw matchesError;
+
+      toast.success(`${matches.length} partida(s) e todos os registros relacionados foram removidos`);
+
+      // Resetar filtros e fechar modal
+      setDeleteDate(undefined);
+      setDeleteHour(undefined);
+      setShowDeleteModal(false);
+    } catch (error: any) {
+      console.error('Erro ao deletar dados:', error);
+      toast.error('Erro ao deletar dados: ' + error.message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const clearAllPvpData = async () => {
     if (!user) {
@@ -107,6 +192,27 @@ export const DatabaseManager = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {/* Deletar por Data */}
+                <div className="bg-warning/10 border border-warning/30 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <CalendarIcon className="w-5 h-5 text-warning mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-warning mb-2">Deletar Dados por Data</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Remova partidas específicas por data e hora. Útil para corrigir dados incorretos ou duplicados.
+                      </p>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setShowDeleteModal(true)}
+                        className="gap-2 border-warning/50 hover:bg-warning/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Deletar por Data
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
                   <div className="flex items-start gap-3">
                     <AlertTriangle className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0" />
@@ -171,6 +277,97 @@ export const DatabaseManager = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Modal de Delete por Data */}
+          <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Deletar Dados por Data</DialogTitle>
+                <DialogDescription>
+                  Selecione a data e opcionalmente a hora dos dados que deseja deletar. Esta ação não pode ser desfeita.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">Data *</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !deleteDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {deleteDate ? format(deleteDate, "PPP", { locale: ptBR }) : "Selecione a data"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={deleteDate}
+                        onSelect={setDeleteDate}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">Hora (opcional)</label>
+                  <select
+                    value={deleteHour ?? ''}
+                    onChange={(e) => setDeleteHour(e.target.value ? parseInt(e.target.value) : undefined)}
+                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="">Todas as horas</option>
+                    {[20, 21, 22, 23].map((hour) => (
+                      <option key={hour} value={hour}>{hour}:00</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Se não selecionar hora, todos os dados do dia serão deletados
+                  </p>
+                </div>
+
+                {deleteDate && (
+                  <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
+                    <p className="text-sm font-semibold text-destructive">
+                      ⚠️ Atenção: Você irá deletar dados de:
+                    </p>
+                    <p className="text-sm mt-2">
+                      📅 {format(deleteDate, "dd/MM/yyyy", { locale: ptBR })}
+                      {deleteHour !== undefined && ` às ${deleteHour}:00`}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDeleteDate(undefined);
+                    setDeleteHour(undefined);
+                  }}
+                  disabled={isDeleting}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteByDate}
+                  disabled={isDeleting || !deleteDate}
+                >
+                  {isDeleting ? 'Deletando...' : 'Confirmar Deleção'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </TabsContent>
 
