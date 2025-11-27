@@ -20,6 +20,7 @@ import { toast } from '@/hooks/use-toast';
 interface AggregatedPlayer {
   name: string;
   class: string | null;
+  guild: string | null;
   kills: number;
   deaths: number;
   kda: number;
@@ -116,29 +117,31 @@ export const RankingGeral = () => {
           .replace(/[^a-zA-Z0-9]/g, '')
           .toLowerCase();
 
-      // Buscar classes/personagens para mapear nome -> classe
+      // Buscar classes/personagens para mapear nome -> classe e guild
       const { data: characters } = await supabase
         .from('characters')
-        .select('name, class');
+        .select('name, class, guild');
 
       const entries = (characters || []).map((c) => {
         const displayName = (c.name ?? '').trim();
         const norm = normalize(displayName);
         const clsStr = ((c.class ?? '') as string).replace(/\s+/g, ' ').trim();
-        return { displayName, norm, cls: clsStr || null };
+        const guildStr = ((c.guild ?? '') as string).replace(/\s+/g, ' ').trim();
+        return { displayName, norm, cls: clsStr || null, guild: guildStr || null };
       });
 
       // Preferir classe não vazia quando houver duplicatas para o mesmo nome normalizado
-      const characterMap = new Map<string, string | null>();
+      const characterMap = new Map<string, { class: string | null; guild: string | null }>();
       for (const e of entries) {
         const current = characterMap.get(e.norm);
-        if (!current || e.cls) characterMap.set(e.norm, e.cls);
+        if (!current || e.cls) characterMap.set(e.norm, { class: e.cls, guild: e.guild });
       }
 
       // Preparar lista para fuzzy match (fallback)
-      const characterEntries = Array.from(characterMap.entries()).map(([norm, cls]) => ({
+      const characterEntries = Array.from(characterMap.entries()).map(([norm, data]) => ({
         norm,
-        class: (cls || '').toString(),
+        class: (data.class || '').toString(),
+        guild: (data.guild || '').toString(),
       }));
 
       // Levenshtein limitado (até distância 1)
@@ -165,14 +168,14 @@ export const RankingGeral = () => {
         return dp[a.length][b.length];
       };
 
-      const findClosestClass = (normName: string): string | null => {
-        let best: { dist: number; cls: string | null } = { dist: 3, cls: null };
+      const findClosestCharacterData = (normName: string): { class: string | null; guild: string | null } => {
+        let best: { dist: number; class: string | null; guild: string | null } = { dist: 3, class: null, guild: null };
         for (const entry of characterEntries) {
           const d = levenshtein2(normName, entry.norm);
-          if (d < best.dist) best = { dist: d, cls: entry.class };
+          if (d < best.dist) best = { dist: d, class: entry.class, guild: entry.guild };
           if (best.dist === 0) break;
         }
-        return best.dist <= 1 ? best.cls : null;
+        return best.dist <= 1 ? { class: best.class, guild: best.guild } : { class: null, guild: null };
       };
 
       // Se houver filtros de data/hora, filtramos pelos match_ids de pvp_matches
@@ -267,9 +270,11 @@ export const RankingGeral = () => {
         const weightedKda = totalBossEvents > 0 ? kda * (stats.matches.size / totalBossEvents) : 0;
         const mvpScore = (stats.kills * 3) + (kda * 2) - (stats.deaths * 1.5);
         const eventScore = (stats.kills * 3) + (kda * 2) - (stats.deaths * 1.5);
+        const charData = characterMap.get(normKey) || findClosestCharacterData(normKey);
         return {
           name: stats.displayName,
-          class: characterMap.get(normKey) || findClosestClass(normKey),
+          class: charData.class,
+          guild: charData.guild,
           kills: stats.kills,
           deaths: stats.deaths,
           kda,
@@ -305,9 +310,9 @@ export const RankingGeral = () => {
 
       // Remove debug logs in production
 
-      const dedupCharacters = Array.from(characterMap.entries()).map(([norm, cls]) => {
+      const dedupCharacters = Array.from(characterMap.entries()).map(([norm, data]) => {
         const original = (entries.find(e => e.norm === norm)?.displayName) || '';
-        return { name: original, class: cls || null };
+        return { name: original, class: data.class || null, guild: data.guild || null };
       });
 
       return { aggregated, brabissimoRecord, coneMonodedoName, characters: dedupCharacters };
@@ -343,6 +348,7 @@ export const RankingGeral = () => {
             ?.map((c: any) => ({
               name: c.name,
               class: c.class || null,
+              guild: c.guild || null,
               kills: 0,
               deaths: 0,
               kda: 0,
@@ -389,11 +395,12 @@ export const RankingGeral = () => {
     const worksheetData = [
       ['Ranking Geral - PVP'],
       [''],
-      ['Rank', 'Jogador', 'Classe', 'Kills', 'Deaths', 'KDA', 'Pontuação', 'Boss'],
+      ['Rank', 'Jogador', 'Classe', 'Guild', 'Kills', 'Deaths', 'KDA', 'Pontuação', 'Boss'],
       ...sortedPlayers.map((player, index) => [
         index + 1,
         player.name,
         player.class || '-',
+        player.guild || '-',
         player.kills,
         player.deaths,
         player.kda.toFixed(2),
@@ -521,7 +528,15 @@ export const RankingGeral = () => {
           kills: sortedPlayers.reduce((sum, p) => sum + p.kills, 0),
           deaths: sortedPlayers.reduce((sum, p) => sum + p.deaths, 0),
           playerCount: sortedPlayers.length
-        }
+        },
+        guildSummary: (() => {
+          const guildCounts = sortedPlayers.reduce((acc, player) => {
+            const guild = player.guild || 'Sem Guild';
+            acc[guild] = (acc[guild] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
+          return guildCounts;
+        })()
       };
 
       const { data, error } = await supabase.functions.invoke('discord-webhook', {
@@ -894,6 +909,9 @@ export const RankingGeral = () => {
                 <th className="px-6 py-4 text-left text-sm font-bold text-foreground uppercase tracking-wider">
                   Classe
                 </th>
+                <th className="px-6 py-4 text-left text-sm font-bold text-foreground uppercase tracking-wider">
+                  Guild
+                </th>
                 <th className="px-6 py-4 text-center text-sm font-bold text-success uppercase tracking-wider">
                   <div className="flex items-center justify-center gap-2">
                     <Crosshair className="w-4 h-4" />
@@ -960,6 +978,11 @@ export const RankingGeral = () => {
                         {player.class || '-'}
                       </span>
                     </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-muted-foreground">
+                        {player.guild || '-'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-center">
                       <span className="font-bold text-success text-lg glow-success">
                         {player.kills}
@@ -1017,6 +1040,38 @@ export const RankingGeral = () => {
           <p className="text-3xl font-bold text-primary glow-primary">
             {sortedPlayers.length}
           </p>
+        </div>
+      </div>
+
+      {/* Resumo por Guild */}
+      <div className="bg-card/50 p-6 rounded-xl border border-border">
+        <h3 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+          <Trophy className="w-6 h-6 text-warning" />
+          Resumo por Guild
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {(() => {
+            const guildCounts = sortedPlayers.reduce((acc, player) => {
+              const guild = player.guild || 'Sem Guild';
+              acc[guild] = (acc[guild] || 0) + 1;
+              return acc;
+            }, {} as Record<string, number>);
+
+            return Object.entries(guildCounts)
+              .sort((a, b) => b[1] - a[1])
+              .map(([guild, count]) => (
+                <div
+                  key={guild}
+                  className="bg-secondary/30 border border-border/50 rounded-lg p-4 text-center hover:bg-secondary/50 transition-colors"
+                >
+                  <p className="text-sm font-semibold text-muted-foreground mb-1">{guild}</p>
+                  <p className="text-2xl font-bold text-primary">{count}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {count === 1 ? 'jogador' : 'jogadores'}
+                  </p>
+                </div>
+              ));
+          })()}
         </div>
       </div>
     </div>
