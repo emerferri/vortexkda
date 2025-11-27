@@ -39,6 +39,7 @@ interface GeneralRankingBody {
     deaths: number;
     playerCount: number;
   };
+  guildSummary: Record<string, number>;
 }
 
 interface KillStreakBody {
@@ -292,6 +293,14 @@ serve(async (req) => {
           {
             name: '📈 Totais',
             value: `${generalBody.totals.playerCount} jogadores • ${generalBody.totals.kills} kills • ${generalBody.totals.deaths} deaths`,
+            inline: false
+          },
+          {
+            name: '⚔️ Resumo por Guild',
+            value: Object.entries(generalBody.guildSummary)
+              .sort((a, b) => b[1] - a[1])
+              .map(([guild, count]) => `**${guild}**: ${count} ${count === 1 ? 'jogador' : 'jogadores'}`)
+              .join('\n') || 'Nenhuma guild registrada',
             inline: false
           }
         ],
