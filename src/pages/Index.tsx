@@ -14,6 +14,7 @@ import { Footer } from '@/components/Footer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +30,7 @@ const Index = () => {
   const [killLogs, setKillLogs] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('placar');
   const { user, signOut } = useAuth();
+  const { isAdmin, canEditData } = useUserRole();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -95,7 +97,7 @@ const Index = () => {
 
         <div className="space-y-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className={`grid w-full max-w-6xl mx-auto ${user ? 'grid-cols-7' : 'grid-cols-6'} mb-8`}>
+            <TabsList className={`grid w-full max-w-6xl mx-auto ${isAdmin ? 'grid-cols-7' : 'grid-cols-6'} mb-8`}>
               <TabsTrigger value="placar" className="text-base font-semibold">
                 Incluir Dados
               </TabsTrigger>
@@ -114,7 +116,7 @@ const Index = () => {
               <TabsTrigger value="killstreak" className="text-base font-semibold">
                 Kill Streak
               </TabsTrigger>
-              {user && (
+              {isAdmin && (
                 <TabsTrigger value="admin" className="text-base font-semibold">
                   Admin
                 </TabsTrigger>
@@ -146,7 +148,7 @@ const Index = () => {
               <KillStreakRanking />
             </TabsContent>
 
-            {user && (
+            {isAdmin && (
               <TabsContent value="admin">
                 <DatabaseManager />
               </TabsContent>

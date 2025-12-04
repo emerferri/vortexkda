@@ -27,6 +27,7 @@ import { WebhookManager } from './WebhookManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConfrontosDiretos } from './ConfrontosDiretos';
 import { Characters } from './Characters';
+import { UserManagement } from './UserManagement';
 
 export const DatabaseManager = () => {
   const [loading, setLoading] = useState(false);
@@ -166,8 +167,9 @@ export const DatabaseManager = () => {
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-3 mb-6">
+      <TabsList className="grid w-full grid-cols-4 mb-6">
         <TabsTrigger value="management">Gerenciamento</TabsTrigger>
+        <TabsTrigger value="usuarios">Usuários</TabsTrigger>
         <TabsTrigger value="confrontos">Confrontos Diretos</TabsTrigger>
         <TabsTrigger value="personagens">Personagens</TabsTrigger>
       </TabsList>
@@ -369,6 +371,10 @@ export const DatabaseManager = () => {
             </DialogContent>
           </Dialog>
         </div>
+      </TabsContent>
+
+      <TabsContent value="usuarios">
+        <UserManagement />
       </TabsContent>
 
       <TabsContent value="confrontos">

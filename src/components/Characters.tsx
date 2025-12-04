@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ interface Character {
 
 export const Characters = () => {
   const { user } = useAuth();
+  const { isAdmin, canEditData } = useUserRole();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -315,7 +317,7 @@ export const Characters = () => {
               </>
             )}
           </Button>
-          {user && (
+          {canEditData && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={openAddDialog}>
@@ -390,13 +392,13 @@ export const Characters = () => {
                 <TableHead>Assassino</TableHead>
                 <TableHead>Guild</TableHead>
                 <TableHead>Classe</TableHead>
-                {user && <TableHead className="w-[100px]">Ações</TableHead>}
+                {canEditData && <TableHead className="w-[100px]">Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredCharacters.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={user ? 4 : 3} className="text-center text-muted-foreground">
+                  <TableCell colSpan={canEditData ? 4 : 3} className="text-center text-muted-foreground">
                     {showUnregisteredOnly ? 'Nenhum personagem sem cadastro no momento' : 'Nenhum personagem encontrado'}
                   </TableCell>
                 </TableRow>
@@ -413,7 +415,7 @@ export const Characters = () => {
                     </TableCell>
                     <TableCell>{character.guild || '-'}</TableCell>
                     <TableCell>{character.class || '-'}</TableCell>
-                    {user && (
+                    {canEditData && (
                       <TableCell>
                         <div className="flex gap-2">
                           <Button
@@ -423,13 +425,15 @@ export const Characters = () => {
                           >
                             <Pencil className="w-4 h-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(character.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(character.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     )}
