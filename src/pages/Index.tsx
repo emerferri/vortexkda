@@ -8,8 +8,9 @@ import { PutinhaRanking } from '@/components/PutinhaRanking';
 import { MuralDaVergonha } from '@/components/MuralDaVergonha';
 import { KillStreakRanking } from '@/components/KillStreakRanking';
 import { DatabaseManager } from '@/components/DatabaseManager';
-import { parseTxtFile } from '@/utils/txtParser';
-import { Swords, LogIn, LogOut, User } from 'lucide-react';
+import { DatabaseImport } from '@/components/DatabaseImport';
+import { parseTxtFile, ParseResult } from '@/utils/txtParser';
+import { Swords, LogIn, LogOut, User, FileText, Database } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -41,8 +42,16 @@ const Index = () => {
     }
   }, [searchParams]);
 
+  const [importSource, setImportSource] = useState<'txt' | 'database'>('txt');
+
   const handleFileUpload = (content: string) => {
     const result = parseTxtFile(content);
+    setPlayers(result.players);
+    setBossLabel(result.bossLabel);
+    setKillLogs(result.killLogs);
+  };
+
+  const handleDatabaseImport = (result: ParseResult) => {
     setPlayers(result.players);
     setBossLabel(result.bossLabel);
     setKillLogs(result.killLogs);
@@ -124,7 +133,38 @@ const Index = () => {
             </TabsList>
             
             <TabsContent value="placar" className="space-y-8">
-              <FileUpload onFileUpload={handleFileUpload} />
+              {/* Import Source Toggle */}
+              {canEditData && (
+                <div className="flex justify-center gap-2 p-1 bg-muted/50 rounded-lg w-fit mx-auto">
+                  <Button
+                    variant={importSource === 'txt' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setImportSource('txt')}
+                    className="gap-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Arquivo TXT
+                  </Button>
+                  <Button
+                    variant={importSource === 'database' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setImportSource('database')}
+                    className="gap-2"
+                  >
+                    <Database className="w-4 h-4" />
+                    Banco de Dados
+                  </Button>
+                </div>
+              )}
+
+              {/* Show appropriate import component */}
+              {canEditData && importSource === 'txt' && (
+                <FileUpload onFileUpload={handleFileUpload} />
+              )}
+              {canEditData && importSource === 'database' && (
+                <DatabaseImport onDataLoaded={handleDatabaseImport} />
+              )}
+              
               <Scoreboard players={players} bossLabel={bossLabel} killLogs={killLogs} />
             </TabsContent>
             
