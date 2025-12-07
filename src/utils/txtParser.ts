@@ -30,57 +30,76 @@ export const parseTxtFile = (content: string): ParseResult => {
     throw new Error('Conteúdo muito grande');
   }
 
-  const lines = content.split('\n')
-    .filter(line => line.trim())
-    .slice(0, MAX_LINES);
+  const lines = content.split('\n').slice(0, MAX_LINES);
   
   const playerMap = new Map<string, { kills: number; deaths: number }>();
   const killLogs: KillLog[] = [];
   let bossLabel: string | null = null;
 
-  lines.forEach(line => {
-    // Extract date/time from line (format: 08/10/2025 22:00:26)
-    const dateMatch = line.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/);
+  // New multi-line format parsing
+  // Format:
+  // Line 1: 06/12/2025 23:11:14 - :dagger:
+  // Line 2:  MAGOO1 matou :skull:
+  // Line 3:  Hakumen no mapa :map:
+  // Line 4:  PvP Square - [Server: Boss Event PvP]
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
     
-    if (dateMatch && !bossLabel) {
-      const day = dateMatch[1];
-      const month = dateMatch[2];
-      const hour = parseInt(dateMatch[4]);
+    // Look for date/time line with :dagger:
+    const dateMatch = line.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})\s*-\s*:dagger:$/);
+    
+    if (dateMatch) {
+      // Extract boss label from first valid entry
+      if (!bossLabel) {
+        const day = dateMatch[1];
+        const month = dateMatch[2];
+        const hour = parseInt(dateMatch[4]);
+        bossLabel = `boss ${day}/${month} ${hour} horas`;
+      }
       
-      bossLabel = `boss ${day}/${month} ${hour} horas`;
-    }
+      // Check if we have the next 3 lines
+      if (i + 3 < lines.length) {
+        const killerLine = lines[i + 1].trim();
+        const victimLine = lines[i + 2].trim();
+        const mapLine = lines[i + 3].trim();
+        
+        // Parse killer: "MAGOO1 matou :skull:"
+        const killerMatch = killerLine.match(/^(\w+)\s+matou\s+:skull:$/i);
+        
+        // Parse victim: "Hakumen no mapa :map:"
+        const victimMatch = victimLine.match(/^(\w+)\s+no mapa\s+:map:$/i);
+        
+        // Check map: "PvP Square - [Server: Boss Event PvP]"
+        const isValidMap = mapLine === 'PvP Square - [Server: Boss Event PvP]';
+        
+        if (killerMatch && victimMatch && isValidMap) {
+          try {
+            const killer = playerNameSchema.parse(killerMatch[1].trim());
+            const victim = playerNameSchema.parse(victimMatch[1].trim());
 
-    // Only consider kills in PvP Square map
-    if (!line.includes(':map: PvP Square - [Server: Boss Event PvP]')) {
-      return; // Skip this line if not in PvP Square
-    }
+            // Add to kill logs
+            killLogs.push({ killer, victim });
 
-    // Pattern: :dagger: KillerName matou :skull: VictimName
-    const killMatch = line.match(/:dagger:\s*(\w+)\s+matou\s+:skull:\s*(\w+)/i);
-    
-    if (killMatch) {
-      try {
-        const killer = playerNameSchema.parse(killMatch[1].trim());
-        const victim = playerNameSchema.parse(killMatch[2].trim());
+            // Update killer stats
+            const killerStats = playerMap.get(killer) || { kills: 0, deaths: 0 };
+            killerStats.kills += 1;
+            playerMap.set(killer, killerStats);
 
-        // Add to kill logs
-        killLogs.push({ killer, victim });
-
-        // Update killer stats
-        const killerStats = playerMap.get(killer) || { kills: 0, deaths: 0 };
-        killerStats.kills += 1;
-        playerMap.set(killer, killerStats);
-
-        // Update victim stats
-        const victimStats = playerMap.get(victim) || { kills: 0, deaths: 0 };
-        victimStats.deaths += 1;
-        playerMap.set(victim, victimStats);
-      } catch {
-        // Skip invalid player names
-        console.warn('Invalid player name, skipping');
+            // Update victim stats
+            const victimStats = playerMap.get(victim) || { kills: 0, deaths: 0 };
+            victimStats.deaths += 1;
+            playerMap.set(victim, victimStats);
+          } catch {
+            console.warn('Invalid player name, skipping');
+          }
+        }
+        
+        // Skip the processed lines
+        i += 3;
       }
     }
-  });
+  }
 
   // Convert to array and calculate KDA
   const players: PlayerStats[] = Array.from(playerMap.entries()).map(([name, stats]) => ({
