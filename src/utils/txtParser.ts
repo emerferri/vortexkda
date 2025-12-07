@@ -12,11 +12,86 @@ export interface ParseResult {
   killLogs: KillLog[];
 }
 
+export interface ExternalLogEntry {
+  id: number;
+  content: string;
+  timestamp: string | null;
+  created_at: string;
+}
+
 const playerNameSchema = z.string()
   .trim()
   .min(1)
   .max(50)
   .regex(/^[a-zA-Z0-9_-]+$/, 'Invalid characters');
+
+// Parser for external database single-line format
+// Format: 05/12/2025 23:11:04 - :dagger: *kikito* matou :skull: *MisticoDL* no mapa :map: *PvP Square* - *[Server: Boss Event PvP]*
+export const parseExternalDbContent = (logs: ExternalLogEntry[]): ParseResult => {
+  const playerMap = new Map<string, { kills: number; deaths: number }>();
+  const killLogs: KillLog[] = [];
+  let bossLabel: string | null = null;
+
+  const validMapPattern = /\*PvP Square\*\s*-\s*\*\[Server: Boss Event PvP\]\*/i;
+  const killPattern = /:dagger:\s*\*(\w+)\*\s*matou\s*:skull:\s*\*(\w+)\*/i;
+  const datePattern = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/;
+
+  for (const log of logs) {
+    if (!log.content) continue;
+
+    const content = log.content;
+
+    // Only process kills from valid PvP map
+    if (!validMapPattern.test(content)) {
+      continue;
+    }
+
+    // Extract date for boss label from first valid entry
+    if (!bossLabel) {
+      const dateMatch = content.match(datePattern);
+      if (dateMatch) {
+        const day = dateMatch[1];
+        const month = dateMatch[2];
+        const hour = parseInt(dateMatch[4]);
+        bossLabel = `boss ${day}/${month} ${hour} horas`;
+      }
+    }
+
+    // Extract killer and victim
+    const killMatch = content.match(killPattern);
+    if (killMatch) {
+      try {
+        const killer = playerNameSchema.parse(killMatch[1].trim());
+        const victim = playerNameSchema.parse(killMatch[2].trim());
+
+        // Add to kill logs
+        killLogs.push({ killer, victim });
+
+        // Update killer stats
+        const killerStats = playerMap.get(killer) || { kills: 0, deaths: 0 };
+        killerStats.kills += 1;
+        playerMap.set(killer, killerStats);
+
+        // Update victim stats
+        const victimStats = playerMap.get(victim) || { kills: 0, deaths: 0 };
+        victimStats.deaths += 1;
+        playerMap.set(victim, victimStats);
+      } catch {
+        console.warn('Invalid player name in external log, skipping');
+      }
+    }
+  }
+
+  // Convert to array and calculate KDA
+  const players: PlayerStats[] = Array.from(playerMap.entries()).map(([name, stats]) => ({
+    name,
+    kills: stats.kills,
+    deaths: stats.deaths,
+    kda: stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths,
+  }));
+
+  return { players, bossLabel, killLogs };
+};
 
 export const parseTxtFile = (content: string): ParseResult => {
   const MAX_LINES = 10000;
