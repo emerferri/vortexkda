@@ -107,11 +107,12 @@ export const parseTxtFile = (content: string): ParseResult => {
   }
 
   const lines = content.split('\n').slice(0, MAX_LINES);
+  console.log(`[TXT Parser] Total lines: ${lines.length}`);
   
   const playerMap = new Map<string, { kills: number; deaths: number }>();
   const killLogs: KillLog[] = [];
   let bossLabel: string | null = null;
-
+  let matchedEntries = 0;
   // New multi-line format parsing
   // Format:
   // Line 1: 06/12/2025 23:11:14 - :dagger:
@@ -150,6 +151,7 @@ export const parseTxtFile = (content: string): ParseResult => {
         const isValidMap = mapLine === 'PvP Square - [Server: Boss Event PvP]';
         
         if (killerMatch && victimMatch && isValidMap) {
+          matchedEntries++;
           try {
             const killer = playerNameSchema.parse(killerMatch[1].trim());
             const victim = playerNameSchema.parse(victimMatch[1].trim());
@@ -169,6 +171,8 @@ export const parseTxtFile = (content: string): ParseResult => {
           } catch {
             console.warn('Invalid player name, skipping');
           }
+        } else if (killerMatch && victimMatch) {
+          console.log(`[TXT Parser] Skipped (wrong map): "${mapLine}"`);
         }
         
         // Skip the processed lines
@@ -176,6 +180,8 @@ export const parseTxtFile = (content: string): ParseResult => {
       }
     }
   }
+
+  console.log(`[TXT Parser] Matched entries from Boss Event PvP: ${matchedEntries}`);
 
   // Convert to array and calculate KDA
   const players: PlayerStats[] = Array.from(playerMap.entries()).map(([name, stats]) => ({
