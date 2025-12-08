@@ -113,21 +113,67 @@ export const parseTxtFile = (content: string): ParseResult => {
   const killLogs: KillLog[] = [];
   let bossLabel: string | null = null;
   let matchedEntries = 0;
-  // New multi-line format parsing
-  // Format:
-  // Line 1: 06/12/2025 23:11:14 - :dagger:
-  // Line 2:  MAGOO1 matou :skull:
-  // Line 3:  Hakumen no mapa :map:
-  // Line 4:  PvP Square - [Server: Boss Event PvP]
-  
+
+  // Single-line format (most common):
+  // 07/12/2025 20:01:02 - :dagger: Freezing matou :skull: HulkSmash no mapa :map: PvP Square - [Server: Boss Event PvP]
+  const singleLinePattern = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})\s*-\s*:dagger:\s*(\w+)\s+matou\s+:skull:\s*(\w+)\s+no mapa\s+:map:\s*(.+)$/i;
+  const validMapSingleLine = /^PvP Square\s*-\s*\[Server: Boss Event PvP\]$/i;
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    
-    // Look for date/time line with :dagger:
+    if (!line) continue;
+
+    // Try single-line format first
+    const singleMatch = line.match(singleLinePattern);
+    if (singleMatch) {
+      const day = singleMatch[1];
+      const month = singleMatch[2];
+      const hour = parseInt(singleMatch[4]);
+      const killer = singleMatch[7];
+      const victim = singleMatch[8];
+      const mapPart = singleMatch[9].trim();
+
+      // Extract boss label from first valid entry
+      if (!bossLabel) {
+        bossLabel = `boss ${day}/${month} ${hour} horas`;
+      }
+
+      // Validate map
+      if (validMapSingleLine.test(mapPart)) {
+        matchedEntries++;
+        try {
+          const validKiller = playerNameSchema.parse(killer.trim());
+          const validVictim = playerNameSchema.parse(victim.trim());
+
+          // Add to kill logs
+          killLogs.push({ killer: validKiller, victim: validVictim });
+
+          // Update killer stats
+          const killerStats = playerMap.get(validKiller) || { kills: 0, deaths: 0 };
+          killerStats.kills += 1;
+          playerMap.set(validKiller, killerStats);
+
+          // Update victim stats
+          const victimStats = playerMap.get(validVictim) || { kills: 0, deaths: 0 };
+          victimStats.deaths += 1;
+          playerMap.set(validVictim, victimStats);
+        } catch {
+          console.warn('[TXT Parser] Invalid player name, skipping');
+        }
+      } else {
+        console.log(`[TXT Parser] Skipped (wrong map): "${mapPart}"`);
+      }
+      continue;
+    }
+
+    // Fallback: Multi-line format
+    // Line 1: 06/12/2025 23:11:14 - :dagger:
+    // Line 2: MAGOO1 matou :skull:
+    // Line 3: Hakumen no mapa :map:
+    // Line 4: PvP Square - [Server: Boss Event PvP]
     const dateMatch = line.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})\s*-\s*:dagger:$/);
     
     if (dateMatch) {
-      // Extract boss label from first valid entry
       if (!bossLabel) {
         const day = dateMatch[1];
         const month = dateMatch[2];
@@ -135,19 +181,13 @@ export const parseTxtFile = (content: string): ParseResult => {
         bossLabel = `boss ${day}/${month} ${hour} horas`;
       }
       
-      // Check if we have the next 3 lines
       if (i + 3 < lines.length) {
         const killerLine = lines[i + 1].trim();
         const victimLine = lines[i + 2].trim();
         const mapLine = lines[i + 3].trim();
         
-        // Parse killer: "MAGOO1 matou :skull:"
         const killerMatch = killerLine.match(/^(\w+)\s+matou\s+:skull:$/i);
-        
-        // Parse victim: "Hakumen no mapa :map:"
         const victimMatch = victimLine.match(/^(\w+)\s+no mapa\s+:map:$/i);
-        
-        // Check map: "PvP Square - [Server: Boss Event PvP]"
         const isValidMap = mapLine === 'PvP Square - [Server: Boss Event PvP]';
         
         if (killerMatch && victimMatch && isValidMap) {
@@ -156,26 +196,19 @@ export const parseTxtFile = (content: string): ParseResult => {
             const killer = playerNameSchema.parse(killerMatch[1].trim());
             const victim = playerNameSchema.parse(victimMatch[1].trim());
 
-            // Add to kill logs
             killLogs.push({ killer, victim });
 
-            // Update killer stats
             const killerStats = playerMap.get(killer) || { kills: 0, deaths: 0 };
             killerStats.kills += 1;
             playerMap.set(killer, killerStats);
 
-            // Update victim stats
             const victimStats = playerMap.get(victim) || { kills: 0, deaths: 0 };
             victimStats.deaths += 1;
             playerMap.set(victim, victimStats);
           } catch {
-            console.warn('Invalid player name, skipping');
+            console.warn('[TXT Parser] Invalid player name, skipping');
           }
-        } else if (killerMatch && victimMatch) {
-          console.log(`[TXT Parser] Skipped (wrong map): "${mapLine}"`);
         }
-        
-        // Skip the processed lines
         i += 3;
       }
     }
