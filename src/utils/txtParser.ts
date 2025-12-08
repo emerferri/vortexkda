@@ -32,9 +32,9 @@ export const parseExternalDbContent = (logs: ExternalLogEntry[]): ParseResult =>
   const killLogs: KillLog[] = [];
   let bossLabel: string | null = null;
 
-  // Format uses double asterisks: **name** and backticks around date
-  const validMapPattern = /\*\*PvP Square\*\*\s*-\s*\*\*\[Server: Boss Event PvP\]\*\*/i;
-  const killPattern = /:dagger:\s*\*\*(\w+)\*\*\s*matou\s*:skull:\s*\*\*(\w+)\*\*/i;
+  // Support both single (*name*) and double (**name**) asterisk formats
+  const validMapPattern = /\*{1,2}PvP Square\*{1,2}\s*-\s*\*{1,2}\[Server: Boss Event PvP\]\*{1,2}/i;
+  const killPattern = /:dagger:\s*\*{1,2}(\w+)\*{1,2}\s*matou\s*:skull:\s*\*{1,2}(\w+)\*{1,2}/i;
   const datePattern = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/;
 
   for (const log of logs) {
