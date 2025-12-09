@@ -36,27 +36,35 @@ export const parseExternalDbContent = (logs: ExternalLogEntry[]): ParseResult =>
   let matchedEntries = 0;
 
   console.log(`[External DB Parser] Processing ${logs.length} logs`);
+  if (logs.length > 0) {
+    console.log(`[External DB Parser] Sample content: "${logs[0].content}"`);
+  }
 
-  // Pattern with asterisks: *name* or **name**
-  const killPatternWithAsterisks = /:dagger:\s*\*{1,2}(\w+)\*{1,2}\s*matou\s*:skull:\s*\*{1,2}(\w+)\*{1,2}/i;
-  const mapPatternWithAsterisks = /\*{1,2}PvP Square\*{1,2}\s*-\s*\*{1,2}\[Server: Boss Event PvP\]\*{1,2}/i;
+  // Pattern with double asterisks: **name** (banco externo)
+  const killPatternDoubleAsterisks = /:dagger:\s*\*\*(\w+)\*\*\s*matou\s*:skull:\s*\*\*(\w+)\*\*/i;
+  const mapPatternDoubleAsterisks = /\*\*PvP Square\*\*\s*-\s*\*\*\[Server: Boss Event PvP\]\*\*/i;
   
-  // Pattern without asterisks
+  // Pattern with single asterisks: *name*
+  const killPatternSingleAsterisks = /:dagger:\s*\*(\w+)\*\s*matou\s*:skull:\s*\*(\w+)\*/i;
+  const mapPatternSingleAsterisks = /\*PvP Square\*\s*-\s*\*\[Server: Boss Event PvP\]\*/i;
+  
+  // Pattern without asterisks (TXT format)
   const killPatternNoAsterisks = /:dagger:\s*(\w+)\s+matou\s+:skull:\s*(\w+)\s+no mapa/i;
   const mapPatternNoAsterisks = /PvP Square\s*-\s*\[Server: Boss Event PvP\]/i;
   
-  const datePattern = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/;
+  const datePattern = /(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/;
 
   for (const log of logs) {
     if (!log.content) continue;
 
     const content = log.content;
 
-    // Check if it's a valid PvP map (either format)
-    const hasValidMapWithAsterisks = mapPatternWithAsterisks.test(content);
-    const hasValidMapNoAsterisks = mapPatternNoAsterisks.test(content);
+    // Check if it's a valid PvP map (any format)
+    const hasValidMap = mapPatternDoubleAsterisks.test(content) || 
+                        mapPatternSingleAsterisks.test(content) || 
+                        mapPatternNoAsterisks.test(content);
     
-    if (!hasValidMapWithAsterisks && !hasValidMapNoAsterisks) {
+    if (!hasValidMap) {
       continue;
     }
 
@@ -71,8 +79,11 @@ export const parseExternalDbContent = (logs: ExternalLogEntry[]): ParseResult =>
       }
     }
 
-    // Try to extract killer and victim (try both patterns)
-    let killMatch = content.match(killPatternWithAsterisks);
+    // Try to extract killer and victim (try all patterns: double asterisks, single, none)
+    let killMatch = content.match(killPatternDoubleAsterisks);
+    if (!killMatch) {
+      killMatch = content.match(killPatternSingleAsterisks);
+    }
     if (!killMatch) {
       killMatch = content.match(killPatternNoAsterisks);
     }
