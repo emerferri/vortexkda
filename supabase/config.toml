@@ -1,1 +1,4 @@
 project_id = "piwvrencvdgngruhuxqw"
+
+[functions.auto-process-ranking]
+verify_jwt = false
