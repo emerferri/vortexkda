@@ -13,6 +13,7 @@ import { CalendarIcon, X, Download, Send } from 'lucide-react';
 import { format } from 'date-fns';
 import html2canvas from 'html2canvas';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 
 interface KillLog {
   killer_name: string;
@@ -46,6 +47,7 @@ const getStreakLevel = (streak: number) => {
 };
 
 export const KillStreakRanking = () => {
+  const { user } = useAuth();
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
@@ -275,16 +277,18 @@ export const KillStreakRanking = () => {
                 Exportar JPG
               </Button>
               
-              <Button
-                onClick={() => setShowDiscordModal(true)}
-                variant="default"
-                size="sm"
-                className="gap-2"
-                disabled={streakRankings.length === 0}
-              >
-                <Send className="w-4 h-4" />
-                Discord
-              </Button>
+              {user && (
+                <Button
+                  onClick={() => setShowDiscordModal(true)}
+                  variant="default"
+                  size="sm"
+                  className="gap-2"
+                  disabled={streakRankings.length === 0}
+                >
+                  <Send className="w-4 h-4" />
+                  Discord
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
