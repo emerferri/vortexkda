@@ -120,14 +120,17 @@ function parseExternalDbContent(logs: ExternalLogEntry[]): ParseResult {
 // Get the time range for the most recent boss event
 function getEventTimeRange(): { startDate: string; endDate: string; matchDate: string; matchHour: number } {
   const now = new Date();
-  const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday
+  const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, 2 = Tuesday, 4 = Thursday
   const currentHour = now.getHours();
 
-  // Boss times: Monday 21:00 and 22:00, Other days 20:00 and 22:00
+  // Boss event times:
+  // Monday: 21:00 and 22:00 (cron at 21:30 and 22:30)
+  // Tuesday & Thursday: 20:00 and 22:00 (cron at 20:30 and 23:00)
+  // Other days: 20:00 and 22:00 (cron at 20:30 and 22:30)
   let eventHour: number;
 
   if (dayOfWeek === 1) {
-    // Monday
+    // Monday: events at 21:00 and 22:00
     if (currentHour >= 22) {
       eventHour = 22;
     } else if (currentHour >= 21) {
@@ -135,8 +138,19 @@ function getEventTimeRange(): { startDate: string; endDate: string; matchDate: s
     } else {
       eventHour = 22; // Previous day's last event
     }
+  } else if (dayOfWeek === 2 || dayOfWeek === 4) {
+    // Tuesday & Thursday: events at 20:00 and 22:00 (cron runs at 23:00 for 22:00 event)
+    if (currentHour >= 23) {
+      eventHour = 22; // 23:00 cron processes 22:00 event
+    } else if (currentHour >= 22) {
+      eventHour = 22;
+    } else if (currentHour >= 20) {
+      eventHour = 20;
+    } else {
+      eventHour = 22; // Previous day's last event
+    }
   } else {
-    // Other days
+    // Other days: events at 20:00 and 22:00
     if (currentHour >= 22) {
       eventHour = 22;
     } else if (currentHour >= 20) {
@@ -154,10 +168,11 @@ function getEventTimeRange(): { startDate: string; endDate: string; matchDate: s
   if (eventDate > now) {
     eventDate.setDate(eventDate.getDate() - 1);
     // Adjust for the actual event time of the previous day
-    if (eventDate.getDay() === 1) {
-      eventDate.setHours(22, 0, 0, 0);
+    const prevDayOfWeek = eventDate.getDay();
+    if (prevDayOfWeek === 1) {
+      eventDate.setHours(22, 0, 0, 0); // Monday last event at 22:00
     } else {
-      eventDate.setHours(22, 0, 0, 0);
+      eventDate.setHours(22, 0, 0, 0); // Other days last event at 22:00
     }
   }
 
