@@ -26,15 +26,25 @@ const playerNameSchema = z.string()
   .regex(/^[a-zA-Z0-9_-]+$/, 'Invalid characters');
 
 // Parser for external database single-line format
-// Format: 05/12/2025 23:11:04 - :dagger: *kikito* matou :skull: *MisticoDL* no mapa :map: *PvP Square* - *[Server: Boss Event PvP]*
+// Supports multiple formats:
+// 1. With asterisks: 05/12/2025 23:11:04 - :dagger: *kikito* matou :skull: *MisticoDL* no mapa :map: *PvP Square* - *[Server: Boss Event PvP]*
+// 2. Without asterisks: 07/12/2025 20:01:02 - :dagger: Freezing matou :skull: HulkSmash no mapa :map: PvP Square - [Server: Boss Event PvP]
 export const parseExternalDbContent = (logs: ExternalLogEntry[]): ParseResult => {
   const playerMap = new Map<string, { kills: number; deaths: number }>();
   const killLogs: KillLog[] = [];
   let bossLabel: string | null = null;
+  let matchedEntries = 0;
 
-  // Support both single (*name*) and double (**name**) asterisk formats
-  const validMapPattern = /\*{1,2}PvP Square\*{1,2}\s*-\s*\*{1,2}\[Server: Boss Event PvP\]\*{1,2}/i;
-  const killPattern = /:dagger:\s*\*{1,2}(\w+)\*{1,2}\s*matou\s*:skull:\s*\*{1,2}(\w+)\*{1,2}/i;
+  console.log(`[External DB Parser] Processing ${logs.length} logs`);
+
+  // Pattern with asterisks: *name* or **name**
+  const killPatternWithAsterisks = /:dagger:\s*\*{1,2}(\w+)\*{1,2}\s*matou\s*:skull:\s*\*{1,2}(\w+)\*{1,2}/i;
+  const mapPatternWithAsterisks = /\*{1,2}PvP Square\*{1,2}\s*-\s*\*{1,2}\[Server: Boss Event PvP\]\*{1,2}/i;
+  
+  // Pattern without asterisks
+  const killPatternNoAsterisks = /:dagger:\s*(\w+)\s+matou\s+:skull:\s*(\w+)\s+no mapa/i;
+  const mapPatternNoAsterisks = /PvP Square\s*-\s*\[Server: Boss Event PvP\]/i;
+  
   const datePattern = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/;
 
   for (const log of logs) {
@@ -42,8 +52,11 @@ export const parseExternalDbContent = (logs: ExternalLogEntry[]): ParseResult =>
 
     const content = log.content;
 
-    // Only process kills from valid PvP map
-    if (!validMapPattern.test(content)) {
+    // Check if it's a valid PvP map (either format)
+    const hasValidMapWithAsterisks = mapPatternWithAsterisks.test(content);
+    const hasValidMapNoAsterisks = mapPatternNoAsterisks.test(content);
+    
+    if (!hasValidMapWithAsterisks && !hasValidMapNoAsterisks) {
       continue;
     }
 
@@ -58,8 +71,12 @@ export const parseExternalDbContent = (logs: ExternalLogEntry[]): ParseResult =>
       }
     }
 
-    // Extract killer and victim
-    const killMatch = content.match(killPattern);
+    // Try to extract killer and victim (try both patterns)
+    let killMatch = content.match(killPatternWithAsterisks);
+    if (!killMatch) {
+      killMatch = content.match(killPatternNoAsterisks);
+    }
+    
     if (killMatch) {
       try {
         const killer = playerNameSchema.parse(killMatch[1].trim());
@@ -67,6 +84,7 @@ export const parseExternalDbContent = (logs: ExternalLogEntry[]): ParseResult =>
 
         // Add to kill logs
         killLogs.push({ killer, victim });
+        matchedEntries++;
 
         // Update killer stats
         const killerStats = playerMap.get(killer) || { kills: 0, deaths: 0 };
@@ -78,10 +96,12 @@ export const parseExternalDbContent = (logs: ExternalLogEntry[]): ParseResult =>
         victimStats.deaths += 1;
         playerMap.set(victim, victimStats);
       } catch {
-        console.warn('Invalid player name in external log, skipping');
+        console.warn('[External DB Parser] Invalid player name, skipping');
       }
     }
   }
+
+  console.log(`[External DB Parser] Matched entries: ${matchedEntries}, Players: ${playerMap.size}`);
 
   // Convert to array and calculate KDA
   const players: PlayerStats[] = Array.from(playerMap.entries()).map(([name, stats]) => ({
