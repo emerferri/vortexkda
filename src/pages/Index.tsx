@@ -29,18 +29,27 @@ const Index = () => {
   const [players, setPlayers] = useState<PlayerStats[]>([]);
   const [bossLabel, setBossLabel] = useState<string | null>(null);
   const [killLogs, setKillLogs] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState('placar');
   const { user, signOut } = useAuth();
   const { isAdmin, canEditData } = useUserRole();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  // Default tab: ranking for non-logged users, placar for logged users with edit permission
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = searchParams.get('tab');
+    if (tab) return tab;
+    return 'ranking'; // Default to ranking for all users initially
+  });
+
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab) {
       setActiveTab(tab);
+    } else if (!user && activeTab === 'placar') {
+      // Redirect non-logged users away from placar tab
+      setActiveTab('ranking');
     }
-  }, [searchParams]);
+  }, [searchParams, user, activeTab]);
 
   const [importSource, setImportSource] = useState<'txt' | 'database'>('txt');
 
@@ -106,10 +115,12 @@ const Index = () => {
 
         <div className="space-y-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className={`grid w-full max-w-6xl mx-auto ${isAdmin ? 'grid-cols-7' : 'grid-cols-6'} mb-8`}>
-              <TabsTrigger value="placar" className="text-base font-semibold">
-                Incluir Dados
-              </TabsTrigger>
+            <TabsList className={`grid w-full max-w-6xl mx-auto ${isAdmin ? 'grid-cols-7' : canEditData ? 'grid-cols-6' : 'grid-cols-5'} mb-8`}>
+              {canEditData && (
+                <TabsTrigger value="placar" className="text-base font-semibold">
+                  Incluir Dados
+                </TabsTrigger>
+              )}
               <TabsTrigger value="ranking" className="text-base font-semibold">
                 Ranking Geral
               </TabsTrigger>
@@ -132,9 +143,9 @@ const Index = () => {
               )}
             </TabsList>
             
-            <TabsContent value="placar" className="space-y-8">
-              {/* Import Source Toggle */}
-              {canEditData && (
+            {canEditData && (
+              <TabsContent value="placar" className="space-y-8">
+                {/* Import Source Toggle */}
                 <div className="flex justify-center gap-2 p-1 bg-muted/50 rounded-lg w-fit mx-auto">
                   <Button
                     variant={importSource === 'txt' ? 'default' : 'ghost'}
@@ -155,18 +166,18 @@ const Index = () => {
                     Banco de Dados
                   </Button>
                 </div>
-              )}
 
-              {/* Show appropriate import component */}
-              {canEditData && importSource === 'txt' && (
-                <FileUpload onFileUpload={handleFileUpload} />
-              )}
-              {canEditData && importSource === 'database' && (
-                <DatabaseImport onDataLoaded={handleDatabaseImport} />
-              )}
-              
-              <Scoreboard players={players} bossLabel={bossLabel} killLogs={killLogs} />
-            </TabsContent>
+                {/* Show appropriate import component */}
+                {importSource === 'txt' && (
+                  <FileUpload onFileUpload={handleFileUpload} />
+                )}
+                {importSource === 'database' && (
+                  <DatabaseImport onDataLoaded={handleDatabaseImport} />
+                )}
+                
+                <Scoreboard players={players} bossLabel={bossLabel} killLogs={killLogs} />
+              </TabsContent>
+            )}
             
             <TabsContent value="ranking">
               <RankingGeral />

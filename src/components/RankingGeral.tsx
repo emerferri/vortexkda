@@ -16,6 +16,7 @@ import { ptBR } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 interface AggregatedPlayer {
   name: string;
@@ -33,6 +34,7 @@ interface AggregatedPlayer {
 type SortKey = 'kills' | 'deaths' | 'kda' | 'weightedKda' | 'eventScore';
 
 export const RankingGeral = () => {
+  const { user } = useAuth();
   const [sortBy, setSortBy] = useState<SortKey>('eventScore');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
@@ -802,16 +804,20 @@ export const RankingGeral = () => {
           JPG
         </Button>
 
-        <div className="w-px h-8 bg-border mx-2" />
+        {user && (
+          <>
+            <div className="w-px h-8 bg-border mx-2" />
 
-        <Button
-          onClick={() => setShowDiscordModal(true)}
-          variant="default"
-          className="flex items-center gap-2"
-        >
-          <Send className="w-4 h-4" />
-          Publicar no Discord
-        </Button>
+            <Button
+              onClick={() => setShowDiscordModal(true)}
+              variant="default"
+              className="flex items-center gap-2"
+            >
+              <Send className="w-4 h-4" />
+              Publicar no Discord
+            </Button>
+          </>
+        )}
       </div>
 
       {/* Modal de Confirmação do Discord */}
