@@ -103,44 +103,61 @@ function parseExternalDbContent(logs: ExternalLogEntry[]): ParseResult {
 }
 
 function getEventTimeRange(): { startDate: string; endDate: string; matchDate: string; matchHour: number } {
+  // Brazil timezone offset (UTC-3)
+  const BRAZIL_OFFSET = -3;
+  
+  // Get current time in Brazil timezone
   const now = new Date();
-  const dayOfWeek = now.getDay();
-  const currentHour = now.getHours();
+  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const brazilTime = new Date(utcTime + (BRAZIL_OFFSET * 3600000));
+  
+  const dayOfWeek = brazilTime.getDay();
+  const currentHour = brazilTime.getHours();
+  
+  console.log(`[Auto Process] Brazil time: ${brazilTime.toISOString()}, day: ${dayOfWeek}, hour: ${currentHour}`);
 
   let eventHour: number;
 
+  // Determine the event hour based on day and time
   if (dayOfWeek === 1) {
+    // Monday: 21:00 and 22:00
     if (currentHour >= 22) eventHour = 22;
     else if (currentHour >= 21) eventHour = 21;
     else eventHour = 22;
   } else if (dayOfWeek === 2 || dayOfWeek === 4) {
-    if (currentHour >= 23) eventHour = 22;
-    else if (currentHour >= 22) eventHour = 22;
+    // Tuesday/Thursday: 20:00 and 22:00
+    if (currentHour >= 22) eventHour = 22;
     else if (currentHour >= 20) eventHour = 20;
     else eventHour = 22;
   } else {
+    // Other days: 20:00 and 22:00
     if (currentHour >= 22) eventHour = 22;
     else if (currentHour >= 20) eventHour = 20;
     else eventHour = 22;
   }
 
-  const eventDate = new Date(now);
-  eventDate.setHours(eventHour, 0, 0, 0);
+  // Create event date in Brazil time
+  const eventDateBrazil = new Date(brazilTime);
+  eventDateBrazil.setHours(eventHour, 0, 0, 0);
 
-  if (eventDate > now) {
-    eventDate.setDate(eventDate.getDate() - 1);
-    eventDate.setHours(22, 0, 0, 0);
+  // If event time is in the future, use previous event
+  if (eventDateBrazil > brazilTime) {
+    eventDateBrazil.setDate(eventDateBrazil.getDate() - 1);
+    eventDateBrazil.setHours(22, 0, 0, 0);
   }
 
-  const startDate = new Date(eventDate);
-  const endDate = new Date(eventDate);
-  endDate.setHours(endDate.getHours() + 1);
+  // Convert Brazil time back to UTC for database query
+  const startDateUTC = new Date(eventDateBrazil.getTime() - (BRAZIL_OFFSET * 3600000));
+  const endDateUTC = new Date(startDateUTC.getTime() + 3600000); // +1 hour
 
-  const matchDate = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
+  // Format match date in Brazil timezone for storage
+  const matchDate = `${eventDateBrazil.getFullYear()}-${String(eventDateBrazil.getMonth() + 1).padStart(2, '0')}-${String(eventDateBrazil.getDate()).padStart(2, '0')}`;
+
+  console.log(`[Auto Process] Event: ${matchDate} ${eventHour}:00 BRT -> UTC: ${startDateUTC.toISOString()} to ${endDateUTC.toISOString()}`);
 
   return {
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
+    startDate: startDateUTC.toISOString(),
+    endDate: endDateUTC.toISOString(),
     matchDate,
     matchHour: eventHour
   };
