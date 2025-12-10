@@ -40,16 +40,16 @@ function parseExternalDbContent(logs: ExternalLogEntry[]): ParseResult {
   console.log(`[Auto Parser] Processing ${logs.length} logs`);
 
   // Pattern with double asterisks: **name** (external database)
-  const killPatternDoubleAsterisks = /:dagger:\\s*\\*\\*(\w+)\*\*\\s*matou\\s*:skull:\\s*\\*\\*(\w+)\*\*/i;
-  const mapPatternDoubleAsterisks = /\*\*PvP Square\*\*\\s*-\\s*\*\*\[Server: Boss Event PvP\]\*\*/i;
+  const killPatternDoubleAsterisks = /:dagger:\s*\*\*(\w+)\*\*\s*matou\s*:skull:\s*\*\*(\w+)\*\*/i;
+  const mapPatternDoubleAsterisks = /\*\*PvP Square\*\*\s*-\s*\*\*\[Server: Boss Event PvP\]\*\*/i;
 
   // Pattern with single asterisks: *name*
-  const killPatternSingleAsterisks = /:dagger:\\s*\\*(\w+)\*\\s*matou\\s*:skull:\\s*\\*(\w+)\*/i;
-  const mapPatternSingleAsterisks = /\*PvP Square\*\\s*-\\s*\*\[Server: Boss Event PvP\]\*/i;
+  const killPatternSingleAsterisks = /:dagger:\s*\*(\w+)\*\s*matou\s*:skull:\s*\*(\w+)\*/i;
+  const mapPatternSingleAsterisks = /\*PvP Square\*\s*-\s*\*\[Server: Boss Event PvP\]\*/i;
 
   // Pattern without asterisks
-  const killPatternNoAsterisks = /:dagger:\\s*(\w+)\\s+matou\\s+:skull:\\s*(\w+)\\s+no mapa/i;
-  const mapPatternNoAsterisks = /PvP Square\\s*-\\s*\[Server: Boss Event PvP\]/i;
+  const killPatternNoAsterisks = /:dagger:\s*(\w+)\s+matou\s+:skull:\s*(\w+)\s+no mapa/i;
+  const mapPatternNoAsterisks = /PvP Square\s*-\s*\[Server: Boss Event PvP\]/i;
 
   const datePattern = /(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/;
 
