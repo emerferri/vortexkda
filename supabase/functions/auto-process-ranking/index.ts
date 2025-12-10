@@ -292,18 +292,22 @@ Deno.serve(async (req) => {
       guildSummary[guild] = (guildSummary[guild] || 0) + 1;
     }
 
-    // Calculate special rankings
-    const sortedByKills = Object.values(parseResult.players).sort((a, b) => b.kills - a.kills);
-    const sortedByDeaths = Object.values(parseResult.players).sort((a, b) => {
-      const scoreA = a.kills - a.deaths;
-      const scoreB = b.kills - b.deaths;
-      return scoreA - scoreB;
-    });
+    // Calculate special rankings using correct eventScore formula: (kills * 3) + (kda * 2) - (deaths * 1.5)
+    const playersWithEventScore = Object.values(parseResult.players).map(p => ({
+      ...p,
+      eventScore: (p.kills * 3) + (p.kda * 2) - (p.deaths * 1.5)
+    }));
 
-    const reiDoPVP = sortedByKills[0];
-    const coneMonodedo = sortedByDeaths[0];
+    // Cone Monodedo = worst eventScore (lowest)
+    const sortedByEventScore = [...playersWithEventScore].sort((a, b) => a.eventScore - b.eventScore);
+    const coneMonodedo = sortedByEventScore[0];
 
-    const sortedByKDA = Object.values(parseResult.players)
+    // Rei do PVP = best eventScore (highest), excluding cone monodedo
+    const eligibleForRei = playersWithEventScore.filter(p => p.name !== coneMonodedo?.name);
+    const reiDoPVP = [...eligibleForRei].sort((a, b) => b.eventScore - a.eventScore)[0];
+
+    // Brabissimo = best KDA, excluding cone monodedo
+    const sortedByKDA = playersWithEventScore
       .filter(p => p.name !== coneMonodedo?.name)
       .sort((a, b) => b.kda - a.kda);
     const brabissimo = sortedByKDA[0];
@@ -320,15 +324,18 @@ Deno.serve(async (req) => {
       .map(([guild, count]) => `**${guild}**: ${count} ${count === 1 ? 'jogador' : 'jogadores'}`)
       .join('\n');
 
-    // Build ranking table text
-    const sortedPlayers = Object.values(parseResult.players).sort((a, b) => b.kills - a.kills);
+    // Build ranking table text with correct eventScore formula: (kills * 3) + (kda * 2) - (deaths * 1.5)
+    const playersWithScore = Object.values(parseResult.players).map(player => {
+      const eventScore = (player.kills * 3) + (player.kda * 2) - (player.deaths * 1.5);
+      return { ...player, eventScore };
+    });
+    const sortedPlayers = playersWithScore.sort((a, b) => b.eventScore - a.eventScore);
     let rankingTableLines = '';
     sortedPlayers.forEach((player, index) => {
       const charInfo = characterMap[player.name];
       const guild = charInfo?.guild || '-';
       const playerClass = charInfo?.class || '-';
-      const eventScore = player.kills - player.deaths;
-      rankingTableLines += `**#${index + 1}** ${player.name} | ${playerClass} | ${guild} | ${player.kills}K/${player.deaths}D | KDA: ${player.kda} | Score: ${eventScore}\n`;
+      rankingTableLines += `**#${index + 1}** ${player.name} | ${playerClass} | ${guild} | ${player.kills}K/${player.deaths}D | KDA: ${player.kda} | Score: ${player.eventScore.toFixed(2)}\n`;
     });
 
     // Post to Discord - matching manual format exactly
@@ -350,17 +357,17 @@ Deno.serve(async (req) => {
           },
           {
             name: '👑 Rei do PVP',
-            value: reiDoPVP ? `**${reiDoPVP.name}**\n${reiDoPVP.kills} kills • ${reiDoPVP.deaths} deaths` : 'N/A',
+            value: reiDoPVP ? `**${reiDoPVP.name}**\nScore: ${reiDoPVP.eventScore.toFixed(2)} • ${reiDoPVP.kills}K/${reiDoPVP.deaths}D` : 'N/A',
             inline: true
           },
           {
             name: '⚡ Brabissimo',
-            value: brabissimo ? `**${brabissimo.name}**\n${brabissimo.kills} kills em 1 partida` : 'N/A',
+            value: brabissimo ? `**${brabissimo.name}**\nKDA: ${brabissimo.kda} • ${brabissimo.kills}K/${brabissimo.deaths}D` : 'N/A',
             inline: true
           },
           {
             name: '🍦 Cone Monodedo',
-            value: coneMonodedo ? `**${coneMonodedo.name}**\n${coneMonodedo.deaths} deaths` : 'N/A',
+            value: coneMonodedo ? `**${coneMonodedo.name}**\nScore: ${coneMonodedo.eventScore.toFixed(2)} • ${coneMonodedo.kills}K/${coneMonodedo.deaths}D` : 'N/A',
             inline: true
           },
           {
