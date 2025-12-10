@@ -1,5 +1,6 @@
-import { useMemo, useState, useRef, useCallback } from 'react';
+import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { debounce } from 'lodash';
+import { useSearchParams } from 'react-router-dom';
 import { Trophy, Skull, Crosshair, TrendingUp, Calendar as CalendarIcon, Download, FileImage, Send } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
@@ -33,46 +34,57 @@ interface AggregatedPlayer {
 
 type SortKey = 'kills' | 'deaths' | 'kda' | 'weightedKda' | 'eventScore';
 
-// Helper to parse URL params on initial mount
-const getInitialDateFromUrl = (): Date | undefined => {
-  const params = new URLSearchParams(window.location.search);
-  const dateParam = params.get('date');
-  if (dateParam) {
-    const parsed = new Date(dateParam);
-    if (!isNaN(parsed.getTime())) return parsed;
-  }
-  return undefined;
-};
-
-const getInitialHourFromUrl = (): number | undefined => {
-  const params = new URLSearchParams(window.location.search);
-  const hourParam = params.get('hour');
-  if (hourParam) {
-    const parsed = parseInt(hourParam, 10);
-    if (!isNaN(parsed) && parsed >= 0 && parsed <= 23) return parsed;
-  }
-  return undefined;
-};
-
 export const RankingGeral = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [sortBy, setSortBy] = useState<SortKey>('eventScore');
-  
-  // Initialize state directly from URL params
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(getInitialDateFromUrl);
-  const [dateTo, setDateTo] = useState<Date | undefined>(getInitialDateFromUrl);
-  const [hourFrom, setHourFrom] = useState<number | undefined>(getInitialHourFromUrl);
-  const [hourTo, setHourTo] = useState<number | undefined>(getInitialHourFromUrl);
-  const [debouncedDateFrom, setDebouncedDateFrom] = useState<Date | undefined>(getInitialDateFromUrl);
-  const [debouncedDateTo, setDebouncedDateTo] = useState<Date | undefined>(getInitialDateFromUrl);
-  const [debouncedHourFrom, setDebouncedHourFrom] = useState<number | undefined>(getInitialHourFromUrl);
-  const [debouncedHourTo, setDebouncedHourTo] = useState<number | undefined>(getInitialHourFromUrl);
+  const [dateFrom, setDateFrom] = useState<Date>();
+  const [dateTo, setDateTo] = useState<Date>();
+  const [hourFrom, setHourFrom] = useState<number>();
+  const [hourTo, setHourTo] = useState<number>();
+  const [debouncedDateFrom, setDebouncedDateFrom] = useState<Date>();
+  const [debouncedDateTo, setDebouncedDateTo] = useState<Date>();
+  const [debouncedHourFrom, setDebouncedHourFrom] = useState<number>();
+  const [debouncedHourTo, setDebouncedHourTo] = useState<number>();
   const [classFilter, setClassFilter] = useState<string>('all');
   const [showDiscordModal, setShowDiscordModal] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [environment, setEnvironment] = useState<'homolog' | 'prod'>('homolog');
   const tableRef = useRef<HTMLDivElement>(null);
   const specialCardsRef = useRef<HTMLDivElement>(null);
+  const urlFiltersAppliedRef = useRef(false);
+
+  // Apply URL parameters as initial filters (from Discord links) - runs once
+  useEffect(() => {
+    if (urlFiltersAppliedRef.current) return;
+    
+    const dateParam = searchParams.get('date');
+    const hourParam = searchParams.get('hour');
+    
+    if (dateParam || hourParam) {
+      if (dateParam) {
+        const parsedDate = new Date(dateParam + 'T00:00:00');
+        if (!isNaN(parsedDate.getTime())) {
+          setDateFrom(parsedDate);
+          setDateTo(parsedDate);
+          setDebouncedDateFrom(parsedDate);
+          setDebouncedDateTo(parsedDate);
+        }
+      }
+      
+      if (hourParam) {
+        const parsedHour = parseInt(hourParam, 10);
+        if (!isNaN(parsedHour) && parsedHour >= 0 && parsedHour <= 23) {
+          setHourFrom(parsedHour);
+          setHourTo(parsedHour);
+          setDebouncedHourFrom(parsedHour);
+          setDebouncedHourTo(parsedHour);
+        }
+      }
+      
+      urlFiltersAppliedRef.current = true;
+    }
+  }, [searchParams]);
 
   // Debounce filter updates
   const debouncedSetFilters = useCallback(
