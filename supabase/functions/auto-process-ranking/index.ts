@@ -102,7 +102,7 @@ function parseExternalDbContent(logs: ExternalLogEntry[]): ParseResult {
   return { players, bossLabel, killLogs };
 }
 
-function getEventTimeRange(): { startDate: string; endDate: string; matchDate: string; matchHour: number } {
+function getEventTimeRange(): { startDate: string; endDate: string; matchDate: string; matchHour: number; localStartDate: string; localEndDate: string } {
   // Brazil timezone offset (UTC-3)
   const BRAZIL_OFFSET = -3;
   
@@ -153,13 +153,21 @@ function getEventTimeRange(): { startDate: string; endDate: string; matchDate: s
   // Format match date in Brazil timezone for storage
   const matchDate = `${eventDateBrazil.getFullYear()}-${String(eventDateBrazil.getMonth() + 1).padStart(2, '0')}-${String(eventDateBrazil.getDate()).padStart(2, '0')}`;
 
-  console.log(`[Auto Process] Event: ${matchDate} ${eventHour}:00 BRT -> UTC: ${startDateUTC.toISOString()} to ${endDateUTC.toISOString()}`);
+  // Format local Brazil time strings for external database query (which stores in local time)
+  const localStartDate = `${matchDate}T${String(eventHour).padStart(2, '0')}:00`;
+  const localEndDate = `${matchDate}T${String(eventHour).padStart(2, '0')}:59`;
+
+  console.log(`[Auto Process] Event: ${matchDate} ${eventHour}:00 BRT`);
+  console.log(`[Auto Process] Local query range: ${localStartDate} to ${localEndDate}`);
+  console.log(`[Auto Process] UTC query range: ${startDateUTC.toISOString()} to ${endDateUTC.toISOString()}`);
 
   return {
     startDate: startDateUTC.toISOString(),
     endDate: endDateUTC.toISOString(),
     matchDate,
-    matchHour: eventHour
+    matchHour: eventHour,
+    localStartDate,
+    localEndDate
   };
 }
 
@@ -175,8 +183,8 @@ Deno.serve(async (req) => {
     const internalServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const internalClient = createClient(internalSupabaseUrl, internalServiceKey);
 
-    const { startDate, endDate, matchDate, matchHour } = getEventTimeRange();
-    console.log(`[Auto Process] Fetching logs from ${startDate} to ${endDate}`);
+    const { startDate, endDate, matchDate, matchHour, localStartDate, localEndDate } = getEventTimeRange();
+    console.log(`[Auto Process] Fetching logs for ${matchDate} ${matchHour}:00`);
 
     // Check if this match already exists
     const { data: existingMatch } = await internalClient
@@ -204,11 +212,12 @@ Deno.serve(async (req) => {
 
     const externalClient = createClient(externalUrl, externalKey);
 
+    // Query using local Brazil time (external DB stores timestamps in local time)
     const { data: logs, error: logsError } = await externalClient
       .from('logs_pvp')
       .select('id, content, timestamp, created_at')
-      .gte('timestamp', startDate)
-      .lte('timestamp', endDate)
+      .gte('timestamp', localStartDate)
+      .lte('timestamp', localEndDate)
       .order('timestamp', { ascending: false })
       .limit(2000);
 
