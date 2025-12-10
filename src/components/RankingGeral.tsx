@@ -1,5 +1,6 @@
-import { useMemo, useState, useRef, useCallback } from 'react';
+import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { debounce } from 'lodash';
+import { useSearchParams } from 'react-router-dom';
 import { Trophy, Skull, Crosshair, TrendingUp, Calendar as CalendarIcon, Download, FileImage, Send } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
@@ -35,6 +36,7 @@ type SortKey = 'kills' | 'deaths' | 'kda' | 'weightedKda' | 'eventScore';
 
 export const RankingGeral = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [sortBy, setSortBy] = useState<SortKey>('eventScore');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
@@ -50,6 +52,35 @@ export const RankingGeral = () => {
   const [environment, setEnvironment] = useState<'homolog' | 'prod'>('homolog');
   const tableRef = useRef<HTMLDivElement>(null);
   const specialCardsRef = useRef<HTMLDivElement>(null);
+  const [urlFiltersApplied, setUrlFiltersApplied] = useState(false);
+
+  // Apply URL parameters as initial filters (from Discord links)
+  useEffect(() => {
+    if (urlFiltersApplied) return;
+    
+    const dateParam = searchParams.get('date');
+    const hourParam = searchParams.get('hour');
+    
+    if (dateParam || hourParam) {
+      if (dateParam) {
+        const parsedDate = new Date(dateParam);
+        if (!isNaN(parsedDate.getTime())) {
+          setDateFrom(parsedDate);
+          setDateTo(parsedDate);
+        }
+      }
+      
+      if (hourParam) {
+        const parsedHour = parseInt(hourParam, 10);
+        if (!isNaN(parsedHour) && parsedHour >= 0 && parsedHour <= 23) {
+          setHourFrom(parsedHour);
+          setHourTo(parsedHour);
+        }
+      }
+      
+      setUrlFiltersApplied(true);
+    }
+  }, [searchParams, urlFiltersApplied]);
 
   // Debounce filter updates
   const debouncedSetFilters = useCallback(

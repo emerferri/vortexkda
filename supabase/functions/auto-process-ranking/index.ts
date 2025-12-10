@@ -387,9 +387,12 @@ Deno.serve(async (req) => {
         color: 0x3b82f6
       };
 
-      // Embed 3: Closing message - matching manual format
+      // Embed 3: Closing message with link - matching manual format
+      const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://rankingpvpboss.lovable.app';
+      const rankingLink = `${frontendUrl}/?tab=ranking&date=${matchDate}&hour=${matchHour}`;
+      
       const embed3 = {
-        description: `Esse é o resultado do BOSSx2 diário! **${reiDoPVP?.name || 'N/A'}** Amassou hoje, já nosso amigo **${coneMonodedo?.name || 'N/A'}** passou fome!`,
+        description: `Esse é o resultado do BOSSx2 diário! **${reiDoPVP?.name || 'N/A'}** Amassou hoje, já nosso amigo **${coneMonodedo?.name || 'N/A'}** passou fome!\n\n🔗 **[Ver ranking completo no site](${rankingLink})**`,
         color: 0x9b87f5
       };
 
