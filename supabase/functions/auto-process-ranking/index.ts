@@ -120,65 +120,50 @@ function parseExternalDbContent(logs: ExternalLogEntry[]): ParseResult {
 // Get the time range for the most recent boss event
 function getEventTimeRange(): { startDate: string; endDate: string; matchDate: string; matchHour: number } {
   const now = new Date();
-  const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, 2 = Tuesday, 4 = Thursday
+  const dayOfWeek = now.getDay();
   const currentHour = now.getHours();
 
-  // Boss event times:
-  // Monday: 21:00 and 22:00 (cron at 21:30 and 22:30)
-  // Tuesday & Thursday: 20:00 and 22:00 (cron at 20:30 and 23:00)
-  // Other days: 20:00 and 22:00 (cron at 20:30 and 22:30)
   let eventHour: number;
 
   if (dayOfWeek === 1) {
-    // Monday: events at 21:00 and 22:00
     if (currentHour >= 22) {
       eventHour = 22;
     } else if (currentHour >= 21) {
       eventHour = 21;
     } else {
-      eventHour = 22; // Previous day's last event
+      eventHour = 22;
     }
   } else if (dayOfWeek === 2 || dayOfWeek === 4) {
-    // Tuesday & Thursday: events at 20:00 and 22:00 (cron runs at 23:00 for 22:00 event)
     if (currentHour >= 23) {
-      eventHour = 22; // 23:00 cron processes 22:00 event
+      eventHour = 22;
     } else if (currentHour >= 22) {
       eventHour = 22;
     } else if (currentHour >= 20) {
       eventHour = 20;
     } else {
-      eventHour = 22; // Previous day's last event
+      eventHour = 22;
     }
   } else {
-    // Other days: events at 20:00 and 22:00
     if (currentHour >= 22) {
       eventHour = 22;
     } else if (currentHour >= 20) {
       eventHour = 20;
     } else {
-      eventHour = 22; // Previous day's last event
+      eventHour = 22;
     }
   }
 
-  // Create date strings
   const eventDate = new Date(now);
   eventDate.setHours(eventHour, 0, 0, 0);
 
-  // If we're looking at an event that would be in the future, go back to yesterday
   if (eventDate > now) {
     eventDate.setDate(eventDate.getDate() - 1);
-    // Adjust for the actual event time of the previous day
-    const prevDayOfWeek = eventDate.getDay();
-    if (prevDayOfWeek === 1) {
-      eventDate.setHours(22, 0, 0, 0); // Monday last event at 22:00
-    } else {
-      eventDate.setHours(22, 0, 0, 0); // Other days last event at 22:00
-    }
+    eventDate.setHours(22, 0, 0, 0);
   }
 
   const startDate = new Date(eventDate);
   const endDate = new Date(eventDate);
-  endDate.setHours(endDate.getHours() + 1); // Event lasts 1 hour
+  endDate.setHours(endDate.getHours() + 1);
 
   const matchDate = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
 
@@ -188,6 +173,34 @@ function getEventTimeRange(): { startDate: string; endDate: string; matchDate: s
     matchDate,
     matchHour: eventHour
   };
+}
+
+// Generate text-based ranking table for Discord
+function generateRankingTable(
+  players: PlayerStats[],
+  characterMap: Record<string, { guild: string; class: string }>
+): string {
+  const sortedPlayers = [...players].sort((a, b) => b.kills - a.kills);
+  
+  let table = '```\n';
+  table += '# │ Player          │ Classe      │ Guild       │ K  │ D  │ KDA\n';
+  table += '──┼─────────────────┼─────────────┼─────────────┼────┼────┼─────\n';
+  
+  sortedPlayers.forEach((player, index) => {
+    const charInfo = characterMap[player.name];
+    const guild = (charInfo?.guild || '-').substring(0, 11).padEnd(11);
+    const playerClass = (charInfo?.class || '-').substring(0, 11).padEnd(11);
+    const name = player.name.substring(0, 15).padEnd(15);
+    const rank = String(index + 1).padStart(2);
+    const kills = String(player.kills).padStart(2);
+    const deaths = String(player.deaths).padStart(2);
+    const kda = String(player.kda).padStart(4);
+    
+    table += `${rank}│ ${name} │ ${playerClass} │ ${guild} │ ${kills} │ ${deaths} │ ${kda}\n`;
+  });
+  
+  table += '```';
+  return table;
 }
 
 Deno.serve(async (req) => {
@@ -202,7 +215,6 @@ Deno.serve(async (req) => {
     const internalServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const internalClient = createClient(internalSupabaseUrl, internalServiceKey);
 
-    // Get time range for the event
     const { startDate, endDate, matchDate, matchHour } = getEventTimeRange();
     console.log(`[Auto Process] Fetching logs from ${startDate} to ${endDate}`);
 
@@ -315,7 +327,6 @@ Deno.serve(async (req) => {
 
     if (killLogsError) {
       console.error('[Auto Process] Failed to insert kill logs:', killLogsError.message);
-      // Don't throw, kill logs are optional
     }
 
     // Fetch character data for guild information
@@ -340,7 +351,7 @@ Deno.serve(async (req) => {
       guildSummary[guild] = (guildSummary[guild] || 0) + 1;
     }
 
-    // Calculate special rankings for Discord
+    // Calculate special rankings
     const sortedByKills = Object.values(parseResult.players).sort((a, b) => b.kills - a.kills);
     const sortedByDeaths = Object.values(parseResult.players).sort((a, b) => {
       const scoreA = a.kills - a.deaths;
@@ -351,7 +362,6 @@ Deno.serve(async (req) => {
     const reiDoPVP = sortedByKills[0];
     const coneMonodedo = sortedByDeaths[0];
 
-    // Brabíssimo - best KDA excluding cone monodedo
     const sortedByKDA = Object.values(parseResult.players)
       .filter(p => p.name !== coneMonodedo?.name)
       .sort((a, b) => b.kda - a.kda);
@@ -366,76 +376,88 @@ Deno.serve(async (req) => {
     // Format guild summary for Discord
     const guildSummaryText = Object.entries(guildSummary)
       .sort((a, b) => b[1] - a[1])
-      .map(([guild, count]) => `**${guild}**: ${count} ${count === 1 ? 'jogador' : 'jogadores'}`)
-      .join('\n') || 'Nenhuma guild registrada';
+      .map(([guild, count]) => `**${guild}**: ${count}`)
+      .join(' • ') || 'Nenhuma guild';
 
-    // Post to Discord (matching manual format without images)
+    // Generate ranking table
+    const rankingTable = generateRankingTable(Object.values(parseResult.players), characterMap);
+
+    // Post to Discord
     const webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_PROD') || Deno.env.get('DISCORD_WEBHOOK_URL');
 
     if (webhookUrl) {
-      // Format date for display
       const [year, month, day] = matchDate.split('-');
       const formattedDate = `${day}/${month}/${year}`;
 
+      // Embed 1: Special Rankings (visual cards replacement)
       const embed1 = {
-        title: '📊 Ranking BOSS Diário',
-        description: `🤖 **Processamento Automático** - ${formattedDate} ${matchHour}:00`,
+        title: '🏆 Destaques do BOSS',
+        description: `📅 ${formattedDate} às ${matchHour}:00`,
         color: 0x10B981,
         fields: [
           {
-            name: '👑 Rei do PVP',
-            value: reiDoPVP ? `**${reiDoPVP.name}**\n${reiDoPVP.kills} kills • ${reiDoPVP.deaths} deaths` : 'N/A',
+            name: '👑 REI DO PVP',
+            value: reiDoPVP 
+              ? `**${reiDoPVP.name}**\n🗡️ ${reiDoPVP.kills} kills\n💀 ${reiDoPVP.deaths} deaths` 
+              : 'N/A',
             inline: true
           },
           {
-            name: '⚡ Brabíssimo',
-            value: brabissimo ? `**${brabissimo.name}**\nKDA: ${brabissimo.kda} (${brabissimo.kills}/${brabissimo.deaths})` : 'N/A',
+            name: '⚡ BRABÍSSIMO',
+            value: brabissimo 
+              ? `**${brabissimo.name}**\n📊 KDA: ${brabissimo.kda}\n(${brabissimo.kills}/${brabissimo.deaths})` 
+              : 'N/A',
             inline: true
           },
           {
-            name: '🍦 Cone Monodedo',
-            value: coneMonodedo ? `**${coneMonodedo.name}**\n${coneMonodedo.deaths} deaths` : 'N/A',
+            name: '🍦 CONE MONODEDO',
+            value: coneMonodedo 
+              ? `**${coneMonodedo.name}**\n💀 ${coneMonodedo.deaths} deaths\n😢 Passou fome!` 
+              : 'N/A',
             inline: true
-          },
+          }
+        ]
+      };
+
+      // Embed 2: Ranking Table
+      const embed2 = {
+        title: '📊 Ranking Completo',
+        description: rankingTable,
+        color: 0x3b82f6
+      };
+
+      // Embed 3: Summary
+      const embed3 = {
+        title: '📈 Resumo',
+        color: 0x9b87f5,
+        fields: [
           {
-            name: '📈 Totais',
-            value: `${totals.playerCount} jogadores • ${totals.kills} kills • ${totals.deaths} deaths`,
+            name: '🎮 Totais',
+            value: `**${totals.playerCount}** jogadores • **${totals.kills}** kills • **${totals.deaths}** deaths`,
             inline: false
           },
           {
-            name: '🏆 Top 5 Kills',
-            value: sortedByKills.slice(0, 5).map((p, i) => `${i + 1}. **${p.name}** - ${p.kills} kills`).join('\n'),
-            inline: true
-          },
-          {
-            name: '💀 Top 5 Deaths',
-            value: Object.values(parseResult.players)
-              .sort((a, b) => b.deaths - a.deaths)
-              .slice(0, 5)
-              .map((p, i) => `${i + 1}. **${p.name}** - ${p.deaths} deaths`).join('\n'),
-            inline: true
-          },
-          {
-            name: '⚔️ Resumo por Guild',
+            name: '⚔️ Por Guild',
             value: guildSummaryText,
             inline: false
           }
         ],
+        footer: {
+          text: '⚙️ Gerado automaticamente pelo sistema'
+        },
         timestamp: new Date().toISOString()
       };
 
-      const embed2 = {
-        description: `Esse é o resultado do BOSSx2! **${reiDoPVP?.name || 'N/A'}** amassou hoje, já nosso amigo **${coneMonodedo?.name || 'N/A'}** passou fome!`,
-        color: 0x9b87f5,
-        footer: {
-          text: '⚙️ Gerado automaticamente pelo sistema'
-        }
+      // Embed 4: Closing message
+      const embed4 = {
+        description: `Esse é o resultado do BOSSx2! **${reiDoPVP?.name || 'N/A'}** amassou hoje, já nosso amigo **${coneMonodedo?.name || 'N/A'}** passou fome! 🍦`,
+        color: 0xffd700
       };
 
       const discordResponse = await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ embeds: [embed1, embed2] })
+        body: JSON.stringify({ embeds: [embed1, embed2, embed3, embed4] })
       });
 
       if (!discordResponse.ok) {
