@@ -388,7 +388,8 @@ Deno.serve(async (req) => {
       };
 
       // Embed 3: Closing message with link - matching manual format
-      const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://rankingpvpboss.lovable.app';
+      const frontendUrlRaw = Deno.env.get('FRONTEND_URL') || 'https://rankingpvpboss.lovable.app';
+      const frontendUrl = frontendUrlRaw.replace(/\/+$/, ''); // Remove trailing slashes
       const rankingLink = `${frontendUrl}/?tab=ranking&date=${matchDate}&hour=${matchHour}`;
       
       const embed3 = {
