@@ -318,6 +318,28 @@ Deno.serve(async (req) => {
       // Don't throw, kill logs are optional
     }
 
+    // Fetch character data for guild information
+    const playerNames = Object.keys(parseResult.players);
+    const { data: characters } = await internalClient
+      .from('characters')
+      .select('name, guild, class')
+      .in('name', playerNames);
+
+    const characterMap: Record<string, { guild: string; class: string }> = {};
+    if (characters) {
+      for (const char of characters) {
+        characterMap[char.name] = { guild: char.guild, class: char.class };
+      }
+    }
+
+    // Calculate guild summary
+    const guildSummary: Record<string, number> = {};
+    for (const playerName of playerNames) {
+      const charInfo = characterMap[playerName];
+      const guild = charInfo?.guild || 'Sem Guild';
+      guildSummary[guild] = (guildSummary[guild] || 0) + 1;
+    }
+
     // Calculate special rankings for Discord
     const sortedByKills = Object.values(parseResult.players).sort((a, b) => b.kills - a.kills);
     const sortedByDeaths = Object.values(parseResult.players).sort((a, b) => {
@@ -341,12 +363,23 @@ Deno.serve(async (req) => {
       playerCount: Object.keys(parseResult.players).length
     };
 
-    // Post to Discord (text only, no images)
+    // Format guild summary for Discord
+    const guildSummaryText = Object.entries(guildSummary)
+      .sort((a, b) => b[1] - a[1])
+      .map(([guild, count]) => `**${guild}**: ${count} ${count === 1 ? 'jogador' : 'jogadores'}`)
+      .join('\n') || 'Nenhuma guild registrada';
+
+    // Post to Discord (matching manual format without images)
     const webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_PROD') || Deno.env.get('DISCORD_WEBHOOK_URL');
 
     if (webhookUrl) {
-      const embed = {
-        title: '🤖 Ranking Automático - ' + bossLabel,
+      // Format date for display
+      const [year, month, day] = matchDate.split('-');
+      const formattedDate = `${day}/${month}/${year}`;
+
+      const embed1 = {
+        title: '📊 Ranking BOSS Diário',
+        description: `🤖 **Processamento Automático** - ${formattedDate} ${matchHour}:00`,
         color: 0x10B981,
         fields: [
           {
@@ -356,7 +389,7 @@ Deno.serve(async (req) => {
           },
           {
             name: '⚡ Brabíssimo',
-            value: brabissimo ? `**${brabissimo.name}**\nKDA: ${brabissimo.kda}` : 'N/A',
+            value: brabissimo ? `**${brabissimo.name}**\nKDA: ${brabissimo.kda} (${brabissimo.kills}/${brabissimo.deaths})` : 'N/A',
             inline: true
           },
           {
@@ -381,18 +414,28 @@ Deno.serve(async (req) => {
               .slice(0, 5)
               .map((p, i) => `${i + 1}. **${p.name}** - ${p.deaths} deaths`).join('\n'),
             inline: true
+          },
+          {
+            name: '⚔️ Resumo por Guild',
+            value: guildSummaryText,
+            inline: false
           }
         ],
-        footer: {
-          text: '⚙️ Gerado automaticamente'
-        },
         timestamp: new Date().toISOString()
+      };
+
+      const embed2 = {
+        description: `Esse é o resultado do BOSSx2! **${reiDoPVP?.name || 'N/A'}** amassou hoje, já nosso amigo **${coneMonodedo?.name || 'N/A'}** passou fome!`,
+        color: 0x9b87f5,
+        footer: {
+          text: '⚙️ Gerado automaticamente pelo sistema'
+        }
       };
 
       const discordResponse = await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ embeds: [embed] })
+        body: JSON.stringify({ embeds: [embed1, embed2] })
       });
 
       if (!discordResponse.ok) {
