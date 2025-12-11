@@ -358,10 +358,7 @@ Deno.serve(async (req) => {
     const sortedPlayers = playersWithScore.sort((a, b) => b.eventScore - a.eventScore);
     let rankingTableLines = '';
     sortedPlayers.forEach((player, index) => {
-      const charInfo = characterMap[player.name];
-      const guild = charInfo?.guild || '-';
-      const playerClass = charInfo?.class || '-';
-      rankingTableLines += `**#${index + 1}** ${player.name} | ${playerClass} | ${guild} | ${player.kills}K/${player.deaths}D | KDA: ${player.kda} | Score: ${player.eventScore.toFixed(2)}\n`;
+      rankingTableLines += `**#${index + 1}** ${player.name} | ${player.kills}K/${player.deaths}D | KDA: ${player.kda} | Score: ${player.eventScore.toFixed(2)}\n`;
     });
 
     // Post to Discord - matching manual format exactly
