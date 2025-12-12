@@ -7,6 +7,7 @@ import { ClassGuildRanking } from '@/components/ClassGuildRanking';
 import { PutinhaRanking } from '@/components/PutinhaRanking';
 import { MuralDaVergonha } from '@/components/MuralDaVergonha';
 import { KillStreakRanking } from '@/components/KillStreakRanking';
+import { ReisDoPVP } from '@/components/ReisDoPVP';
 import { DatabaseManager } from '@/components/DatabaseManager';
 import { DatabaseImport } from '@/components/DatabaseImport';
 import { parseTxtFile, ParseResult } from '@/utils/txtParser';
@@ -115,7 +116,7 @@ const Index = () => {
 
         <div className="space-y-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className={`grid w-full max-w-6xl mx-auto ${isAdmin ? 'grid-cols-7' : canEditData ? 'grid-cols-6' : 'grid-cols-5'} mb-8`}>
+            <TabsList className={`grid w-full max-w-6xl mx-auto ${isAdmin ? 'grid-cols-8' : canEditData ? 'grid-cols-7' : 'grid-cols-6'} mb-8`}>
               {canEditData && (
                 <TabsTrigger value="placar" className="text-base font-semibold">
                   Incluir Dados
@@ -123,6 +124,9 @@ const Index = () => {
               )}
               <TabsTrigger value="ranking" className="text-base font-semibold">
                 Ranking Geral
+              </TabsTrigger>
+              <TabsTrigger value="reis" className="text-base font-semibold">
+                Reis do PVP
               </TabsTrigger>
               <TabsTrigger value="classe-guild" className="text-base font-semibold">
                 Classe/Guild
@@ -181,6 +185,10 @@ const Index = () => {
             
             <TabsContent value="ranking">
               <RankingGeral />
+            </TabsContent>
+
+            <TabsContent value="reis">
+              <ReisDoPVP />
             </TabsContent>
 
             <TabsContent value="classe-guild">
