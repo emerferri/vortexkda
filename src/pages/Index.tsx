@@ -126,7 +126,7 @@ const Index = () => {
                 Ranking Geral
               </TabsTrigger>
               <TabsTrigger value="reis" className="text-base font-semibold">
-                Reis do PVP
+                Rei/Cone PVP
               </TabsTrigger>
               <TabsTrigger value="classe-guild" className="text-base font-semibold">
                 Classe/Guild
