@@ -28,18 +28,22 @@ export const ReisDoPVP = () => {
 
   const { data: rankingData, isLoading } = useQuery({
     queryKey: ['reis-cone-pvp'],
+    staleTime: 0, // Always refetch
     queryFn: async () => {
+      console.log('[ReisDoPVP] Starting query...');
       const { data: matches, error: matchesError } = await supabase
         .from('pvp_matches')
         .select('id, match_date, match_hour');
 
       if (matchesError) throw matchesError;
+      console.log('[ReisDoPVP] Fetched matches:', matches?.length);
 
       const { data: players, error: playersError } = await supabase
         .from('pvp_match_players')
         .select('match_id, player_name, kills, deaths, kda');
 
       if (playersError) throw playersError;
+      console.log('[ReisDoPVP] Fetched players:', players?.length);
 
       // Calculate Rei (highest score) and Cone (lowest score) for each match
       const reiPerMatch: { player_name: string; score: number; date: string; hour: number }[] = [];
@@ -85,6 +89,9 @@ export const ReisDoPVP = () => {
         });
       });
 
+      console.log('[ReisDoPVP] Reis per match:', reiPerMatch.length);
+      console.log('[ReisDoPVP] Sample reis:', reiPerMatch.slice(0, 5));
+
       // Aggregate Reis
       const reiStats: Record<string, { vezes: number; scores: number[]; melhorScore: number }> = {};
       reiPerMatch.forEach(rei => {
@@ -105,6 +112,9 @@ export const ReisDoPVP = () => {
         pior_score: Math.min(...stats.scores),
         media_score: Number((stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length).toFixed(2))
       })).sort((a, b) => b.vezes - a.vezes || b.melhor_score - a.melhor_score);
+
+      console.log('[ReisDoPVP] Rei ranking top 5:', reiRanking.slice(0, 5));
+
 
       // Aggregate Cones
       const coneStats: Record<string, { vezes: number; scores: number[]; piorScore: number }> = {};
