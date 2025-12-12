@@ -1,57 +1,67 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Crown, Trophy, Target, TrendingUp } from 'lucide-react';
+import { Crown, Trophy, Target, TrendingUp, TrendingDown, Skull } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 
-interface ReiStats {
+interface PlayerStats {
   player_name: string;
-  vezes_rei: number;
+  vezes: number;
   melhor_score: number;
+  pior_score: number;
   media_score: number;
 }
 
 interface HighlightData {
-  maisVitorias: ReiStats | null;
-  melhorScore: { player_name: string; score: number; date: string; hour: number } | null;
-  melhorMedia: ReiStats | null;
+  maisVezes: PlayerStats | null;
+  extremeScore: { player_name: string; score: number; date: string; hour: number } | null;
+  extremeMedia: PlayerStats | null;
 }
 
+type ViewMode = 'rei' | 'cone';
+
 export const ReisDoPVP = () => {
-  const { data: reisRanking, isLoading } = useQuery({
-    queryKey: ['reis-do-pvp'],
+  const [viewMode, setViewMode] = useState<ViewMode>('rei');
+
+  const { data: rankingData, isLoading } = useQuery({
+    queryKey: ['reis-cone-pvp'],
     queryFn: async () => {
-      // First, get all matches with their top player
       const { data: matches, error: matchesError } = await supabase
         .from('pvp_matches')
         .select('id, match_date, match_hour');
 
       if (matchesError) throw matchesError;
 
-      // Get all players for these matches
       const { data: players, error: playersError } = await supabase
         .from('pvp_match_players')
         .select('match_id, player_name, kills, deaths, kda');
 
       if (playersError) throw playersError;
 
-      // Calculate event score and find the "Rei" for each match
+      // Calculate Rei (highest score) and Cone (lowest score) for each match
       const reiPerMatch: { player_name: string; score: number; date: string; hour: number }[] = [];
+      const conePerMatch: { player_name: string; score: number; date: string; hour: number }[] = [];
 
       matches?.forEach(match => {
         const matchPlayers = players?.filter(p => p.match_id === match.id) || [];
         if (matchPlayers.length === 0) return;
 
-        // Calculate event score for each player
         const playersWithScore = matchPlayers.map(p => ({
           ...p,
           eventScore: (p.kills * 3) + (p.kda * 2) - (p.deaths * 1.5)
         }));
 
-        // Find the player with highest score
+        // Find Rei (highest score)
         const rei = playersWithScore.reduce((best, current) => 
           current.eventScore > best.eventScore ? current : best
+        );
+
+        // Find Cone (lowest score)
+        const cone = playersWithScore.reduce((worst, current) => 
+          current.eventScore < worst.eventScore ? current : worst
         );
 
         reiPerMatch.push({
@@ -60,46 +70,92 @@ export const ReisDoPVP = () => {
           date: match.match_date,
           hour: match.match_hour
         });
+
+        conePerMatch.push({
+          player_name: cone.player_name,
+          score: Number(cone.eventScore.toFixed(2)),
+          date: match.match_date,
+          hour: match.match_hour
+        });
       });
 
-      // Aggregate by player
-      const playerStats: Record<string, { vezes: number; scores: number[]; melhorScore: number }> = {};
-      
+      // Aggregate Reis
+      const reiStats: Record<string, { vezes: number; scores: number[]; melhorScore: number }> = {};
       reiPerMatch.forEach(rei => {
-        if (!playerStats[rei.player_name]) {
-          playerStats[rei.player_name] = { vezes: 0, scores: [], melhorScore: 0 };
+        if (!reiStats[rei.player_name]) {
+          reiStats[rei.player_name] = { vezes: 0, scores: [], melhorScore: 0 };
         }
-        playerStats[rei.player_name].vezes++;
-        playerStats[rei.player_name].scores.push(rei.score);
-        if (rei.score > playerStats[rei.player_name].melhorScore) {
-          playerStats[rei.player_name].melhorScore = rei.score;
+        reiStats[rei.player_name].vezes++;
+        reiStats[rei.player_name].scores.push(rei.score);
+        if (rei.score > reiStats[rei.player_name].melhorScore) {
+          reiStats[rei.player_name].melhorScore = rei.score;
         }
       });
 
-      // Convert to array and sort
-      const ranking: ReiStats[] = Object.entries(playerStats).map(([name, stats]) => ({
+      const reiRanking: PlayerStats[] = Object.entries(reiStats).map(([name, stats]) => ({
         player_name: name,
-        vezes_rei: stats.vezes,
+        vezes: stats.vezes,
         melhor_score: stats.melhorScore,
+        pior_score: Math.min(...stats.scores),
         media_score: Number((stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length).toFixed(2))
-      })).sort((a, b) => b.vezes_rei - a.vezes_rei || b.melhor_score - a.melhor_score);
+      })).sort((a, b) => b.vezes - a.vezes || b.melhor_score - a.melhor_score);
 
-      // Find highlights
-      const maisVitorias = ranking[0] || null;
-      const melhorMedia = ranking.reduce((best, current) => 
+      // Aggregate Cones
+      const coneStats: Record<string, { vezes: number; scores: number[]; piorScore: number }> = {};
+      conePerMatch.forEach(cone => {
+        if (!coneStats[cone.player_name]) {
+          coneStats[cone.player_name] = { vezes: 0, scores: [], piorScore: Infinity };
+        }
+        coneStats[cone.player_name].vezes++;
+        coneStats[cone.player_name].scores.push(cone.score);
+        if (cone.score < coneStats[cone.player_name].piorScore) {
+          coneStats[cone.player_name].piorScore = cone.score;
+        }
+      });
+
+      const coneRanking: PlayerStats[] = Object.entries(coneStats).map(([name, stats]) => ({
+        player_name: name,
+        vezes: stats.vezes,
+        melhor_score: Math.max(...stats.scores),
+        pior_score: stats.piorScore,
+        media_score: Number((stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length).toFixed(2))
+      })).sort((a, b) => b.vezes - a.vezes || a.pior_score - b.pior_score);
+
+      // Highlights for Rei
+      const reiMaisVezes = reiRanking[0] || null;
+      const reiMelhorMedia = reiRanking.reduce((best, current) => 
         current.media_score > (best?.media_score || 0) ? current : best
-      , null as ReiStats | null);
-      const melhorScoreEvento = reiPerMatch.reduce((best, current) => 
+      , null as PlayerStats | null);
+      const reiMelhorScore = reiPerMatch.reduce((best, current) => 
         current.score > (best?.score || 0) ? current : best
       , null as typeof reiPerMatch[0] | null);
 
+      // Highlights for Cone
+      const coneMaisVezes = coneRanking[0] || null;
+      const conePiorMedia = coneRanking.reduce((worst, current) => 
+        current.media_score < (worst?.media_score || Infinity) ? current : worst
+      , null as PlayerStats | null);
+      const conePiorScore = conePerMatch.reduce((worst, current) => 
+        current.score < (worst?.score || Infinity) ? current : worst
+      , null as typeof conePerMatch[0] | null);
+
       return {
-        ranking,
-        highlights: {
-          maisVitorias,
-          melhorScore: melhorScoreEvento,
-          melhorMedia
-        } as HighlightData
+        rei: {
+          ranking: reiRanking,
+          highlights: {
+            maisVezes: reiMaisVezes,
+            extremeScore: reiMelhorScore,
+            extremeMedia: reiMelhorMedia
+          }
+        },
+        cone: {
+          ranking: coneRanking,
+          highlights: {
+            maisVezes: coneMaisVezes,
+            extremeScore: conePiorScore,
+            extremeMedia: conePiorMedia
+          }
+        }
       };
     }
   });
@@ -107,6 +163,10 @@ export const ReisDoPVP = () => {
   if (isLoading) {
     return (
       <div className="space-y-6">
+        <div className="flex justify-center gap-2 mb-4">
+          <Skeleton className="h-10 w-40" />
+          <Skeleton className="h-10 w-40" />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => (
             <Card key={i} className="gaming-card">
@@ -125,70 +185,110 @@ export const ReisDoPVP = () => {
     );
   }
 
-  const { ranking, highlights } = reisRanking || { ranking: [], highlights: {} as HighlightData };
+  const isRei = viewMode === 'rei';
+  const currentData = isRei ? rankingData?.rei : rankingData?.cone;
+  const { ranking, highlights } = currentData || { ranking: [], highlights: {} as HighlightData };
 
   return (
     <div className="space-y-6">
+      {/* View Mode Toggle */}
+      <div className="flex justify-center gap-2 p-1 bg-muted/50 rounded-lg w-fit mx-auto">
+        <Button
+          variant={viewMode === 'rei' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setViewMode('rei')}
+          className="gap-2"
+        >
+          <Crown className="w-4 h-4" />
+          Reis do PVP
+        </Button>
+        <Button
+          variant={viewMode === 'cone' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setViewMode('cone')}
+          className="gap-2"
+        >
+          <Skull className="w-4 h-4" />
+          Cones Monodedo
+        </Button>
+      </div>
+
       {/* Highlights Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Mais Vitórias */}
-        <Card className="gaming-card bg-gradient-to-br from-yellow-500/20 to-amber-600/20 border-yellow-500/50">
+        {/* Mais Vezes */}
+        <Card className={`gaming-card ${isRei 
+          ? 'bg-gradient-to-br from-yellow-500/20 to-amber-600/20 border-yellow-500/50' 
+          : 'bg-gradient-to-br from-gray-500/20 to-slate-600/20 border-gray-500/50'}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-yellow-400">
-              <Crown className="w-5 h-5" />
-              Mais Vitórias
+            <CardTitle className={`flex items-center gap-2 ${isRei ? 'text-yellow-400' : 'text-gray-400'}`}>
+              {isRei ? <Crown className="w-5 h-5" /> : <Skull className="w-5 h-5" />}
+              {isRei ? 'Mais Vitórias' : 'Mais Derrotas'}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-center">
-              <p className="text-3xl font-bold text-yellow-300">{highlights.maisVitorias?.player_name || '-'}</p>
-              <p className="text-lg text-yellow-400/80 mt-1">
-                {highlights.maisVitorias?.vezes_rei || 0} vitórias como Rei
+              <p className={`text-3xl font-bold ${isRei ? 'text-yellow-300' : 'text-gray-300'}`}>
+                {highlights.maisVezes?.player_name || '-'}
+              </p>
+              <p className={`text-lg mt-1 ${isRei ? 'text-yellow-400/80' : 'text-gray-400/80'}`}>
+                {highlights.maisVezes?.vezes || 0}x {isRei ? 'Rei' : 'Cone'}
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                Melhor score: {highlights.maisVitorias?.melhor_score?.toFixed(2) || 0}
+                {isRei ? 'Melhor' : 'Pior'} score: {isRei 
+                  ? highlights.maisVezes?.melhor_score?.toFixed(2) 
+                  : highlights.maisVezes?.pior_score?.toFixed(2) || 0}
               </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Maior Score */}
-        <Card className="gaming-card bg-gradient-to-br from-red-500/20 to-orange-600/20 border-red-500/50">
+        {/* Extreme Score */}
+        <Card className={`gaming-card ${isRei 
+          ? 'bg-gradient-to-br from-red-500/20 to-orange-600/20 border-red-500/50' 
+          : 'bg-gradient-to-br from-blue-500/20 to-cyan-600/20 border-blue-500/50'}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-red-400">
+            <CardTitle className={`flex items-center gap-2 ${isRei ? 'text-red-400' : 'text-blue-400'}`}>
               <Target className="w-5 h-5" />
-              Maior Score
+              {isRei ? 'Maior Score' : 'Menor Score'}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-center">
-              <p className="text-3xl font-bold text-red-300">{highlights.melhorScore?.player_name || '-'}</p>
-              <p className="text-lg text-red-400/80 mt-1">
-                Score: {highlights.melhorScore?.score?.toFixed(2) || 0}
+              <p className={`text-3xl font-bold ${isRei ? 'text-red-300' : 'text-blue-300'}`}>
+                {highlights.extremeScore?.player_name || '-'}
+              </p>
+              <p className={`text-lg mt-1 ${isRei ? 'text-red-400/80' : 'text-blue-400/80'}`}>
+                Score: {highlights.extremeScore?.score?.toFixed(2) || 0}
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                {highlights.melhorScore?.date ? new Date(highlights.melhorScore.date + 'T12:00:00').toLocaleDateString('pt-BR') : '-'} às {highlights.melhorScore?.hour || 0}h
+                {highlights.extremeScore?.date 
+                  ? new Date(highlights.extremeScore.date + 'T12:00:00').toLocaleDateString('pt-BR') 
+                  : '-'} às {highlights.extremeScore?.hour || 0}h
               </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Melhor Média */}
-        <Card className="gaming-card bg-gradient-to-br from-purple-500/20 to-violet-600/20 border-purple-500/50">
+        {/* Extreme Média */}
+        <Card className={`gaming-card ${isRei 
+          ? 'bg-gradient-to-br from-purple-500/20 to-violet-600/20 border-purple-500/50' 
+          : 'bg-gradient-to-br from-rose-500/20 to-pink-600/20 border-rose-500/50'}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-purple-400">
-              <TrendingUp className="w-5 h-5" />
-              Melhor Média
+            <CardTitle className={`flex items-center gap-2 ${isRei ? 'text-purple-400' : 'text-rose-400'}`}>
+              {isRei ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+              {isRei ? 'Melhor Média' : 'Pior Média'}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-center">
-              <p className="text-3xl font-bold text-purple-300">{highlights.melhorMedia?.player_name || '-'}</p>
-              <p className="text-lg text-purple-400/80 mt-1">
-                Média: {highlights.melhorMedia?.media_score?.toFixed(2) || 0}
+              <p className={`text-3xl font-bold ${isRei ? 'text-purple-300' : 'text-rose-300'}`}>
+                {highlights.extremeMedia?.player_name || '-'}
+              </p>
+              <p className={`text-lg mt-1 ${isRei ? 'text-purple-400/80' : 'text-rose-400/80'}`}>
+                Média: {highlights.extremeMedia?.media_score?.toFixed(2) || 0}
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                {highlights.melhorMedia?.vezes_rei || 0} vitórias
+                {highlights.extremeMedia?.vezes || 0}x {isRei ? 'Rei' : 'Cone'}
               </p>
             </div>
           </CardContent>
@@ -199,8 +299,8 @@ export const ReisDoPVP = () => {
       <Card className="gaming-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Trophy className="w-6 h-6 text-primary" />
-            Ranking de Reis do PVP
+            {isRei ? <Trophy className="w-6 h-6 text-primary" /> : <Skull className="w-6 h-6 text-muted-foreground" />}
+            {isRei ? 'Ranking de Reis do PVP' : 'Ranking de Cones Monodedo'}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -209,26 +309,30 @@ export const ReisDoPVP = () => {
               <TableRow>
                 <TableHead className="w-16">#</TableHead>
                 <TableHead>Jogador</TableHead>
-                <TableHead className="text-center">Vitórias</TableHead>
-                <TableHead className="text-center">Melhor Score</TableHead>
+                <TableHead className="text-center">{isRei ? 'Vitórias' : 'Derrotas'}</TableHead>
+                <TableHead className="text-center">{isRei ? 'Melhor Score' : 'Pior Score'}</TableHead>
                 <TableHead className="text-center">Média Score</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {ranking.map((rei, index) => (
-                <TableRow key={rei.player_name} className={index < 3 ? 'bg-primary/5' : ''}>
+              {ranking.map((player, index) => (
+                <TableRow key={player.player_name} className={index < 3 ? (isRei ? 'bg-primary/5' : 'bg-muted/20') : ''}>
                   <TableCell className="font-bold">
-                    {index === 0 && <span className="text-yellow-400">🥇</span>}
-                    {index === 1 && <span className="text-gray-400">🥈</span>}
-                    {index === 2 && <span className="text-amber-600">🥉</span>}
+                    {index === 0 && <span>{isRei ? '🥇' : '💩'}</span>}
+                    {index === 1 && <span>{isRei ? '🥈' : '🤡'}</span>}
+                    {index === 2 && <span>{isRei ? '🥉' : '😭'}</span>}
                     {index > 2 && `#${index + 1}`}
                   </TableCell>
-                  <TableCell className="font-semibold">{rei.player_name}</TableCell>
+                  <TableCell className="font-semibold">{player.player_name}</TableCell>
                   <TableCell className="text-center">
-                    <span className="font-bold text-primary">{rei.vezes_rei}</span>
+                    <span className={`font-bold ${isRei ? 'text-primary' : 'text-muted-foreground'}`}>
+                      {player.vezes}
+                    </span>
                   </TableCell>
-                  <TableCell className="text-center">{rei.melhor_score.toFixed(2)}</TableCell>
-                  <TableCell className="text-center">{rei.media_score.toFixed(2)}</TableCell>
+                  <TableCell className="text-center">
+                    {isRei ? player.melhor_score.toFixed(2) : player.pior_score.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-center">{player.media_score.toFixed(2)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
