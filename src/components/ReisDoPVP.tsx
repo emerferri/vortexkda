@@ -49,10 +49,16 @@ export const ReisDoPVP = () => {
         const matchPlayers = players?.filter(p => p.match_id === match.id) || [];
         if (matchPlayers.length === 0) return;
 
-        const playersWithScore = matchPlayers.map(p => ({
-          ...p,
-          eventScore: (p.kills * 3) + (p.kda * 2) - (p.deaths * 1.5)
-        }));
+        const playersWithScore = matchPlayers.map(p => {
+          // Ensure numeric types for calculation
+          const kills = Number(p.kills) || 0;
+          const deaths = Number(p.deaths) || 0;
+          const kda = Number(p.kda) || 0;
+          return {
+            ...p,
+            eventScore: (kills * 3) + (kda * 2) - (deaths * 1.5)
+          };
+        });
 
         // Find Rei (highest score)
         const rei = playersWithScore.reduce((best, current) => 
