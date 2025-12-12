@@ -38,11 +38,30 @@ export const ReisDoPVP = () => {
       if (matchesError) throw matchesError;
       console.log('[ReisDoPVP] Fetched matches:', matches?.length);
 
-      const { data: players, error: playersError } = await supabase
-        .from('pvp_match_players')
-        .select('match_id, player_name, kills, deaths, kda');
+      // Fetch ALL players - need to paginate since Supabase has 1000 row limit
+      let allPlayers: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (playersError) throw playersError;
+      while (hasMore) {
+        const { data: playersPage, error: playersError } = await supabase
+          .from('pvp_match_players')
+          .select('match_id, player_name, kills, deaths, kda')
+          .range(from, from + pageSize - 1);
+
+        if (playersError) throw playersError;
+        
+        if (playersPage && playersPage.length > 0) {
+          allPlayers = [...allPlayers, ...playersPage];
+          from += pageSize;
+          hasMore = playersPage.length === pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const players = allPlayers;
       console.log('[ReisDoPVP] Fetched players:', players?.length);
 
       // Calculate Rei (highest score) and Cone (lowest score) for each match
