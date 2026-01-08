@@ -51,14 +51,20 @@ const parseGuild = (html: string): string | null => {
   return null;
 };
 
+// Normalize name: trim, collapse spaces
+const normalizeName = (name: string): string => {
+  return name.replace(/\s+/g, ' ').trim();
+};
+
 // Fetch character data from VortexMU
 const fetchCharacterFromVortex = async (
-  name: string
+  rawName: string
 ): Promise<{ class: string; guild: string } | null> => {
+  const name = normalizeName(rawName);
   const hexName = nameToHex(name);
   const url = `https://vortexmu.net/character/${hexName}/MUONLINE`;
 
-  console.log(`[Vortex] Fetching: ${name} -> ${url}`);
+  console.log(`[Vortex] Fetching: ${name} (hex=${hexName}) -> ${url}`);
 
   try {
     const response = await fetch(url, {
@@ -89,8 +95,9 @@ const fetchCharacterFromVortex = async (
 
     if (!hasCharacterInfo || !hasNameBlock) {
       console.log(
-        `[Vortex] Character not found or blocked: ${name} (hasCharacterInfo=${hasCharacterInfo}, hasNameBlock=${hasNameBlock})`
+        `[Vortex] Character not found or blocked: ${name} (hasCharacterInfo=${hasCharacterInfo}, hasNameBlock=${hasNameBlock}, htmlLength=${html.length})`
       );
+      console.log(`[Vortex] HTML snippet (first 500 chars): ${html.substring(0, 500)}`);
       return null;
     }
 
