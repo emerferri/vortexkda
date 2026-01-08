@@ -7,12 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Plus, Search, Trash2, Pencil, Filter, FilterX, FileUp } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Pencil, Filter, FilterX, FileUp, RefreshCw } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useSearchParams } from 'react-router-dom';
 import { CharacterImport } from './CharacterImport';
+import { Progress } from '@/components/ui/progress';
 
 interface Character {
   id: string;
@@ -34,6 +35,8 @@ export const Characters = () => {
   const [showUnregisteredOnly, setShowUnregisteredOnly] = useState(false);
   const [searchParams] = useSearchParams();
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(0);
 
   useEffect(() => {
     loadCharacters();
@@ -223,6 +226,71 @@ export const Characters = () => {
     setDialogOpen(true);
   };
 
+  const handleSyncVortex = async (mode: 'unregistered' | 'all') => {
+    if (!user) {
+      toast({
+        title: 'Erro',
+        description: 'Você precisa estar logado',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const count = mode === 'unregistered' ? unregisteredCount : characters.length;
+    if (count === 0) {
+      toast({
+        title: 'Aviso',
+        description: mode === 'unregistered' 
+          ? 'Não há personagens não cadastrados para sincronizar'
+          : 'Não há personagens para sincronizar',
+      });
+      return;
+    }
+
+    if (!confirm(`Sincronizar ${count} personagens com VortexMU? Isso pode levar alguns minutos.`)) {
+      return;
+    }
+
+    setSyncing(true);
+    setSyncProgress(10);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sessão expirada');
+
+      setSyncProgress(20);
+
+      const response = await supabase.functions.invoke('sync-characters-vortex', {
+        body: { mode },
+      });
+
+      setSyncProgress(90);
+
+      if (response.error) throw response.error;
+
+      const result = response.data;
+      if (result.success) {
+        toast({
+          title: 'Sincronização Concluída',
+          description: `${result.summary.updated} atualizados, ${result.summary.created} criados, ${result.summary.notFound} não encontrados`,
+        });
+        loadCharacters();
+      } else {
+        throw new Error(result.error || 'Erro desconhecido');
+      }
+    } catch (error: any) {
+      console.error('Error syncing with VortexMU:', error);
+      toast({
+        title: 'Erro na Sincronização',
+        description: error.message || 'Falha ao sincronizar com VortexMU',
+        variant: 'destructive',
+      });
+    } finally {
+      setSyncing(false);
+      setSyncProgress(0);
+    }
+  };
+
   // Helper to normalize strings (for checking special values)
   const normalize = (s?: string) =>
     (s ?? '')
@@ -290,6 +358,15 @@ export const Characters = () => {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {syncing && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Sincronizando com VortexMU... Isso pode levar alguns minutos.
+            </div>
+            <Progress value={syncProgress} className="h-2" />
+          </div>
+        )}
         <div className="flex gap-2 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -321,6 +398,19 @@ export const Characters = () => {
           </Button>
           {canEditData && (
             <>
+              <Button
+                variant="outline"
+                onClick={() => handleSyncVortex('unregistered')}
+                disabled={syncing || unregisteredCount === 0}
+                className="gap-2"
+              >
+                {syncing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                Sincronizar VortexMU
+              </Button>
               <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline">
