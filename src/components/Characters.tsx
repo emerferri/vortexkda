@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Plus, Search, Trash2, Pencil, Filter, FilterX, FileUp, RefreshCw } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Pencil, Filter, FilterX, FileUp, RefreshCw, ChevronDown } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +38,7 @@ export const Characters = () => {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
+  const [syncingCharacterId, setSyncingCharacterId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCharacters();
@@ -226,7 +228,7 @@ export const Characters = () => {
     setDialogOpen(true);
   };
 
-  const handleSyncVortex = async (mode: 'unregistered' | 'all') => {
+  const handleSyncVortex = async (mode: 'unregistered' | 'all' | 'selected', names?: string[]) => {
     if (!user) {
       toast({
         title: 'Erro',
@@ -236,7 +238,12 @@ export const Characters = () => {
       return;
     }
 
-    const count = mode === 'unregistered' ? unregisteredCount : characters.length;
+    const count = mode === 'unregistered' 
+      ? unregisteredCount 
+      : mode === 'selected' 
+        ? (names?.length || 0) 
+        : characters.length;
+
     if (count === 0) {
       toast({
         title: 'Aviso',
@@ -247,7 +254,7 @@ export const Characters = () => {
       return;
     }
 
-    if (!confirm(`Sincronizar ${count} personagens com VortexMU? Isso pode levar alguns minutos.`)) {
+    if (mode !== 'selected' && !confirm(`Sincronizar ${count} personagens com VortexMU? Isso pode levar alguns minutos.`)) {
       return;
     }
 
@@ -261,7 +268,7 @@ export const Characters = () => {
       setSyncProgress(20);
 
       const response = await supabase.functions.invoke('sync-characters-vortex', {
-        body: { mode },
+        body: { mode, names },
       });
 
       setSyncProgress(90);
@@ -288,6 +295,58 @@ export const Characters = () => {
     } finally {
       setSyncing(false);
       setSyncProgress(0);
+    }
+  };
+
+  const handleSyncSingleCharacter = async (characterName: string, characterId: string) => {
+    if (!user) {
+      toast({
+        title: 'Erro',
+        description: 'Você precisa estar logado',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSyncingCharacterId(characterId);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sessão expirada');
+
+      const response = await supabase.functions.invoke('sync-characters-vortex', {
+        body: { mode: 'selected', names: [characterName] },
+      });
+
+      if (response.error) throw response.error;
+
+      const result = response.data;
+      if (result.success) {
+        if (result.summary.notFound > 0) {
+          toast({
+            title: 'Não Encontrado',
+            description: `Personagem "${characterName}" não foi encontrado no VortexMU`,
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Sincronizado',
+            description: `"${characterName}" atualizado com sucesso!`,
+          });
+          loadCharacters();
+        }
+      } else {
+        throw new Error(result.error || 'Erro desconhecido');
+      }
+    } catch (error: any) {
+      console.error('Error syncing character:', error);
+      toast({
+        title: 'Erro na Sincronização',
+        description: error.message || 'Falha ao sincronizar personagem',
+        variant: 'destructive',
+      });
+    } finally {
+      setSyncingCharacterId(null);
     }
   };
 
@@ -398,19 +457,30 @@ export const Characters = () => {
           </Button>
           {canEditData && (
             <>
-              <Button
-                variant="outline"
-                onClick={() => handleSyncVortex('unregistered')}
-                disabled={syncing || unregisteredCount === 0}
-                className="gap-2"
-              >
-                {syncing ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-4 h-4" />
-                )}
-                Sincronizar VortexMU
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" disabled={syncing} className="gap-2">
+                    {syncing ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4" />
+                    )}
+                    Sincronizar VortexMU
+                    <ChevronDown className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem 
+                    onClick={() => handleSyncVortex('unregistered')}
+                    disabled={unregisteredCount === 0}
+                  >
+                    Apenas não cadastrados ({unregisteredCount})
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleSyncVortex('all')}>
+                    Todos das partidas ({characters.length})
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline">
@@ -534,7 +604,20 @@ export const Characters = () => {
                     <TableCell>{character.class || '-'}</TableCell>
                     {canEditData && (
                       <TableCell>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleSyncSingleCharacter(character.name, character.id)}
+                            disabled={syncingCharacterId === character.id}
+                            title="Sincronizar com VortexMU"
+                          >
+                            {syncingCharacterId === character.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-4 h-4" />
+                            )}
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
