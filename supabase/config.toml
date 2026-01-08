@@ -2,3 +2,6 @@ project_id = "piwvrencvdgngruhuxqw"
 
 [functions.auto-process-ranking]
 verify_jwt = false
+
+[functions.sync-characters-vortex]
+verify_jwt = false
