@@ -15,7 +15,8 @@ const nameToHex = (name: string): string => {
 // Parse class from VortexMU HTML
 const parseClass = (html: string): string | null => {
   // Pattern: <label class="text-white">Class</label> followed by <div>ClassName</div>
-  const classRegex = /<label[^>]*>\s*Class\s*<\/label>\s*<div[^>]*>([^<]+)<\/div>/i;
+  // The HTML has whitespace/newlines between tags and content
+  const classRegex = /<label[^>]*>\s*Class\s*<\/label>\s*<div[^>]*>\s*([\s\S]*?)\s*<\/div>/i;
   const match = html.match(classRegex);
   if (match && match[1]) {
     return match[1].trim();
@@ -25,8 +26,9 @@ const parseClass = (html: string): string | null => {
 
 // Parse guild from VortexMU HTML
 const parseGuild = (html: string): string | null => {
-  // Pattern 1: Guild with link - <label>Guild</label><div><a>GuildName</a></div>
-  const guildLinkRegex = /<label[^>]*>\s*Guild\s*<\/label>\s*<div[^>]*>\s*<a[^>]*>([^<]+)<\/a>/i;
+  // Pattern 1: Guild with link - <label>Guild</label><div><a href="...">GuildName</a></div>
+  // The HTML has whitespace/newlines between tags
+  const guildLinkRegex = /<label[^>]*>\s*Guild\s*<\/label>\s*<div[^>]*>\s*<a[^>]*>([\s\S]*?)<\/a>/i;
   const linkMatch = html.match(guildLinkRegex);
   if (linkMatch && linkMatch[1]) {
     return linkMatch[1].trim();
@@ -39,7 +41,7 @@ const parseGuild = (html: string): string | null => {
   }
 
   // Pattern 3: Direct text (fallback)
-  const guildTextRegex = /<label[^>]*>\s*Guild\s*<\/label>\s*<div[^>]*>([^<]+)<\/div>/i;
+  const guildTextRegex = /<label[^>]*>\s*Guild\s*<\/label>\s*<div[^>]*>\s*([\s\S]*?)\s*<\/div>/i;
   const textMatch = html.match(guildTextRegex);
   if (textMatch && textMatch[1]) {
     const guild = textMatch[1].trim();
