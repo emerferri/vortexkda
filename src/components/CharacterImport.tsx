@@ -76,10 +76,16 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
           
           const characters: CharacterData[] = rows
             .map((row) => {
-              // Try different column name variations
-              const name = row['Nome'] || row['name'] || row['Name'] || row['NOME'] || '';
-              const guild = row['Guild'] || row['guild'] || row['GUILD'] || row['Guilda'] || '';
-              const charClass = row['Classe'] || row['Class'] || row['class'] || row['CLASSE'] || '';
+              // Normalize keys to lowercase for comparison
+              const normalizedRow: Record<string, any> = {};
+              for (const key of Object.keys(row)) {
+                normalizedRow[key.toLowerCase().trim()] = row[key];
+              }
+              
+              // Try different column name variations (all lowercase now)
+              const name = normalizedRow['nome'] || normalizedRow['name'] || normalizedRow['personagem'] || '';
+              const guild = normalizedRow['guild'] || normalizedRow['guilda'] || '';
+              const charClass = normalizedRow['classe'] || normalizedRow['class'] || '';
               
               return {
                 name: String(name).trim(),
