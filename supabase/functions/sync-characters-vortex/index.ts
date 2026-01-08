@@ -79,9 +79,18 @@ const fetchCharacterFromVortex = async (
 
     const html = await response.text();
 
-    // Check if character was found (page should contain the name)
-    if (html.includes("Character not found") || html.includes("404")) {
-      console.log(`[Vortex] Character not found: ${name}`);
+    // Detect "not found" more robustly.
+    // Some pages can include "404" strings in unrelated assets; don't use that.
+    const hasCharacterInfo = /Character\s+Information/i.test(html);
+    const hasNameBlock = new RegExp(
+      `<label[^>]*>\\s*Name\\s*<\\/label>[\\s\\S]*?<div[^>]*>\\s*${name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\s*<\\/div>`,
+      "i"
+    ).test(html);
+
+    if (!hasCharacterInfo || !hasNameBlock || html.includes("Character not found")) {
+      console.log(
+        `[Vortex] Character not found or blocked: ${name} (hasCharacterInfo=${hasCharacterInfo}, hasNameBlock=${hasNameBlock})`
+      );
       return null;
     }
 
