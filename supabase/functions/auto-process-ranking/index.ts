@@ -30,6 +30,14 @@ interface ParseResult {
   killLogs: KillLog[];
 }
 
+interface RequestBody {
+  trigger?: string;
+  attempt?: number;        // 1, 2, or 3
+  forceProcess?: boolean;  // true on 3rd attempt
+  eventHour?: number;      // boss hour (20, 21, 22)
+  eventMinute?: number;    // boss minute (0 or 30)
+}
+
 // Parser logic
 function parseExternalDbContent(logs: ExternalLogEntry[]): ParseResult {
   const players: Record<string, PlayerStats> = {};
@@ -102,7 +110,72 @@ function parseExternalDbContent(logs: ExternalLogEntry[]): ParseResult {
   return { players, bossLabel, killLogs };
 }
 
-function getEventTimeRange(): { startDate: string; endDate: string; matchDate: string; matchHour: number; localStartDate: string; localEndDate: string } {
+// Extract minute from the last log entry
+function getLastKillMinute(logs: ExternalLogEntry[]): number | null {
+  if (!logs || logs.length === 0) return null;
+  
+  // Logs are ordered by timestamp DESC, first = most recent
+  const lastLog = logs[0];
+  
+  // Try to extract time from timestamp field (format: YYYY-MM-DDTHH:MM:SS or similar)
+  const timestampMatch = lastLog.timestamp?.match(/(\d{2}):(\d{2}):(\d{2})/);
+  if (timestampMatch) {
+    return parseInt(timestampMatch[2], 10); // return minute
+  }
+  
+  // Try from content field
+  const contentMatch = lastLog.content?.match(/(\d{2}):(\d{2}):(\d{2})/);
+  if (contentMatch) {
+    return parseInt(contentMatch[2], 10);
+  }
+  
+  return null;
+}
+
+// Get minute threshold based on attempt and event configuration
+function getMinuteThreshold(attempt: number, eventHour: number, eventMinute: number = 0): number {
+  if (eventHour === 22 && eventMinute === 0) {
+    // Boss 22:00 - checks happen at 23:00, 23:20, 23:30
+    if (attempt === 1) return 59; // 23:00 checks for 22:59
+    if (attempt === 2) return 19; // 23:20 checks for 23:19
+  } else if (eventHour === 22 && eventMinute === 30) {
+    // Boss 22:30 (Tuesday/Thursday) - checks happen at 23:00, 23:20, 23:30
+    if (attempt === 1) return 29; // 23:00 checks for 22:59... wait, 22:30 boss
+    if (attempt === 2) return 49; // 23:20 checks for 23:19... hmm
+    // Actually for 22:30 boss:
+    // Attempt 1 at 23:00 should check if last kill >= minute 29 of 22:XX (event started at 22:30)
+    // Let me recalculate based on the plan
+  } else if (eventHour === 20 || eventHour === 21) {
+    // Boss 20:00 or 21:00
+    if (attempt === 1) return 29; // XX:30 checks for XX:29
+    if (attempt === 2) return 49; // XX:50 checks for XX:49
+  }
+  return -1; // Attempt 3 always processes
+}
+
+// Check if event might still be active based on last kill minute
+function shouldPostpone(attempt: number, forceProcess: boolean, lastKillMinute: number | null, eventHour: number, eventMinute: number = 0): boolean {
+  if (forceProcess || attempt === 3) {
+    return false; // Always process on force or 3rd attempt
+  }
+  
+  if (lastKillMinute === null) {
+    return false; // No logs = nothing to postpone
+  }
+  
+  const threshold = getMinuteThreshold(attempt, eventHour, eventMinute);
+  if (threshold === -1) {
+    return false;
+  }
+  
+  // For 22:00 boss, we check the hour after (23:xx), so minute thresholds apply directly
+  // For 22:30 boss on attempt 1, we check if kills happened up to 22:59
+  // For 20:00/21:00 bosses, we check within the same hour
+  
+  return lastKillMinute >= threshold;
+}
+
+function getEventTimeRange(eventHour?: number, eventMinute: number = 0): { startDate: string; endDate: string; matchDate: string; matchHour: number; localStartDate: string; localEndDate: string } {
   // Brazil timezone offset (UTC-3)
   const BRAZIL_OFFSET = -3;
   
@@ -116,31 +189,36 @@ function getEventTimeRange(): { startDate: string; endDate: string; matchDate: s
   
   console.log(`[Auto Process] Brazil time: ${brazilTime.toISOString()}, day: ${dayOfWeek}, hour: ${currentHour}`);
 
-  let eventHour: number;
+  let targetEventHour: number;
 
-  // Determine the event hour based on day and time
-  if (dayOfWeek === 1) {
-    // Monday: 21:00 and 22:00
-    if (currentHour >= 22) eventHour = 22;
-    else if (currentHour >= 21) eventHour = 21;
-    else eventHour = 22;
-  } else if (dayOfWeek === 2 || dayOfWeek === 4) {
-    // Tuesday/Thursday: 20:00 and 22:00
-    if (currentHour >= 22) eventHour = 22;
-    else if (currentHour >= 20) eventHour = 20;
-    else eventHour = 22;
+  // Use provided eventHour if available, otherwise determine from current time
+  if (eventHour !== undefined) {
+    targetEventHour = eventHour;
   } else {
-    // Other days: 20:00 and 22:00
-    if (currentHour >= 22) eventHour = 22;
-    else if (currentHour >= 20) eventHour = 20;
-    else eventHour = 22;
+    // Determine the event hour based on day and time
+    if (dayOfWeek === 1) {
+      // Monday: 21:00 and 22:00
+      if (currentHour >= 22) targetEventHour = 22;
+      else if (currentHour >= 21) targetEventHour = 21;
+      else targetEventHour = 22;
+    } else if (dayOfWeek === 2 || dayOfWeek === 4) {
+      // Tuesday/Thursday: 20:00 and 22:00
+      if (currentHour >= 22) targetEventHour = 22;
+      else if (currentHour >= 20) targetEventHour = 20;
+      else targetEventHour = 22;
+    } else {
+      // Other days: 20:00 and 22:00
+      if (currentHour >= 22) targetEventHour = 22;
+      else if (currentHour >= 20) targetEventHour = 20;
+      else targetEventHour = 22;
+    }
   }
 
   // Create event date in Brazil time
   const eventDateBrazil = new Date(brazilTime);
-  eventDateBrazil.setHours(eventHour, 0, 0, 0);
+  eventDateBrazil.setHours(targetEventHour, eventMinute, 0, 0);
 
-  // If event time is in the future, use previous event
+  // If event time is in the future, use previous day's event
   if (eventDateBrazil > brazilTime) {
     eventDateBrazil.setDate(eventDateBrazil.getDate() - 1);
     eventDateBrazil.setHours(22, 0, 0, 0);
@@ -148,16 +226,33 @@ function getEventTimeRange(): { startDate: string; endDate: string; matchDate: s
 
   // Convert Brazil time back to UTC for database query
   const startDateUTC = new Date(eventDateBrazil.getTime() - (BRAZIL_OFFSET * 3600000));
-  const endDateUTC = new Date(startDateUTC.getTime() + 3600000); // +1 hour
+  
+  // For 22:00 boss, extend end time to 23:30 to capture extended events
+  let endOffsetMs = 3600000; // Default +1 hour
+  if (targetEventHour === 22) {
+    endOffsetMs = 5400000; // +1.5 hours (until 23:30)
+  }
+  const endDateUTC = new Date(startDateUTC.getTime() + endOffsetMs);
 
   // Format match date in Brazil timezone for storage
   const matchDate = `${eventDateBrazil.getFullYear()}-${String(eventDateBrazil.getMonth() + 1).padStart(2, '0')}-${String(eventDateBrazil.getDate()).padStart(2, '0')}`;
 
   // Format local Brazil time strings for external database query (which stores in local time)
-  const localStartDate = `${matchDate}T${String(eventHour).padStart(2, '0')}:00`;
-  const localEndDate = `${matchDate}T${String(eventHour).padStart(2, '0')}:59`;
+  // For 22:00 boss, extend to 23:29 to capture late kills
+  let localEndHour = targetEventHour;
+  let localEndMinute = 59;
+  if (targetEventHour === 22 && eventMinute === 0) {
+    localEndHour = 23;
+    localEndMinute = 29;
+  } else if (targetEventHour === 22 && eventMinute === 30) {
+    localEndHour = 23;
+    localEndMinute = 29;
+  }
+  
+  const localStartDate = `${matchDate}T${String(targetEventHour).padStart(2, '0')}:${String(eventMinute).padStart(2, '0')}`;
+  const localEndDate = `${matchDate}T${String(localEndHour).padStart(2, '0')}:${String(localEndMinute).padStart(2, '0')}`;
 
-  console.log(`[Auto Process] Event: ${matchDate} ${eventHour}:00 BRT`);
+  console.log(`[Auto Process] Event: ${matchDate} ${targetEventHour}:${String(eventMinute).padStart(2, '0')} BRT`);
   console.log(`[Auto Process] Local query range: ${localStartDate} to ${localEndDate}`);
   console.log(`[Auto Process] UTC query range: ${startDateUTC.toISOString()} to ${endDateUTC.toISOString()}`);
 
@@ -165,7 +260,7 @@ function getEventTimeRange(): { startDate: string; endDate: string; matchDate: s
     startDate: startDateUTC.toISOString(),
     endDate: endDateUTC.toISOString(),
     matchDate,
-    matchHour: eventHour,
+    matchHour: targetEventHour,
     localStartDate,
     localEndDate
   };
@@ -177,14 +272,27 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('[Auto Process] Starting automatic ranking processing...');
+    // Parse request body
+    let body: RequestBody = {};
+    try {
+      body = await req.json();
+    } catch {
+      // No body or invalid JSON, use defaults
+    }
+    
+    const attempt = body.attempt || 1;
+    const forceProcess = body.forceProcess || false;
+    const eventHour = body.eventHour;
+    const eventMinute = body.eventMinute || 0;
+    
+    console.log(`[Auto Process] Starting automatic ranking processing... Attempt: ${attempt}, Force: ${forceProcess}, EventHour: ${eventHour}, EventMinute: ${eventMinute}`);
 
     const internalSupabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const internalServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const internalClient = createClient(internalSupabaseUrl, internalServiceKey);
 
-    const { startDate, endDate, matchDate, matchHour, localStartDate, localEndDate } = getEventTimeRange();
-    console.log(`[Auto Process] Fetching logs for ${matchDate} ${matchHour}:00`);
+    const { startDate, endDate, matchDate, matchHour, localStartDate, localEndDate } = getEventTimeRange(eventHour, eventMinute);
+    console.log(`[Auto Process] Fetching logs for ${matchDate} ${matchHour}:${String(eventMinute).padStart(2, '0')}`);
 
     // Check if this match already exists
     const { data: existingMatch } = await internalClient
@@ -197,7 +305,7 @@ Deno.serve(async (req) => {
     if (existingMatch) {
       console.log(`[Auto Process] Match already exists for ${matchDate} ${matchHour}:00, skipping`);
       return new Response(
-        JSON.stringify({ success: true, message: 'Match already processed', matchDate, matchHour }),
+        JSON.stringify({ success: true, status: 'already_exists', message: 'Match already processed', matchDate, matchHour }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -230,7 +338,27 @@ Deno.serve(async (req) => {
     if (!logs || logs.length === 0) {
       console.log('[Auto Process] No logs found for this time period');
       return new Response(
-        JSON.stringify({ success: true, message: 'No logs found', matchDate, matchHour }),
+        JSON.stringify({ success: true, status: 'no_logs', message: 'No logs found', matchDate, matchHour, attempt }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if we should postpone based on last kill time
+    const lastKillMinute = getLastKillMinute(logs);
+    console.log(`[Auto Process] Last kill minute: ${lastKillMinute}`);
+    
+    if (shouldPostpone(attempt, forceProcess, lastKillMinute, matchHour, eventMinute)) {
+      const threshold = getMinuteThreshold(attempt, matchHour, eventMinute);
+      console.log(`[Auto Process] Attempt ${attempt}: Last kill at minute ${lastKillMinute}, >= ${threshold}, postponing`);
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          status: 'postponed',
+          attempt,
+          lastKillMinute,
+          threshold,
+          message: 'Event may still be active, waiting for next attempt'
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -240,7 +368,7 @@ Deno.serve(async (req) => {
     if (Object.keys(parseResult.players).length === 0) {
       console.log('[Auto Process] No valid player data found after parsing');
       return new Response(
-        JSON.stringify({ success: true, message: 'No valid player data', matchDate, matchHour }),
+        JSON.stringify({ success: true, status: 'no_players', message: 'No valid player data', matchDate, matchHour }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -405,7 +533,7 @@ Deno.serve(async (req) => {
           }
         ],
         footer: {
-          text: `Hoje às ${String(matchHour).padStart(2, '0')}:00`
+          text: `Hoje às ${String(matchHour).padStart(2, '0')}:00 • Tentativa ${attempt}${forceProcess ? ' (forçado)' : ''}`
         },
         timestamp: new Date().toISOString()
       };
@@ -447,11 +575,14 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
+        status: 'processed',
         matchId: newMatch.id,
         matchDate,
         matchHour,
         playerCount: totals.playerCount,
-        totalKills: totals.kills
+        totalKills: totals.kills,
+        attempt,
+        forceProcess
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
