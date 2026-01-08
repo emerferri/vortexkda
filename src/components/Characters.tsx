@@ -7,11 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Plus, Search, Trash2, Pencil, Filter, FilterX } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Pencil, Filter, FilterX, FileUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useSearchParams } from 'react-router-dom';
+import { CharacterImport } from './CharacterImport';
 
 interface Character {
   id: string;
@@ -32,6 +33,7 @@ export const Characters = () => {
   const [submitting, setSubmitting] = useState(false);
   const [showUnregisteredOnly, setShowUnregisteredOnly] = useState(false);
   const [searchParams] = useSearchParams();
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   useEffect(() => {
     loadCharacters();
@@ -318,13 +320,37 @@ export const Characters = () => {
             )}
           </Button>
           {canEditData && (
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={openAddDialog}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Adicionar
-                </Button>
-              </DialogTrigger>
+            <>
+              <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <FileUp className="w-4 h-4 mr-2" />
+                    Importar em Massa
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Importar Personagens em Massa</DialogTitle>
+                    <DialogDescription>
+                      Importe personagens de um arquivo Excel ou TXT. Personagens existentes serão atualizados.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <CharacterImport
+                    onComplete={() => {
+                      setImportDialogOpen(false);
+                      loadCharacters();
+                    }}
+                    onCancel={() => setImportDialogOpen(false)}
+                  />
+                </DialogContent>
+              </Dialog>
+              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button onClick={openAddDialog}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Adicionar
+                  </Button>
+                </DialogTrigger>
               <DialogContent>
                 <form onSubmit={handleSubmit}>
                   <DialogHeader>
@@ -382,6 +408,7 @@ export const Characters = () => {
                 </form>
               </DialogContent>
             </Dialog>
+            </>
           )}
         </div>
 
