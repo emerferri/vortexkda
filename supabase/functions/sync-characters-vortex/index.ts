@@ -87,7 +87,7 @@ const fetchCharacterFromVortex = async (
       "i"
     ).test(html);
 
-    if (!hasCharacterInfo || !hasNameBlock || html.includes("Character not found")) {
+    if (!hasCharacterInfo || !hasNameBlock) {
       console.log(
         `[Vortex] Character not found or blocked: ${name} (hasCharacterInfo=${hasCharacterInfo}, hasNameBlock=${hasNameBlock})`
       );
