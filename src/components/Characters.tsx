@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { useSearchParams } from 'react-router-dom';
 import { CharacterImport } from './CharacterImport';
 import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
 
 interface Character {
   id: string;
@@ -39,6 +40,8 @@ export const Characters = () => {
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   const [syncingCharacterId, setSyncingCharacterId] = useState<string | null>(null);
+  const [batchSyncDialogOpen, setBatchSyncDialogOpen] = useState(false);
+  const [batchSyncNames, setBatchSyncNames] = useState('');
 
   useEffect(() => {
     loadCharacters();
@@ -350,6 +353,26 @@ export const Characters = () => {
     }
   };
 
+  const handleBatchSync = async () => {
+    const namesList = batchSyncNames
+      .split('\n')
+      .map(n => n.trim())
+      .filter(n => n.length > 0);
+    
+    if (namesList.length === 0) {
+      toast({
+        title: 'Aviso',
+        description: 'Digite ao menos um nome de personagem',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setBatchSyncDialogOpen(false);
+    await handleSyncVortex('selected', namesList);
+    setBatchSyncNames('');
+  };
+
   // Helper to normalize strings (for checking special values)
   const normalize = (s?: string) =>
     (s ?? '')
@@ -479,8 +502,48 @@ export const Characters = () => {
                   <DropdownMenuItem onClick={() => handleSyncVortex('all')}>
                     Todos das partidas ({characters.length})
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setBatchSyncDialogOpen(true)}>
+                    Por nome (digitar lista)
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <Dialog open={batchSyncDialogOpen} onOpenChange={setBatchSyncDialogOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Sincronizar por Nome</DialogTitle>
+                    <DialogDescription>
+                      Digite os nomes dos personagens (um por linha) para sincronizar com VortexMU
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <Textarea
+                      placeholder="GodSnow&#10;Conan&#10;Ronin&#10;..."
+                      value={batchSyncNames}
+                      onChange={(e) => setBatchSyncNames(e.target.value)}
+                      rows={8}
+                      className="resize-none"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      {batchSyncNames.split('\n').filter(n => n.trim()).length} personagem(ns) para sincronizar
+                    </p>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setBatchSyncDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleBatchSync} disabled={syncing}>
+                      {syncing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Sincronizando...
+                        </>
+                      ) : (
+                        'Sincronizar'
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
               <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline">

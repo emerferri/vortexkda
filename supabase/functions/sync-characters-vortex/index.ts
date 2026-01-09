@@ -183,39 +183,71 @@ Deno.serve(async (req) => {
 
     console.log(`[Sync] Mode: ${mode}, Names count: ${names?.length || 0}`);
 
+    // Helper to fetch all rows with pagination (Supabase has 1000 row limit)
+    const fetchAllRows = async <T>(
+      table: string,
+      column: string
+    ): Promise<T[]> => {
+      const PAGE_SIZE = 1000;
+      let allData: T[] = [];
+      let from = 0;
+
+      while (true) {
+        const { data, error } = await supabase
+          .from(table)
+          .select(column)
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (error) throw error;
+        const batch = data || [];
+        allData = allData.concat(batch as T[]);
+        if (batch.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+
+      return allData;
+    };
+
     // Get characters to sync based on mode
     let charactersToSync: string[] = [];
 
     if (mode === "selected" && names && names.length > 0) {
       charactersToSync = names;
     } else if (mode === "unregistered") {
-      // Get all player names from matches
-      const { data: players } = await supabase
-        .from("pvp_match_players")
-        .select("player_name");
+      // Get all player names from matches (with pagination)
+      const players = await fetchAllRows<{ player_name: string }>(
+        "pvp_match_players",
+        "player_name"
+      );
 
-      // Get all registered characters
-      const { data: registered } = await supabase
-        .from("characters")
-        .select("name");
+      // Get all registered characters (with pagination)
+      const registered = await fetchAllRows<{ name: string }>(
+        "characters",
+        "name"
+      );
+
+      console.log(`[Sync] Fetched ${players.length} players and ${registered.length} registered characters`);
 
       const registeredNames = new Set(
-        (registered || []).map((c) => c.name.toLowerCase())
+        registered.map((c) => c.name.toLowerCase())
       );
       const allPlayers = new Set(
-        (players || []).map((p) => p.player_name)
+        players.map((p) => p.player_name)
       );
 
       charactersToSync = [...allPlayers].filter(
         (name) => !registeredNames.has(name.toLowerCase())
       );
     } else if (mode === "all") {
-      // Get unique player names from matches
-      const { data: players } = await supabase
-        .from("pvp_match_players")
-        .select("player_name");
+      // Get unique player names from matches (with pagination)
+      const players = await fetchAllRows<{ player_name: string }>(
+        "pvp_match_players",
+        "player_name"
+      );
 
-      charactersToSync = [...new Set((players || []).map((p) => p.player_name))];
+      console.log(`[Sync] Fetched ${players.length} total players for 'all' mode`);
+
+      charactersToSync = [...new Set(players.map((p) => p.player_name))];
     }
 
     console.log(`[Sync] Characters to sync: ${charactersToSync.length}`);
