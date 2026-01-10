@@ -133,10 +133,11 @@ export const ClassGuildRanking = () => {
         });
       });
 
-      // Fetch all characters
+      // Fetch all characters (excluding banned)
       const { data: characters, error: charError } = await supabase
         .from('characters')
-        .select('name, class, guild');
+        .select('name, class, guild, banned')
+        .eq('banned', false);
 
       if (charError) throw charError;
 

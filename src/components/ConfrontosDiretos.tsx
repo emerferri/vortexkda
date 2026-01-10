@@ -63,6 +63,21 @@ export const ConfrontosDiretos = () => {
     queryKey: ['confrontos-diretos', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
     staleTime: 30000,
     queryFn: async () => {
+      // Buscar lista de personagens banidos
+      const { data: bannedChars } = await supabase
+        .from('characters')
+        .select('name')
+        .eq('banned', true);
+      
+      const normalize = (s?: string) =>
+        (s ?? '')
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-zA-Z0-9]/g, '')
+          .toLowerCase();
+      
+      const bannedNames = new Set((bannedChars || []).map(c => normalize((c.name || '').trim())));
+
       // Se houver filtros de data/hora, filtramos pelos match_ids de pvp_matches
       const matchFilterActive = !!(debouncedDateFrom || debouncedDateTo || debouncedHourFrom !== undefined || debouncedHourTo !== undefined);
       let matchIds: string[] | undefined = undefined;
@@ -112,7 +127,15 @@ export const ConfrontosDiretos = () => {
         const { data, error } = await query.range(from, from + pageSize - 1);
 
         if (error) throw error;
-        if (data && data.length > 0) accumulated = accumulated.concat(data);
+        if (data && data.length > 0) {
+          // Filtrar logs de jogadores banidos
+          const filtered = data.filter(log => {
+            const killerKey = normalize((log.killer_name || '').trim());
+            const victimKey = normalize((log.victim_name || '').trim());
+            return !bannedNames.has(killerKey) && !bannedNames.has(victimKey);
+          });
+          accumulated = accumulated.concat(filtered);
+        }
         if (!data || data.length < pageSize) break;
         from += pageSize;
       }

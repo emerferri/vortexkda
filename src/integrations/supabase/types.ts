@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       characters: {
         Row: {
+          banned: boolean
           class: string
           created_at: string
           guild: string
@@ -23,6 +24,7 @@ export type Database = {
           name: string
         }
         Insert: {
+          banned?: boolean
           class: string
           created_at?: string
           guild: string
@@ -30,6 +32,7 @@ export type Database = {
           name: string
         }
         Update: {
+          banned?: boolean
           class?: string
           created_at?: string
           guild?: string
