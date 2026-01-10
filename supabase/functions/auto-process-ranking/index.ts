@@ -38,6 +38,39 @@ interface RequestBody {
   eventMinute?: number;    // boss minute (0 or 30)
 }
 
+// Format ranking as monospaced table for Discord
+function formatRankingTable(players: Array<{name: string, kills: number, deaths: number, kda: number, eventScore: number}>): string {
+  // Calculate max widths for dynamic column sizing
+  const maxNameLen = Math.max(7, ...players.map(p => p.name.length));
+  
+  // Header
+  let table = '🏆 RANKING PVP\n';
+  table += '═'.repeat(52) + '\n\n';
+  table += ' Pos  ' + 'Jogador'.padEnd(maxNameLen + 2) + '  K    D    KDA     Score\n';
+  table += '─'.repeat(52) + '\n';
+  
+  // Player rows
+  players.forEach((player, index) => {
+    const pos = index + 1;
+    let posStr: string;
+    
+    if (pos === 1) posStr = ' 🥇  ';
+    else if (pos === 2) posStr = ' 🥈  ';
+    else if (pos === 3) posStr = ' 🥉  ';
+    else posStr = ` #${pos.toString().padStart(2)} `;
+    
+    const nameStr = player.name.padEnd(maxNameLen + 2);
+    const killsStr = player.kills.toString().padStart(3);
+    const deathsStr = player.deaths.toString().padStart(4);
+    const kdaStr = player.kda.toFixed(2).padStart(7);
+    const scoreStr = player.eventScore.toFixed(2).padStart(9);
+    
+    table += `${posStr} ${nameStr}${killsStr}${deathsStr}${kdaStr}${scoreStr}\n`;
+  });
+  
+  return table;
+}
+
 // Parser logic
 function parseExternalDbContent(logs: ExternalLogEntry[]): ParseResult {
   const players: Record<string, PlayerStats> = {};
@@ -484,10 +517,7 @@ Deno.serve(async (req) => {
       return { ...player, eventScore };
     });
     const sortedPlayers = playersWithScore.sort((a, b) => b.eventScore - a.eventScore);
-    let rankingTableLines = '';
-    sortedPlayers.forEach((player, index) => {
-      rankingTableLines += `**#${index + 1}** ${player.name} | ${player.kills}K/${player.deaths}D | KDA: ${player.kda} | Score: ${player.eventScore.toFixed(2)}\n`;
-    });
+    const rankingTableText = formatRankingTable(sortedPlayers);
 
     // Post to Discord - matching manual format exactly
     const webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_PROD') || Deno.env.get('DISCORD_WEBHOOK_URL');
@@ -538,10 +568,10 @@ Deno.serve(async (req) => {
         timestamp: new Date().toISOString()
       };
 
-      // Embed 2: Ranking table
+      // Embed 2: Ranking table (monospaced code block)
       const embed2 = {
         title: '🏆 Ranking Completo',
-        description: rankingTableLines.substring(0, 4000), // Discord limit
+        description: '```\n' + rankingTableText.substring(0, 3990) + '\n```',
         color: 0x3b82f6
       };
 
