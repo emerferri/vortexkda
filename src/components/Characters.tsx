@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Plus, Search, Trash2, Pencil, Filter, FilterX, FileUp, RefreshCw, ChevronDown } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Pencil, Filter, FilterX, FileUp, RefreshCw, ChevronDown, Ban, ShieldCheck } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -16,12 +16,14 @@ import { useSearchParams } from 'react-router-dom';
 import { CharacterImport } from './CharacterImport';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 
 interface Character {
   id: string;
   name: string;
   guild: string;
   class: string;
+  banned: boolean;
 }
 
 export const Characters = () => {
@@ -56,7 +58,7 @@ export const Characters = () => {
       // Get all registered characters (explicit columns to avoid reserved-word issues)
       const { data: registeredChars, error: charsError } = await supabase
         .from('characters')
-        .select('id, name, guild, class')
+        .select('id, name, guild, class, banned')
         .order('name');
 
       if (charsError) throw charsError;
@@ -110,6 +112,7 @@ export const Characters = () => {
           name: display,
           guild: '',
           class: '',
+          banned: false,
         }));
       console.log('[Characters] unregistered count:', unregisteredPlayers.length);
       console.log('[Characters] unregistered sample (first 20):', unregisteredPlayers.map(u => u.name).slice(0, 20));
@@ -214,6 +217,56 @@ export const Characters = () => {
       toast({
         title: 'Erro',
         description: 'Falha ao excluir personagem',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleToggleBan = async (character: Character) => {
+    if (!user) {
+      toast({
+        title: 'Erro',
+        description: 'Você precisa estar logado',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Cannot ban unregistered characters
+    if (character.id.startsWith('unregistered-')) {
+      toast({
+        title: 'Aviso',
+        description: 'Cadastre o personagem antes de banir',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const newBannedStatus = !character.banned;
+    const action = newBannedStatus ? 'banir' : 'desbanir';
+    
+    if (!confirm(`Tem certeza que deseja ${action} o personagem "${character.name}"?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('characters')
+        .update({ banned: newBannedStatus })
+        .eq('id', character.id);
+
+      if (error) throw error;
+      
+      toast({ 
+        title: 'Sucesso', 
+        description: newBannedStatus 
+          ? `Personagem "${character.name}" foi banido e não aparecerá mais nos rankings`
+          : `Personagem "${character.name}" foi desbanido e voltará a aparecer nos rankings`
+      });
+      loadCharacters();
+    } catch (error) {
+      console.error('Error toggling ban:', error);
+      toast({
+        title: 'Erro',
+        description: `Falha ao ${action} personagem`,
         variant: 'destructive',
       });
     }
@@ -642,29 +695,52 @@ export const Characters = () => {
                 <TableHead>Assassino</TableHead>
                 <TableHead>Guild</TableHead>
                 <TableHead>Classe</TableHead>
+                {canEditData && <TableHead>Status</TableHead>}
                 {canEditData && <TableHead className="w-[100px]">Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredCharacters.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={canEditData ? 4 : 3} className="text-center text-muted-foreground">
+                  <TableCell colSpan={canEditData ? 5 : 3} className="text-center text-muted-foreground">
                     {showUnregisteredOnly ? 'Nenhum personagem sem cadastro no momento' : 'Nenhum personagem encontrado'}
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredCharacters.map((character) => (
-                  <TableRow key={character.id}>
+                  <TableRow 
+                    key={character.id}
+                    className={character.banned ? 'bg-destructive/10 opacity-70' : ''}
+                  >
                     <TableCell className="font-medium">
-                      {character.name}
-                      {isIncomplete(character) && (
-                        <span className="ml-2 text-xs text-yellow-600 font-semibold">
-                          (Cadastro incompleto)
+                      <div className="flex items-center gap-2">
+                        {character.banned && <Ban className="w-4 h-4 text-destructive" />}
+                        <span className={character.banned ? 'text-destructive line-through' : ''}>
+                          {character.name}
                         </span>
-                      )}
+                        {isIncomplete(character) && (
+                          <span className="text-xs text-yellow-600 font-semibold">
+                            (Cadastro incompleto)
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>{character.guild || '-'}</TableCell>
                     <TableCell>{character.class || '-'}</TableCell>
+                    {canEditData && (
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={!character.banned}
+                            onCheckedChange={() => handleToggleBan(character)}
+                            disabled={character.id.startsWith('unregistered-')}
+                          />
+                          <span className={`text-xs font-medium ${character.banned ? 'text-destructive' : 'text-green-600'}`}>
+                            {character.banned ? 'Banido' : 'Ativo'}
+                          </span>
+                        </div>
+                      </TableCell>
+                    )}
                     {canEditData && (
                       <TableCell>
                         <div className="flex gap-1">
