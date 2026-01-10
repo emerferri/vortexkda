@@ -457,30 +457,40 @@ Deno.serve(async (req) => {
       console.error('[Auto Process] Failed to insert kill logs:', killLogsError.message);
     }
 
-    // Fetch character data
+    // Fetch character data (including banned status for filtering)
     const playerNames = Object.keys(parseResult.players);
     const { data: characters } = await internalClient
       .from('characters')
-      .select('name, guild, class')
+      .select('name, guild, class, banned')
       .in('name', playerNames);
 
-    const characterMap: Record<string, { guild: string; class: string }> = {};
+    const characterMap: Record<string, { guild: string; class: string; banned: boolean }> = {};
     if (characters) {
       for (const char of characters) {
-        characterMap[char.name] = { guild: char.guild, class: char.class };
+        characterMap[char.name] = { guild: char.guild, class: char.class, banned: char.banned || false };
       }
     }
 
-    // Calculate guild summary
+    // Filter out banned players from rankings
+    const bannedPlayerNames = new Set(
+      Object.entries(characterMap)
+        .filter(([_, data]) => data.banned)
+        .map(([name, _]) => name)
+    );
+
+    const nonBannedPlayers = Object.values(parseResult.players)
+      .filter(p => !bannedPlayerNames.has(p.name));
+
+    // Calculate guild summary (only non-banned players)
     const guildSummary: Record<string, number> = {};
-    for (const playerName of playerNames) {
-      const charInfo = characterMap[playerName];
+    for (const player of nonBannedPlayers) {
+      const charInfo = characterMap[player.name];
       const guild = charInfo?.guild || 'Sem Guild';
       guildSummary[guild] = (guildSummary[guild] || 0) + 1;
     }
 
     // Calculate special rankings using correct eventScore formula: (kills * 3) + (kda * 2) - (deaths * 1.5)
-    const playersWithEventScore = Object.values(parseResult.players).map(p => ({
+    const playersWithEventScore = nonBannedPlayers.map(p => ({
       ...p,
       eventScore: (p.kills * 3) + (p.kda * 2) - (p.deaths * 1.5)
     }));
@@ -500,9 +510,9 @@ Deno.serve(async (req) => {
     const brabissimo = sortedByKDA[0];
 
     const totals = {
-      kills: Object.values(parseResult.players).reduce((sum, p) => sum + p.kills, 0),
-      deaths: Object.values(parseResult.players).reduce((sum, p) => sum + p.deaths, 0),
-      playerCount: Object.keys(parseResult.players).length
+      kills: nonBannedPlayers.reduce((sum, p) => sum + p.kills, 0),
+      deaths: nonBannedPlayers.reduce((sum, p) => sum + p.deaths, 0),
+      playerCount: nonBannedPlayers.length
     };
 
     // Format guild summary - matching manual format
@@ -511,8 +521,8 @@ Deno.serve(async (req) => {
       .map(([guild, count]) => `**${guild}**: ${count} ${count === 1 ? 'jogador' : 'jogadores'}`)
       .join('\n');
 
-    // Build ranking table text with correct eventScore formula: (kills * 3) + (kda * 2) - (deaths * 1.5)
-    const playersWithScore = Object.values(parseResult.players).map(player => {
+    // Build ranking table text with correct eventScore formula: (kills * 3) + (kda * 2) - (deaths * 1.5) - excluding banned
+    const playersWithScore = nonBannedPlayers.map(player => {
       const eventScore = (player.kills * 3) + (player.kda * 2) - (player.deaths * 1.5);
       return { ...player, eventScore };
     });

@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Ban, ShieldCheck } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { z } from 'zod';
 
 const characterSchema = z.object({
@@ -29,6 +30,7 @@ interface Character {
   guild: string;
   class: string;
   created_at: string;
+  banned: boolean;
 }
 
 export const CharacterManagement = () => {
@@ -128,6 +130,27 @@ export const CharacterManagement = () => {
     }
   };
 
+  const handleToggleBan = async (character: Character) => {
+    const newBannedStatus = !character.banned;
+    const action = newBannedStatus ? 'banir' : 'desbanir';
+    
+    if (!confirm(`Tem certeza que deseja ${action} ${character.name}?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('characters')
+        .update({ banned: newBannedStatus })
+        .eq('id', character.id);
+
+      if (error) throw error;
+      toast.success(`Personagem ${newBannedStatus ? 'banido' : 'desbanido'} com sucesso!`);
+      fetchCharacters();
+    } catch (error) {
+      console.error('Error toggling ban:', error);
+      toast.error(`Erro ao ${action} personagem`);
+    }
+  };
+
   const handleEdit = (character: Character) => {
     setEditingCharacter(character);
     setFormData({
@@ -190,22 +213,42 @@ export const CharacterManagement = () => {
                   <TableHead>Assassino</TableHead>
                   <TableHead>Guild</TableHead>
                   <TableHead>Classe</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredCharacters.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
                       Nenhum personagem encontrado
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredCharacters.map((char) => (
-                    <TableRow key={char.id}>
-                      <TableCell className="font-medium">{char.name}</TableCell>
+                    <TableRow key={char.id} className={char.banned ? 'opacity-60 bg-destructive/10' : ''}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {char.banned && <Ban className="h-4 w-4 text-destructive" />}
+                          {char.name}
+                        </div>
+                      </TableCell>
                       <TableCell>{char.guild}</TableCell>
                       <TableCell>{char.class}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <Switch
+                            checked={!char.banned}
+                            onCheckedChange={() => handleToggleBan(char)}
+                            aria-label={char.banned ? 'Desbanir' : 'Banir'}
+                          />
+                          {char.banned ? (
+                            <span className="text-xs text-destructive font-medium">Banido</span>
+                          ) : (
+                            <span className="text-xs text-green-600 font-medium">Ativo</span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button

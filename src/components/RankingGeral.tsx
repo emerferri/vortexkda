@@ -154,10 +154,19 @@ export const RankingGeral = () => {
           .replace(/[^a-zA-Z0-9]/g, '')
           .toLowerCase();
 
-      // Buscar classes/personagens para mapear nome -> classe e guild
+      // Buscar classes/personagens para mapear nome -> classe e guild (excluindo banidos)
       const { data: characters } = await supabase
         .from('characters')
-        .select('name, class, guild');
+        .select('name, class, guild, banned')
+        .eq('banned', false);
+
+      // Buscar lista de todos os personagens banidos para filtrar nos logs
+      const { data: bannedChars } = await supabase
+        .from('characters')
+        .select('name')
+        .eq('banned', true);
+      
+      const bannedNames = new Set((bannedChars || []).map(c => normalize((c.name || '').trim())));
 
       const entries = (characters || []).map((c) => {
         const displayName = (c.name ?? '').trim();
@@ -276,6 +285,9 @@ export const RankingGeral = () => {
         const victimDisplay = (log.victim_name || '').trim();
         const killerKey = normalize(killerDisplay);
         const victimKey = normalize(victimDisplay);
+
+        // Ignorar jogadores banidos
+        if (bannedNames.has(killerKey) || bannedNames.has(victimKey)) continue;
 
         if (killerKey) {
           const kstats = playerMap.get(killerKey) || { kills: 0, deaths: 0, displayName: killerDisplay, matches: new Set<string>() };
