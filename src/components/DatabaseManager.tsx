@@ -28,10 +28,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConfrontosDiretos } from './ConfrontosDiretos';
 import { Characters } from './Characters';
 import { UserManagement } from './UserManagement';
+import { AutoProcessMonitor } from './AutoProcessMonitor';
 
 export const DatabaseManager = () => {
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('management');
+  const [activeTab, setActiveTab] = useState('monitoramento');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteDate, setDeleteDate] = useState<Date>();
   const [deleteHour, setDeleteHour] = useState<number>();
@@ -167,12 +168,17 @@ export const DatabaseManager = () => {
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-4 mb-6">
+      <TabsList className="grid w-full grid-cols-5 mb-6">
+        <TabsTrigger value="monitoramento">Monitoramento</TabsTrigger>
         <TabsTrigger value="management">Gerenciamento</TabsTrigger>
         <TabsTrigger value="usuarios">Usuários</TabsTrigger>
         <TabsTrigger value="confrontos">Confrontos Diretos</TabsTrigger>
         <TabsTrigger value="personagens">Personagens</TabsTrigger>
       </TabsList>
+
+      <TabsContent value="monitoramento">
+        <AutoProcessMonitor />
+      </TabsContent>
 
       <TabsContent value="management">
         <div className="space-y-6">

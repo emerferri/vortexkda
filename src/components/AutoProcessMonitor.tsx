@@ -1,0 +1,300 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Activity, CheckCircle2, Clock, AlertCircle, RefreshCw, Calendar, Users } from 'lucide-react';
+import { format, formatDistanceToNow, parseISO, isToday, isYesterday, subDays } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+interface MatchData {
+  id: string;
+  match_date: string;
+  match_hour: number;
+  boss_label: string;
+  created_at: string;
+  player_count?: number;
+}
+
+interface ExpectedEvent {
+  date: string;
+  hour: number;
+  label: string;
+}
+
+export const AutoProcessMonitor = () => {
+  const [recentMatches, setRecentMatches] = useState<MatchData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchRecentMatches = async () => {
+    try {
+      // Buscar últimas 14 partidas processadas (7 dias x 2 eventos por dia)
+      const { data: matches, error } = await supabase
+        .from('pvp_matches')
+        .select('id, match_date, match_hour, boss_label, created_at')
+        .order('created_at', { ascending: false })
+        .limit(14);
+
+      if (error) throw error;
+
+      // Buscar contagem de jogadores para cada partida
+      const matchesWithCounts = await Promise.all(
+        (matches || []).map(async (match) => {
+          const { count } = await supabase
+            .from('pvp_match_players')
+            .select('*', { count: 'exact', head: true })
+            .eq('match_id', match.id);
+          
+          return { ...match, player_count: count || 0 };
+        })
+      );
+
+      setRecentMatches(matchesWithCounts);
+    } catch (error) {
+      console.error('Erro ao buscar partidas recentes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecentMatches();
+  }, []);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchRecentMatches();
+    setRefreshing(false);
+  };
+
+  // Gerar lista de eventos esperados para os últimos 7 dias
+  const getExpectedEvents = (): ExpectedEvent[] => {
+    const events: ExpectedEvent[] = [];
+    const today = new Date();
+    
+    for (let i = 0; i < 7; i++) {
+      const date = subDays(today, i);
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const dayOfWeek = date.getDay(); // 0 = domingo, 6 = sábado
+      
+      // Evento das 20:00 - todos os dias
+      events.push({
+        date: dateStr,
+        hour: 20,
+        label: `BOSSx2 ${format(date, 'dd/MM/yyyy')} 20H`
+      });
+      
+      // Evento das 22:00 ou 22:30 dependendo do dia
+      if (dayOfWeek === 2 || dayOfWeek === 4) {
+        // Terça ou quinta - evento às 22:30 (registrado como hora 22)
+        events.push({
+          date: dateStr,
+          hour: 22,
+          label: `BOSSx2 ${format(date, 'dd/MM/yyyy')} 23H` // Label do banco mostra como 23H
+        });
+      } else {
+        // Outros dias - evento às 22:00
+        events.push({
+          date: dateStr,
+          hour: 22,
+          label: `BOSSx2 ${format(date, 'dd/MM/yyyy')} 22H`
+        });
+      }
+    }
+    
+    return events;
+  };
+
+  // Verificar se um evento foi processado
+  const isEventProcessed = (event: ExpectedEvent): MatchData | null => {
+    return recentMatches.find(
+      (m) => m.match_date === event.date && m.match_hour === event.hour
+    ) || null;
+  };
+
+  // Verificar se evento deveria ter sido processado (já passou)
+  const shouldBeProcessed = (event: ExpectedEvent): boolean => {
+    const now = new Date();
+    const eventDate = parseISO(event.date);
+    const eventTime = new Date(eventDate);
+    // Adicionar 1 hora após o evento para dar tempo de processamento
+    eventTime.setHours(event.hour + 2); // +2 para dar margem
+    return now > eventTime;
+  };
+
+  const expectedEvents = getExpectedEvents();
+  
+  // Estatísticas
+  const processedCount = expectedEvents.filter(e => isEventProcessed(e) && shouldBeProcessed(e)).length;
+  const pendingCount = expectedEvents.filter(e => !isEventProcessed(e) && shouldBeProcessed(e)).length;
+  const upcomingCount = expectedEvents.filter(e => !shouldBeProcessed(e)).length;
+
+  const formatProcessingDelay = (event: ExpectedEvent, match: MatchData): string => {
+    const eventDate = parseISO(event.date);
+    const eventTime = new Date(eventDate);
+    eventTime.setHours(event.hour);
+    
+    const processedTime = parseISO(match.created_at);
+    const delayMs = processedTime.getTime() - eventTime.getTime();
+    const delayMinutes = Math.round(delayMs / (1000 * 60));
+    
+    if (delayMinutes < 60) {
+      return `${delayMinutes}min após`;
+    }
+    const hours = Math.floor(delayMinutes / 60);
+    const mins = delayMinutes % 60;
+    return `${hours}h${mins > 0 ? ` ${mins}min` : ''} após`;
+  };
+
+  const getDateLabel = (dateStr: string): string => {
+    const date = parseISO(dateStr);
+    if (isToday(date)) return 'Hoje';
+    if (isYesterday(date)) return 'Ontem';
+    return format(date, 'EEEE', { locale: ptBR });
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="w-5 h-5" />
+            Monitoramento de Processamento Automático
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Activity className="w-6 h-6 text-primary" />
+            <div>
+              <CardTitle>Monitoramento de Processamento Automático</CardTitle>
+              <CardDescription className="mt-1">
+                Status dos últimos rankings processados automaticamente
+              </CardDescription>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {/* Estatísticas resumidas */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 text-center">
+            <CheckCircle2 className="w-6 h-6 text-green-500 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-green-500">{processedCount}</div>
+            <div className="text-sm text-muted-foreground">Processados</div>
+          </div>
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 text-center">
+            <AlertCircle className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-yellow-500">{pendingCount}</div>
+            <div className="text-sm text-muted-foreground">Pendentes</div>
+          </div>
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-center">
+            <Clock className="w-6 h-6 text-blue-500 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-blue-500">{upcomingCount}</div>
+            <div className="text-sm text-muted-foreground">Aguardando</div>
+          </div>
+        </div>
+
+        {/* Lista de eventos */}
+        <div className="space-y-2">
+          {expectedEvents.map((event, index) => {
+            const match = isEventProcessed(event);
+            const isPast = shouldBeProcessed(event);
+            const isProcessed = !!match;
+            
+            return (
+              <div
+                key={`${event.date}-${event.hour}`}
+                className={`flex items-center justify-between p-3 rounded-lg border ${
+                  isProcessed
+                    ? 'bg-green-500/5 border-green-500/20'
+                    : isPast
+                    ? 'bg-yellow-500/5 border-yellow-500/20'
+                    : 'bg-muted/30 border-border'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-2 h-2 rounded-full ${
+                    isProcessed ? 'bg-green-500' : isPast ? 'bg-yellow-500' : 'bg-muted-foreground'
+                  }`} />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <span className="font-medium">
+                        {getDateLabel(event.date)} - {event.hour === 20 ? '20:00' : '22:00'}
+                      </span>
+                      <Badge variant="outline" className="text-xs">
+                        {format(parseISO(event.date), 'dd/MM')}
+                      </Badge>
+                    </div>
+                    {match && (
+                      <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                        <Users className="w-3 h-3" />
+                        {match.player_count} jogadores • {formatProcessingDelay(event, match)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {isProcessed ? (
+                    <Badge className="bg-green-500/20 text-green-500 border-green-500/30">
+                      <CheckCircle2 className="w-3 h-3 mr-1" />
+                      Processado
+                    </Badge>
+                  ) : isPast ? (
+                    <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/30">
+                      <AlertCircle className="w-3 h-3 mr-1" />
+                      Pendente
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-muted-foreground">
+                      <Clock className="w-3 h-3 mr-1" />
+                      Aguardando
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Último processamento */}
+        {recentMatches.length > 0 && (
+          <div className="mt-4 pt-4 border-t">
+            <p className="text-sm text-muted-foreground">
+              Último processamento: <span className="font-medium text-foreground">
+                {formatDistanceToNow(parseISO(recentMatches[0].created_at), { 
+                  addSuffix: true, 
+                  locale: ptBR 
+                })}
+              </span>
+              {' '}({format(parseISO(recentMatches[0].created_at), "dd/MM 'às' HH:mm", { locale: ptBR })})
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
