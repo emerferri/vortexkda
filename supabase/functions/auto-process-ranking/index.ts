@@ -143,23 +143,36 @@ function parseExternalDbContent(logs: ExternalLogEntry[]): ParseResult {
   return { players, bossLabel, killLogs };
 }
 
-// Extract minute from the last log entry
+// Extract minute from the last log entry - ONLY from valid map logs
 function getLastKillMinute(logs: ExternalLogEntry[]): number | null {
   if (!logs || logs.length === 0) return null;
   
-  // Logs are ordered by timestamp DESC, first = most recent
-  const lastLog = logs[0];
+  // Map validation patterns (same as in parseExternalDbContent)
+  const mapPatternDoubleAsterisks = /\*\*PvP Square\*\*\s*-\s*\*\*\[Server: Boss Event PvP\]\*\*/i;
+  const mapPatternSingleAsterisks = /\*PvP Square\*\s*-\s*\*\[Server: Boss Event PvP\]\*/i;
+  const mapPatternNoAsterisks = /PvP Square\s*-\s*\[Server: Boss Event PvP\]/i;
   
-  // Try to extract time from timestamp field (format: YYYY-MM-DDTHH:MM:SS or similar)
-  const timestampMatch = lastLog.timestamp?.match(/(\d{2}):(\d{2}):(\d{2})/);
-  if (timestampMatch) {
-    return parseInt(timestampMatch[2], 10); // return minute
-  }
-  
-  // Try from content field
-  const contentMatch = lastLog.content?.match(/(\d{2}):(\d{2}):(\d{2})/);
-  if (contentMatch) {
-    return parseInt(contentMatch[2], 10);
+  // Find the most recent log from the valid map (logs are ordered DESC)
+  for (const log of logs) {
+    if (!log.content) continue;
+    
+    const hasValidMap = mapPatternDoubleAsterisks.test(log.content) ||
+      mapPatternSingleAsterisks.test(log.content) ||
+      mapPatternNoAsterisks.test(log.content);
+    
+    if (!hasValidMap) continue;
+    
+    // Try to extract time from timestamp field (format: YYYY-MM-DDTHH:MM:SS or similar)
+    const timestampMatch = log.timestamp?.match(/(\d{2}):(\d{2}):(\d{2})/);
+    if (timestampMatch) {
+      return parseInt(timestampMatch[2], 10); // return minute
+    }
+    
+    // Try from content field
+    const contentMatch = log.content?.match(/(\d{2}):(\d{2}):(\d{2})/);
+    if (contentMatch) {
+      return parseInt(contentMatch[2], 10);
+    }
   }
   
   return null;
