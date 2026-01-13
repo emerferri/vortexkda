@@ -76,31 +76,22 @@ export const AutoProcessMonitor = () => {
     for (let i = 0; i < 7; i++) {
       const date = subDays(today, i);
       const dateStr = format(date, 'yyyy-MM-dd');
-      const dayOfWeek = date.getDay(); // 0 = domingo, 6 = sábado
+      const dayOfWeek = date.getDay(); // 0 = domingo, 1 = segunda, 2 = terça, etc.
       
-      // Evento das 20:00 - todos os dias
+      // Primeiro evento do dia - 21:00 para segunda-feira, 20:00 para outros dias
+      const firstEventHour = dayOfWeek === 1 ? 21 : 20;
       events.push({
         date: dateStr,
-        hour: 20,
-        label: `BOSSx2 ${format(date, 'dd/MM/yyyy')} 20H`
+        hour: firstEventHour,
+        label: `BOSSx2 ${format(date, 'dd/MM/yyyy')} ${firstEventHour}H`
       });
       
-      // Evento das 22:00 ou 22:30 dependendo do dia
-      if (dayOfWeek === 2 || dayOfWeek === 4) {
-        // Terça ou quinta - evento às 22:30 (registrado como hora 22)
-        events.push({
-          date: dateStr,
-          hour: 22,
-          label: `BOSSx2 ${format(date, 'dd/MM/yyyy')} 23H` // Label do banco mostra como 23H
-        });
-      } else {
-        // Outros dias - evento às 22:00
-        events.push({
-          date: dateStr,
-          hour: 22,
-          label: `BOSSx2 ${format(date, 'dd/MM/yyyy')} 22H`
-        });
-      }
+      // Segundo evento - 22:00 (ou 22:30 para terça/quinta, registrado como hora 22)
+      events.push({
+        date: dateStr,
+        hour: 22,
+        label: `BOSSx2 ${format(date, 'dd/MM/yyyy')} 22H`
+      });
     }
     
     return events;
@@ -243,7 +234,7 @@ export const AutoProcessMonitor = () => {
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
                       <span className="font-medium">
-                        {getDateLabel(event.date)} - {event.hour === 20 ? '20:00' : '22:00'}
+                        {getDateLabel(event.date)} - {event.hour}:00
                       </span>
                       <Badge variant="outline" className="text-xs">
                         {format(parseISO(event.date), 'dd/MM')}
