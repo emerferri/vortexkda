@@ -251,10 +251,11 @@ function getEventTimeRange(eventHour?: number, eventMinute: number = 0): { start
   const eventDateBrazil = new Date(brazilTime);
   eventDateBrazil.setHours(targetEventHour, eventMinute, 0, 0);
 
-  // If event time is in the future, use previous day's event
-  if (eventDateBrazil > brazilTime) {
+  // Only go back a day if we haven't reached the event time yet AND no eventHour was explicitly provided
+  // When eventHour is provided via cron, we trust that the event already happened today
+  if (eventHour === undefined && eventDateBrazil > brazilTime) {
     eventDateBrazil.setDate(eventDateBrazil.getDate() - 1);
-    eventDateBrazil.setHours(22, 0, 0, 0);
+    // Don't change the hour - keep the determined targetEventHour
   }
 
   // Convert Brazil time back to UTC for database query
