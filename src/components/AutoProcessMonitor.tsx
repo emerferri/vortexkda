@@ -3,9 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Activity, CheckCircle2, Clock, AlertCircle, RefreshCw, Calendar, Users } from 'lucide-react';
+import { Activity, CheckCircle2, Clock, AlertCircle, RefreshCw, Calendar, Users, Play, Loader2 } from 'lucide-react';
 import { format, formatDistanceToNow, parseISO, isToday, isYesterday, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useToast } from '@/hooks/use-toast';
 
 interface MatchData {
   id: string;
@@ -19,6 +20,7 @@ interface MatchData {
 interface ExpectedEvent {
   date: string;
   hour: number;
+  minute: number;
   label: string;
 }
 
@@ -26,6 +28,8 @@ export const AutoProcessMonitor = () => {
   const [recentMatches, setRecentMatches] = useState<MatchData[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [processingEvent, setProcessingEvent] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const fetchRecentMatches = async () => {
     try {
@@ -68,6 +72,66 @@ export const AutoProcessMonitor = () => {
     setRefreshing(false);
   };
 
+  // Disparar processamento manual de um evento
+  const handleManualProcess = async (event: ExpectedEvent) => {
+    const eventKey = `${event.date}-${event.hour}`;
+    setProcessingEvent(eventKey);
+    
+    try {
+      console.log(`[Manual Trigger] Disparando processamento para ${event.date} ${event.hour}:${event.minute}`);
+      
+      const { data, error } = await supabase.functions.invoke('auto-process-ranking', {
+        body: {
+          attempt: 3,
+          forceProcess: true,
+          eventHour: event.hour,
+          eventMinute: event.minute
+        }
+      });
+
+      if (error) throw error;
+
+      console.log('[Manual Trigger] Resposta:', data);
+
+      if (data?.success) {
+        toast({
+          title: "Processamento concluído!",
+          description: `Ranking de ${event.date} ${event.hour}:${String(event.minute).padStart(2, '0')} processado com ${data.playersCount || 0} jogadores.`,
+        });
+        // Atualizar lista após sucesso
+        await fetchRecentMatches();
+      } else if (data?.skipped) {
+        toast({
+          title: "Evento já processado",
+          description: data.message || "Este evento já foi processado anteriormente.",
+          variant: "default",
+        });
+        await fetchRecentMatches();
+      } else if (data?.noData) {
+        toast({
+          title: "Sem dados",
+          description: data.message || "Nenhum dado encontrado para este período.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Resultado inesperado",
+          description: JSON.stringify(data),
+          variant: "default",
+        });
+      }
+    } catch (error) {
+      console.error('[Manual Trigger] Erro:', error);
+      toast({
+        title: "Erro no processamento",
+        description: error instanceof Error ? error.message : "Erro desconhecido ao processar ranking.",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingEvent(null);
+    }
+  };
+
   // Gerar lista de eventos esperados para os últimos 7 dias
   const getExpectedEvents = (): ExpectedEvent[] => {
     const events: ExpectedEvent[] = [];
@@ -76,21 +140,24 @@ export const AutoProcessMonitor = () => {
     for (let i = 0; i < 7; i++) {
       const date = subDays(today, i);
       const dateStr = format(date, 'yyyy-MM-dd');
-      const dayOfWeek = date.getDay(); // 0 = domingo, 1 = segunda, 2 = terça, etc.
+      const dayOfWeek = date.getDay(); // 0 = domingo, 1 = segunda, 2 = terça, 4 = quinta
       
       // Primeiro evento do dia - 21:00 para segunda-feira, 20:00 para outros dias
       const firstEventHour = dayOfWeek === 1 ? 21 : 20;
       events.push({
         date: dateStr,
         hour: firstEventHour,
+        minute: 0,
         label: `BOSSx2 ${format(date, 'dd/MM/yyyy')} ${firstEventHour}H`
       });
       
-      // Segundo evento - 22:00 (ou 22:30 para terça/quinta, registrado como hora 22)
+      // Segundo evento - 22:00 (ou 22:30 para terça/quinta)
+      const isSecondEventLate = dayOfWeek === 2 || dayOfWeek === 4; // terça ou quinta
       events.push({
         date: dateStr,
         hour: 22,
-        label: `BOSSx2 ${format(date, 'dd/MM/yyyy')} 22H`
+        minute: isSecondEventLate ? 30 : 0,
+        label: `BOSSx2 ${format(date, 'dd/MM/yyyy')} 22${isSecondEventLate ? ':30' : ':00'}`
       });
     }
     
@@ -109,8 +176,19 @@ export const AutoProcessMonitor = () => {
     const now = new Date();
     const eventDate = parseISO(event.date);
     const eventTime = new Date(eventDate);
-    // Adicionar 1 hora após o evento para dar tempo de processamento
-    eventTime.setHours(event.hour + 2); // +2 para dar margem
+    // Evento deve estar 30 minutos após o início para considerar processável
+    eventTime.setHours(event.hour);
+    eventTime.setMinutes(event.minute + 30);
+    return now > eventTime;
+  };
+
+  // Verificar se pode disparar manualmente (passou pelo menos 25 min desde o início)
+  const canManuallyProcess = (event: ExpectedEvent): boolean => {
+    const now = new Date();
+    const eventDate = parseISO(event.date);
+    const eventTime = new Date(eventDate);
+    eventTime.setHours(event.hour);
+    eventTime.setMinutes(event.minute + 25);
     return now > eventTime;
   };
 
@@ -125,6 +203,7 @@ export const AutoProcessMonitor = () => {
     const eventDate = parseISO(event.date);
     const eventTime = new Date(eventDate);
     eventTime.setHours(event.hour);
+    eventTime.setMinutes(event.minute);
     
     const processedTime = parseISO(match.created_at);
     const delayMs = processedTime.getTime() - eventTime.getTime();
@@ -143,6 +222,10 @@ export const AutoProcessMonitor = () => {
     if (isToday(date)) return 'Hoje';
     if (isYesterday(date)) return 'Ontem';
     return format(date, 'EEEE', { locale: ptBR });
+  };
+
+  const formatEventTime = (event: ExpectedEvent): string => {
+    return `${event.hour}:${String(event.minute).padStart(2, '0')}`;
   };
 
   if (loading) {
@@ -214,10 +297,13 @@ export const AutoProcessMonitor = () => {
             const match = isEventProcessed(event);
             const isPast = shouldBeProcessed(event);
             const isProcessed = !!match;
+            const eventKey = `${event.date}-${event.hour}`;
+            const isProcessing = processingEvent === eventKey;
+            const canProcess = canManuallyProcess(event);
             
             return (
               <div
-                key={`${event.date}-${event.hour}`}
+                key={eventKey}
                 className={`flex items-center justify-between p-3 rounded-lg border ${
                   isProcessed
                     ? 'bg-green-500/5 border-green-500/20'
@@ -234,7 +320,7 @@ export const AutoProcessMonitor = () => {
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
                       <span className="font-medium">
-                        {getDateLabel(event.date)} - {event.hour}:00
+                        {getDateLabel(event.date)} - {formatEventTime(event)}
                       </span>
                       <Badge variant="outline" className="text-xs">
                         {format(parseISO(event.date), 'dd/MM')}
@@ -255,10 +341,47 @@ export const AutoProcessMonitor = () => {
                       Processado
                     </Badge>
                   ) : isPast ? (
-                    <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/30">
-                      <AlertCircle className="w-3 h-3 mr-1" />
-                      Pendente
-                    </Badge>
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleManualProcess(event)}
+                        disabled={isProcessing || !canProcess}
+                        className="gap-1 h-7 text-xs bg-yellow-500/10 border-yellow-500/30 hover:bg-yellow-500/20"
+                      >
+                        {isProcessing ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Play className="w-3 h-3" />
+                        )}
+                        {isProcessing ? 'Processando...' : 'Processar'}
+                      </Button>
+                      <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/30">
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        Pendente
+                      </Badge>
+                    </>
+                  ) : canProcess ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleManualProcess(event)}
+                        disabled={isProcessing}
+                        className="gap-1 h-7 text-xs"
+                      >
+                        {isProcessing ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Play className="w-3 h-3" />
+                        )}
+                        {isProcessing ? 'Processando...' : 'Processar'}
+                      </Button>
+                      <Badge variant="outline" className="text-muted-foreground">
+                        <Clock className="w-3 h-3 mr-1" />
+                        Aguardando
+                      </Badge>
+                    </>
                   ) : (
                     <Badge variant="outline" className="text-muted-foreground">
                       <Clock className="w-3 h-3 mr-1" />
