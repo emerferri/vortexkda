@@ -52,6 +52,15 @@ const Index = () => {
     }
   }, [searchParams, user, activeTab]);
 
+  // Handler to change tabs and clean up URL params
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    // Clean URL when changing main tabs to avoid getting stuck
+    if (searchParams.get('subtab') || searchParams.get('filter')) {
+      navigate(`/?tab=${newTab}`, { replace: true });
+    }
+  };
+
   const [importSource, setImportSource] = useState<'txt' | 'database'>('txt');
 
   const handleFileUpload = (content: string) => {
@@ -115,7 +124,7 @@ const Index = () => {
         </header>
 
         <div className="space-y-8">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className={`grid w-full max-w-6xl mx-auto ${isAdmin ? 'grid-cols-8' : canEditData ? 'grid-cols-7' : 'grid-cols-6'} mb-8`}>
               {canEditData && (
                 <TabsTrigger value="placar" className="text-base font-semibold">
