@@ -384,31 +384,11 @@ export const RankingGeral = () => {
     let filtered = base;
 
     if (classFilter !== 'all') {
-      filtered = base.filter(p => normalizeClassKey(p.class || '') === classFilter);
-
-      // Só adiciona jogadores cadastrados sem partidas se NÃO houver filtros de data/hora
-      const hasDateFilters = !!(debouncedDateFrom || debouncedDateTo || debouncedHourFrom !== undefined || debouncedHourTo !== undefined);
-      if (!hasDateFilters) {
-        const existing = new Set(filtered.map(p => normalizeNameKey(p.name)));
-        const toAdd =
-          (aggregatedData as any)?.characters
-            ?.filter((c: any) => normalizeClassKey(c.class || '') === classFilter)
-            ?.filter((c: any) => !existing.has(normalizeNameKey(c.name)))
-            ?.map((c: any) => ({
-              name: c.name,
-              class: c.class || null,
-              guild: c.guild || null,
-              kills: 0,
-              deaths: 0,
-              kda: 0,
-              weightedKda: 0,
-              matches: 0,
-              mvpScore: 0,
-              eventScore: 0,
-            })) || [];
-
-        filtered = [...filtered, ...toAdd];
-      }
+      // Filtra por classe E apenas jogadores com atividade (kills > 0 ou deaths > 0)
+      filtered = base.filter(p => 
+        normalizeClassKey(p.class || '') === classFilter && 
+        (p.kills > 0 || p.deaths > 0)
+      );
     }
     
     return [...filtered].sort((a, b) => b[sortBy] - a[sortBy]);
