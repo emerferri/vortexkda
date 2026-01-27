@@ -318,15 +318,8 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    // Parse request body
-    let body: RequestBody = {};
-    try {
-      body = await req.json();
-    } catch {
-      // No body or invalid JSON, use defaults
-    }
-    
+  // Core processor extracted so we can optionally run it in background.
+  const processRanking = async (body: RequestBody) => {
     const attempt = body.attempt || 1;
     const forceProcess = body.forceProcess || false;
     const eventHour = body.eventHour;
@@ -351,10 +344,13 @@ Deno.serve(async (req) => {
 
     if (existingMatch) {
       console.log(`[Auto Process] Match already exists for ${matchDate} ${matchHour}:00, skipping`);
-      return new Response(
-        JSON.stringify({ success: true, status: 'already_exists', message: 'Match already processed', matchDate, matchHour }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return {
+        success: true,
+        status: 'already_exists',
+        message: 'Match already processed',
+        matchDate,
+        matchHour,
+      };
     }
 
     // Connect to external Supabase
@@ -384,10 +380,7 @@ Deno.serve(async (req) => {
 
     if (!logs || logs.length === 0) {
       console.log('[Auto Process] No logs found for this time period');
-      return new Response(
-        JSON.stringify({ success: true, status: 'no_logs', message: 'No logs found', matchDate, matchHour, attempt }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return { success: true, status: 'no_logs', message: 'No logs found', matchDate, matchHour, attempt };
     }
 
     // Check if we should postpone based on last kill time
@@ -397,27 +390,21 @@ Deno.serve(async (req) => {
     if (shouldPostpone(attempt, forceProcess, lastKillMinute, matchHour, eventMinute)) {
       const threshold = getMinuteThreshold(attempt, matchHour, eventMinute);
       console.log(`[Auto Process] Attempt ${attempt}: Last kill at minute ${lastKillMinute}, >= ${threshold}, postponing`);
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          status: 'postponed',
-          attempt,
-          lastKillMinute,
-          threshold,
-          message: 'Event may still be active, waiting for next attempt'
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return {
+        success: true,
+        status: 'postponed',
+        attempt,
+        lastKillMinute,
+        threshold,
+        message: 'Event may still be active, waiting for next attempt',
+      };
     }
 
     const parseResult = parseExternalDbContent(logs);
 
     if (Object.keys(parseResult.players).length === 0) {
       console.log('[Auto Process] No valid player data found after parsing');
-      return new Response(
-        JSON.stringify({ success: true, status: 'no_players', message: 'No valid player data', matchDate, matchHour }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return { success: true, status: 'no_players', message: 'No valid player data', matchDate, matchHour };
     }
 
     const bossLabel = parseResult.bossLabel || `BOSSx2 ${matchDate} ${matchHour}H`;
@@ -428,7 +415,7 @@ Deno.serve(async (req) => {
       .insert({
         match_date: matchDate,
         match_hour: matchHour,
-        boss_label: bossLabel
+        boss_label: bossLabel,
       })
       .select()
       .single();
@@ -445,7 +432,7 @@ Deno.serve(async (req) => {
       player_name: player.name,
       kills: player.kills,
       deaths: player.deaths,
-      kda: player.kda
+      kda: player.kda,
     }));
 
     const { error: playersError } = await internalClient
@@ -460,7 +447,7 @@ Deno.serve(async (req) => {
     const killLogInserts = parseResult.killLogs.map(log => ({
       match_id: newMatch.id,
       killer_name: log.killer,
-      victim_name: log.victim
+      victim_name: log.victim,
     }));
 
     const { error: killLogsError } = await internalClient
@@ -489,7 +476,7 @@ Deno.serve(async (req) => {
     const bannedPlayerNames = new Set(
       Object.entries(characterMap)
         .filter(([_, data]) => data.banned)
-        .map(([name, _]) => name)
+        .map(([name, _]) => name),
     );
 
     const nonBannedPlayers = Object.values(parseResult.players)
@@ -506,7 +493,7 @@ Deno.serve(async (req) => {
     // Calculate special rankings using correct eventScore formula: (kills * 3) + (kda * 2) - (deaths * 1.5)
     const playersWithEventScore = nonBannedPlayers.map(p => ({
       ...p,
-      eventScore: (p.kills * 3) + (p.kda * 2) - (p.deaths * 1.5)
+      eventScore: (p.kills * 3) + (p.kda * 2) - (p.deaths * 1.5),
     }));
 
     // Cone Monodedo = worst eventScore (lowest)
@@ -526,7 +513,7 @@ Deno.serve(async (req) => {
     const totals = {
       kills: nonBannedPlayers.reduce((sum, p) => sum + p.kills, 0),
       deaths: nonBannedPlayers.reduce((sum, p) => sum + p.deaths, 0),
-      playerCount: nonBannedPlayers.length
+      playerCount: nonBannedPlayers.length,
     };
 
     // Format guild summary - matching manual format
@@ -558,45 +545,45 @@ Deno.serve(async (req) => {
           {
             name: '🔍 Filtros Aplicados',
             value: `A partir de: **${formattedDate}**\nHora inicial: **${matchHour}:00**\nOrdenação: **eventScore**`,
-            inline: false
+            inline: false,
           },
           {
             name: '👑 Rei do PVP',
             value: reiDoPVP ? `**${reiDoPVP.name}**\nScore: ${reiDoPVP.eventScore.toFixed(2)} • ${reiDoPVP.kills}K/${reiDoPVP.deaths}D` : 'N/A',
-            inline: true
+            inline: true,
           },
           {
             name: '⚡ Brabissimo',
             value: brabissimo ? `**${brabissimo.name}**\nKDA: ${brabissimo.kda} • ${brabissimo.kills}K/${brabissimo.deaths}D` : 'N/A',
-            inline: true
+            inline: true,
           },
           {
             name: '🍦 Cone Monodedo',
             value: coneMonodedo ? `**${coneMonodedo.name}**\nScore: ${coneMonodedo.eventScore.toFixed(2)} • ${coneMonodedo.kills}K/${coneMonodedo.deaths}D` : 'N/A',
-            inline: true
+            inline: true,
           },
           {
             name: '📈 Totais',
             value: `${totals.playerCount} jogadores • ${totals.kills} kills • ${totals.deaths} deaths`,
-            inline: false
+            inline: false,
           },
           {
             name: '⚔️ Resumo por Guild',
             value: guildSummaryLines || 'Nenhuma guild registrada',
-            inline: false
-          }
+            inline: false,
+          },
         ],
         footer: {
-          text: `Hoje às ${String(matchHour).padStart(2, '0')}:00 • Tentativa ${attempt}${forceProcess ? ' (forçado)' : ''}`
+          text: `Hoje às ${String(matchHour).padStart(2, '0')}:00 • Tentativa ${attempt}${forceProcess ? ' (forçado)' : ''}`,
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
 
       // Embed 2: Ranking table (monospaced code block)
       const embed2 = {
         title: '🏆 Ranking Completo',
         description: '```\n' + rankingTableText.substring(0, 3990) + '\n```',
-        color: 0x3b82f6
+        color: 0x3b82f6,
       };
 
       // Embed 3: Closing message with link - matching manual format
@@ -606,13 +593,13 @@ Deno.serve(async (req) => {
       
       const embed3 = {
         description: `Esse é o resultado do BOSSx2 diário! **${reiDoPVP?.name || 'N/A'}** Amassou hoje, já nosso amigo **${coneMonodedo?.name || 'N/A'}** passou fome!\n\n🔗 **[Ver ranking completo no site](${rankingLink})**`,
-        color: 0x9b87f5
+        color: 0x9b87f5,
       };
 
       const discordResponse = await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ embeds: [embed1, embed2, embed3] })
+        body: JSON.stringify({ embeds: [embed1, embed2, embed3] }),
       });
 
       if (!discordResponse.ok) {
@@ -626,19 +613,53 @@ Deno.serve(async (req) => {
 
     console.log('[Auto Process] Completed successfully');
 
+    return {
+      success: true,
+      status: 'processed',
+      matchId: newMatch.id,
+      matchDate,
+      matchHour,
+      playerCount: totals.playerCount,
+      totalKills: totals.kills,
+      attempt,
+      forceProcess,
+    };
+  };
+
+  try {
+    // Parse request body
+    let body: RequestBody = {};
+    try {
+      body = await req.json();
+    } catch {
+      // No body or invalid JSON, use defaults
+    }
+
+    // If this invocation came from cron, run in background and ACK quickly.
+    if (body.trigger === 'cron') {
+      const edgeRuntime = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+      if (edgeRuntime?.waitUntil) {
+        edgeRuntime.waitUntil(
+          processRanking(body).catch((e) => {
+            console.error('[Auto Process][cron] Background error:', e);
+          }),
+        );
+      } else {
+        // Fallback: run inline if waitUntil isn't available.
+        await processRanking(body);
+      }
+
+      return new Response(
+        JSON.stringify({ accepted: true, trigger: 'cron' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // Default (manual / UI): run synchronously and return result.
+    const result = await processRanking(body);
     return new Response(
-      JSON.stringify({
-        success: true,
-        status: 'processed',
-        matchId: newMatch.id,
-        matchDate,
-        matchHour,
-        playerCount: totals.playerCount,
-        totalKills: totals.kills,
-        attempt,
-        forceProcess
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify(result),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
 
   } catch (error: unknown) {
