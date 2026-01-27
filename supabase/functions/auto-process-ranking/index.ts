@@ -39,33 +39,37 @@ interface RequestBody {
 }
 
 // Format ranking as monospaced table for Discord
-function formatRankingTable(players: Array<{name: string, kills: number, deaths: number, kda: number, eventScore: number}>): string {
-  // Calculate max widths for dynamic column sizing
+function formatRankingTable(players: Array<{name: string, kills: number, deaths: number, kda: number, eventScore: number, class?: string}>): string {
   const maxNameLen = Math.max(7, ...players.map(p => p.name.length));
+  const maxClassLen = Math.min(18, Math.max(6, ...players.map(p => (p.class || '—').length)));
+  const totalWidth = 50 + maxNameLen + maxClassLen;
   
-  // Header
   let table = '🏆 RANKING PVP\n';
-  table += '═'.repeat(52) + '\n\n';
-  table += ' Pos  ' + 'Jogador'.padEnd(maxNameLen + 2) + '  K    D    KDA     Score\n';
-  table += '─'.repeat(52) + '\n';
+  table += '═'.repeat(totalWidth) + '\n\n';
+  table += ' Pos  ' + 'Jogador'.padEnd(maxNameLen + 2) + 'Classe'.padEnd(maxClassLen + 2) + '  K    D    KDA     Score\n';
+  table += '─'.repeat(totalWidth) + '\n';
   
-  // Player rows
   players.forEach((player, index) => {
     const pos = index + 1;
     let posStr: string;
-    
     if (pos === 1) posStr = ' 🥇  ';
     else if (pos === 2) posStr = ' 🥈  ';
     else if (pos === 3) posStr = ' 🥉  ';
     else posStr = ` #${pos.toString().padStart(2)} `;
     
+    let classStr = player.class || '—';
+    if (classStr.length > maxClassLen) {
+      classStr = classStr.substring(0, maxClassLen - 3) + '...';
+    }
+    
     const nameStr = player.name.padEnd(maxNameLen + 2);
+    const classDisplay = classStr.padEnd(maxClassLen + 2);
     const killsStr = player.kills.toString().padStart(3);
     const deathsStr = player.deaths.toString().padStart(4);
     const kdaStr = player.kda.toFixed(2).padStart(7);
     const scoreStr = player.eventScore.toFixed(2).padStart(9);
     
-    table += `${posStr} ${nameStr}${killsStr}${deathsStr}${kdaStr}${scoreStr}\n`;
+    table += `${posStr} ${nameStr}${classDisplay}${killsStr}${deathsStr}${kdaStr}${scoreStr}\n`;
   });
   
   return table;
@@ -525,7 +529,8 @@ Deno.serve(async (req) => {
     // Build ranking table text with correct eventScore formula: (kills * 3) + (kda * 2) - (deaths * 1.5) - excluding banned
     const playersWithScore = nonBannedPlayers.map(player => {
       const eventScore = (player.kills * 3) + (player.kda * 2) - (player.deaths * 1.5);
-      return { ...player, eventScore };
+      const charInfo = characterMap[player.name];
+      return { ...player, eventScore, class: charInfo?.class || '—' };
     });
     const sortedPlayers = playersWithScore.sort((a, b) => b.eventScore - a.eventScore);
     const rankingTableText = formatRankingTable(sortedPlayers);
