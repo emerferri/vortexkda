@@ -1,188 +1,104 @@
 
+# Plano: Ranking Throne Conquest
 
-# Plano: Expandir Resumo por Guild com Estatísticas Completas
-
-## Objetivo
-Transformar o resumo simples de contagem de jogadores por guild em uma tabela completa com kills, deaths e score da guild, seguindo o mesmo formato visual do ranking de jogadores.
+## Resumo
+Criar um novo sistema de ranking para o evento **Throne Conquest** que ocorre toda **terça-feira das 21:36 as 22:06 de Brasilia**, replicando as funcionalidades do Ranking Geral mas filtrando por um mapa diferente: **Devias - [Server: Boss Event PvP]**.
 
 ---
 
-## Estado Atual
+## O que vai mudar
 
-O resumo por guild atualmente mostra apenas:
-```text
-⚔️ Resumo por Guild
-PHOENIX: 18 jogadores 
-BADBOYS: 5 jogadores
-OsGoDs: 5 jogadores
+### Nova aba no menu principal
+Uma nova aba chamada **"Throne Conquest"** sera adicionada ao menu, visivel para todos os usuarios.
+
+### Dados separados do Boss Event
+- Os dados do Throne Conquest serao armazenados nas **mesmas tabelas** existentes (`pvp_matches`, `pvp_match_players`, `pvp_kill_logs`)
+- Sera adicionada uma nova coluna para identificar o tipo de evento
+- Os rankings serao filtrados pelo tipo de evento para exibir apenas dados relevantes
+
+### Formato do log esperado
 ```
-
----
-
-## Novo Formato Proposto
-
-Transformar em uma tabela formatada semelhante ao ranking de jogadores:
-
-```text
-⚔️ RANKING POR GUILD
-═══════════════════════════════════════════════════
-
- Pos  Guild               Jogadores    K     D    Score
-────────────────────────────────────────────────────
- 🥇  PHOENIX                    18   125    87   292.50
- 🥈  BADBOYS                     5    42    35   112.30
- 🥉  OsGoDs                      5    38    40    89.20
- #4  MARVEL                      4    28    32    65.00
- #5  TITANS                      1     8    12    18.00
+27/01/2026 22:05:56 - :dagger: **ViidaBoa** matou :skull: **LOGAN** no mapa :map: **Devias** - **[Server: Boss Event PvP]**
 ```
 
 ---
 
-## Cálculo do Score da Guild
+## Componentes a serem criados/modificados
 
-Usando a mesma fórmula do score individual, aplicada à soma dos jogadores:
+### 1. Nova aba de Ranking
+- Novo componente `RankingThroneConquest.tsx` baseado no `RankingGeral.tsx`
+- Mesma estrutura visual e funcionalidades (filtros de data/hora, ordenacao, exportacao)
+- Filtra dados apenas do evento Throne Conquest
 
-```typescript
-guildScore = (totalKills * 3) + (totalKDA * 2) - (totalDeaths * 1.5)
+### 2. Parser de logs atualizado
+- Adicionar validacao para o mapa **"Devias - [Server: Boss Event PvP]"**
+- Manter compatibilidade com o mapa existente do Boss Event
 
-// Onde totalKDA = totalKills / totalDeaths (ou totalKills se deaths = 0)
+### 3. Importacao de dados (manual)
+- O componente `Scoreboard.tsx` sera atualizado para identificar automaticamente o tipo de evento baseado no mapa
+- Ao salvar, marcara o evento como "throne_conquest" ou "boss_event"
+
+---
+
+## Alteracoes no Banco de Dados
+
+### Tabela: `pvp_matches`
+Nova coluna:
+- `event_type` (text, default: 'boss_event') - valores: 'boss_event' ou 'throne_conquest'
+
+---
+
+## Detalhes Tecnicos
+
+### Arquivos a serem criados:
+1. `src/components/RankingThroneConquest.tsx` - Componente de ranking (clone adaptado do RankingGeral)
+
+### Arquivos a serem modificados:
+1. `src/pages/Index.tsx` - Adicionar nova aba "Throne Conquest"
+2. `src/utils/txtParser.ts` - Adicionar pattern para mapa Devias + retornar tipo de evento
+3. `src/components/Scoreboard.tsx` - Salvar tipo de evento ao gravar no banco
+4. `supabase/functions/auto-process-ranking/index.ts` - Suporte futuro para automacao do Throne Conquest
+
+### Migracao SQL:
+```sql
+ALTER TABLE pvp_matches 
+ADD COLUMN event_type text NOT NULL DEFAULT 'boss_event';
+```
+
+### Patterns de validacao do parser:
+```javascript
+// Throne Conquest - mapa Devias
+const mapPatternDevias = /Devias\s*-\s*\[Server: Boss Event PvP\]/i;
+
+// Boss Event - mapa PvP Square (existente)
+const mapPatternPvPSquare = /PvP Square\s*-\s*\[Server: Boss Event PvP\]/i;
+```
+
+### Logica de identificacao do evento:
+- Se o log contem mapa "Devias" -> event_type = 'throne_conquest'
+- Se o log contem mapa "PvP Square" -> event_type = 'boss_event'
+
+### Formato do boss_label para Throne Conquest:
+```
+throne 27/01 21 horas
 ```
 
 ---
 
-## Alterações Necessárias
+## Sequencia de Implementacao
 
-### 1. Criar Função `formatGuildRankingTable`
-
-Nova função similar à `formatRankingTable`, mas para guilds:
-
-```typescript
-function formatGuildRankingTable(guilds: Array<{
-  guild: string, 
-  playerCount: number, 
-  kills: number, 
-  deaths: number, 
-  score: number
-}>): string {
-  const maxGuildLen = Math.max(5, ...guilds.map(g => g.guild.length));
-  
-  let table = '⚔️ RANKING POR GUILD\n';
-  table += '═'.repeat(55) + '\n\n';
-  table += ' Pos  ' + 'Guild'.padEnd(maxGuildLen + 2) + 'Jogadores    K     D    Score\n';
-  table += '─'.repeat(55) + '\n';
-  
-  guilds.forEach((guild, index) => {
-    const pos = index + 1;
-    let posStr: string;
-    if (pos === 1) posStr = ' 🥇  ';
-    else if (pos === 2) posStr = ' 🥈  ';
-    else if (pos === 3) posStr = ' 🥉  ';
-    else posStr = ` #${pos.toString().padStart(2)} `;
-    
-    const guildStr = guild.guild.padEnd(maxGuildLen + 2);
-    const playersStr = guild.playerCount.toString().padStart(9);
-    const killsStr = guild.kills.toString().padStart(5);
-    const deathsStr = guild.deaths.toString().padStart(5);
-    const scoreStr = guild.score.toFixed(2).padStart(9);
-    
-    table += `${posStr} ${guildStr}${playersStr}${killsStr}${deathsStr}${scoreStr}\n`;
-  });
-  
-  return table;
-}
-```
-
-### 2. Modificar Cálculo do `guildSummary`
-
-Expandir a estrutura de dados para incluir todas as estatísticas:
-
-```typescript
-// Antes (linha 483-488):
-const guildSummary: Record<string, number> = {};
-for (const player of nonBannedPlayers) {
-  const charInfo = characterMap[player.name];
-  const guild = charInfo?.guild || 'Sem Guild';
-  guildSummary[guild] = (guildSummary[guild] || 0) + 1;
-}
-
-// Depois:
-interface GuildStats {
-  playerCount: number;
-  kills: number;
-  deaths: number;
-}
-
-const guildSummary: Record<string, GuildStats> = {};
-for (const player of nonBannedPlayers) {
-  const charInfo = characterMap[player.name];
-  const guild = charInfo?.guild || 'Sem Guild';
-  if (!guildSummary[guild]) {
-    guildSummary[guild] = { playerCount: 0, kills: 0, deaths: 0 };
-  }
-  guildSummary[guild].playerCount++;
-  guildSummary[guild].kills += player.kills;
-  guildSummary[guild].deaths += player.deaths;
-}
-```
-
-### 3. Calcular Score e Ordenar Guilds
-
-```typescript
-const guildsWithScore = Object.entries(guildSummary).map(([guild, stats]) => {
-  const guildKDA = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
-  const score = (stats.kills * 3) + (guildKDA * 2) - (stats.deaths * 1.5);
-  return { guild, ...stats, score };
-});
-
-const sortedGuilds = guildsWithScore.sort((a, b) => b.score - a.score);
-const guildRankingText = formatGuildRankingTable(sortedGuilds);
-```
-
-### 4. Atualizar Embed do Discord
-
-Modificar o campo "Resumo por Guild" para usar o novo formato:
-
-```typescript
-{
-  name: '⚔️ Ranking por Guild',
-  value: '```\n' + guildRankingText.substring(0, 1000) + '\n```',
-  inline: false,
-}
-```
+1. **Migracao do banco** - Adicionar coluna `event_type`
+2. **Parser** - Adicionar suporte ao mapa Devias e retornar tipo de evento
+3. **Scoreboard** - Atualizar para salvar o tipo de evento
+4. **RankingThroneConquest** - Criar componente de ranking
+5. **Index** - Adicionar nova aba no menu
+6. **Teste** - Importar dados do Throne Conquest e verificar ranking
 
 ---
 
-## Simulação do Resultado
+## Automacao Futura (nao incluso neste plano)
+A automacao via Edge Function (`auto-process-ranking`) podera ser expandida futuramente para:
+- Processar logs do Throne Conquest automaticamente toda terca-feira as 22:10
+- Postar no Discord com formato similar ao Boss Event
 
-Baseado nos dados típicos de um evento:
-
-```text
-⚔️ RANKING POR GUILD
-═══════════════════════════════════════════════════════
-
- Pos  Guild               Jogadores    K     D    Score
-───────────────────────────────────────────────────────
- 🥇  PHOENIX                    18   125    87   305.37
- 🥈  BADBOYS                     5    42    35    98.90
- 🥉  OsGoDs                      5    38    40    75.90
- #4  MARVEL                      4    28    32    49.75
- #5  TITANS                      1     8    12     8.33
- #6  Sem Guild                   3    15    20    21.50
-```
-
----
-
-## Detalhes Técnicos
-
-**Arquivo a modificar:** `supabase/functions/auto-process-ranking/index.ts`
-
-**Alterações:**
-1. Adicionar interface `GuildStats` (após linha 30)
-2. Adicionar função `formatGuildRankingTable` (após `formatRankingTable`, ~linha 69)
-3. Modificar bloco de cálculo do `guildSummary` (linhas 483-488)
-4. Adicionar cálculo de score e ordenação (após linha 488)
-5. Atualizar formatação do resumo (linhas 516-520)
-6. Modificar o embed field para usar code block com a tabela (linhas 568-571)
-
-**Limite de caracteres:** O campo do embed tem limite de ~1024 caracteres, então a tabela será truncada se necessário, mas tipicamente 5-8 guilds cabem facilmente.
-
+Isso seria uma segunda fase apos validar o funcionamento manual.
