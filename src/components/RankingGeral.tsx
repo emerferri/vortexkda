@@ -565,6 +565,28 @@ export const RankingGeral = () => {
             return acc;
           }, {} as Record<string, number>);
           return guildCounts;
+        })(),
+        guildRanking: (() => {
+          // Calculate full guild stats with kills, deaths, and score
+          const guildStats: Record<string, { playerCount: number; kills: number; deaths: number }> = {};
+          for (const player of sortedPlayers) {
+            const guild = player.guild || 'Sem Guild';
+            if (!guildStats[guild]) {
+              guildStats[guild] = { playerCount: 0, kills: 0, deaths: 0 };
+            }
+            guildStats[guild].playerCount++;
+            guildStats[guild].kills += player.kills;
+            guildStats[guild].deaths += player.deaths;
+          }
+          
+          // Calculate scores and create sorted array
+          return Object.entries(guildStats)
+            .map(([guild, stats]) => {
+              const guildKDA = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
+              const score = (stats.kills * 3) + (guildKDA * 2) - (stats.deaths * 1.5);
+              return { guild, ...stats, score };
+            })
+            .sort((a, b) => b.score - a.score);
         })()
       };
 
