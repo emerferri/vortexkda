@@ -471,58 +471,8 @@ export const RankingGeral = () => {
   };
 
   const publishToDiscord = async () => {
-    if (!tableRef.current || !specialCardsRef.current) return;
-    
     setIsPublishing(true);
     try {
-      // Esconder elementos que não devem aparecer na imagem
-      const kdaMedioCard = document.querySelector('[data-hide-on-export="kda-medio-card"]') as HTMLElement;
-      const kdaMedioHeader = document.querySelector('[data-hide-on-export="kda-medio-header"]') as HTMLElement;
-      const kdaMedioCells = document.querySelectorAll('[data-hide-on-export="kda-medio-cell"]');
-      
-      if (kdaMedioCard) kdaMedioCard.style.display = 'none';
-      if (kdaMedioHeader) kdaMedioHeader.style.display = 'none';
-      kdaMedioCells.forEach(cell => (cell as HTMLElement).style.display = 'none');
-      
-      // Ajustar grid para 3 colunas quando KDA/Médio estiver escondido
-      if (specialCardsRef.current) {
-        specialCardsRef.current.className = 'grid grid-cols-1 md:grid-cols-3 gap-4';
-      }
-
-      // Capturar os cards especiais como imagem
-      const specialCardsCanvas = await html2canvas(specialCardsRef.current, {
-        backgroundColor: '#1a1a1a',
-        scale: 1.5,
-        logging: false,
-        useCORS: true
-      });
-
-      let specialCardsImage = specialCardsCanvas.toDataURL('image/jpeg', 0.85);
-      if (specialCardsImage.length > 7 * 1024 * 1024) {
-        console.log('Special cards image too large, reducing quality...');
-        specialCardsImage = specialCardsCanvas.toDataURL('image/jpeg', 0.7);
-      }
-
-      // Capturar a tabela como imagem com qualidade otimizada
-      const canvas = await html2canvas(tableRef.current, {
-        backgroundColor: '#1a1a1a',
-        scale: 1.5, // Reduzido de 2 para 1.5
-        logging: false,
-        useCORS: true
-      });
-
-      // Tentar com qualidade menor se a imagem for muito grande
-      let imageData = canvas.toDataURL('image/jpeg', 0.85); // Reduzido de 0.95 para 0.85
-
-      // Se ainda for muito grande (>7MB em base64), reduzir mais
-      if (imageData.length > 7 * 1024 * 1024) {
-        console.log('Image too large, reducing quality...');
-        imageData = canvas.toDataURL('image/jpeg', 0.7);
-      }
-
-      console.log('Table image size:', (imageData.length / 1024 / 1024).toFixed(2), 'MB (as base64)');
-      console.log('Special cards image size:', (specialCardsImage.length / 1024 / 1024).toFixed(2), 'MB (as base64)');
-
       const payload = {
         environment,
         filters: {
@@ -551,8 +501,6 @@ export const RankingGeral = () => {
             matches: coneMonodedo?.matches || 0
           }
         },
-        specialCardsImage,
-        image: imageData,
         totals: {
           kills: sortedPlayers.reduce((sum, p) => sum + p.kills, 0),
           deaths: sortedPlayers.reduce((sum, p) => sum + p.deaths, 0),
@@ -605,7 +553,7 @@ export const RankingGeral = () => {
 
       toast({
         title: 'Sucesso!',
-        description: `Ranking publicado no Discord com imagem.`,
+        description: `Ranking publicado no Discord.`,
       });
       
       setShowDiscordModal(false);
@@ -617,20 +565,6 @@ export const RankingGeral = () => {
         variant: 'destructive'
       });
     } finally {
-      // Restaurar elementos escondidos
-      const kdaMedioCard = document.querySelector('[data-hide-on-export="kda-medio-card"]') as HTMLElement;
-      const kdaMedioHeader = document.querySelector('[data-hide-on-export="kda-medio-header"]') as HTMLElement;
-      const kdaMedioCells = document.querySelectorAll('[data-hide-on-export="kda-medio-cell"]');
-      
-      if (kdaMedioCard) kdaMedioCard.style.display = '';
-      if (kdaMedioHeader) kdaMedioHeader.style.display = '';
-      kdaMedioCells.forEach(cell => (cell as HTMLElement).style.display = '');
-      
-      // Restaurar grid original
-      if (specialCardsRef.current) {
-        specialCardsRef.current.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4';
-      }
-      
       setIsPublishing(false);
     }
   };
