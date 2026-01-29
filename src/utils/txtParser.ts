@@ -1,6 +1,8 @@
 import { PlayerStats } from '@/components/Scoreboard';
 import { z } from 'zod';
 
+export type EventType = 'boss_event' | 'throne_conquest';
+
 export interface KillLog {
   killer: string;
   victim: string;
@@ -10,6 +12,7 @@ export interface ParseResult {
   players: PlayerStats[];
   bossLabel: string | null;
   killLogs: KillLog[];
+  eventType: EventType;
 }
 
 export interface ExternalLogEntry {
@@ -29,11 +32,12 @@ const playerNameSchema = z.string()
 // Supports multiple formats:
 // 1. With asterisks: 05/12/2025 23:11:04 - :dagger: *kikito* matou :skull: *MisticoDL* no mapa :map: *PvP Square* - *[Server: Boss Event PvP]*
 // 2. Without asterisks: 07/12/2025 20:01:02 - :dagger: Freezing matou :skull: HulkSmash no mapa :map: PvP Square - [Server: Boss Event PvP]
-export const parseExternalDbContent = (logs: ExternalLogEntry[]): ParseResult => {
+export const parseExternalDbContent = (logs: ExternalLogEntry[], targetEventType?: EventType): ParseResult => {
   const playerMap = new Map<string, { kills: number; deaths: number }>();
   const killLogs: KillLog[] = [];
   let bossLabel: string | null = null;
   let matchedEntries = 0;
+  let detectedEventType: EventType = 'boss_event';
 
   console.log(`[External DB Parser] Processing ${logs.length} logs`);
   if (logs.length > 0) {
@@ -42,15 +46,22 @@ export const parseExternalDbContent = (logs: ExternalLogEntry[]): ParseResult =>
 
   // Pattern with double asterisks: **name** (banco externo)
   const killPatternDoubleAsterisks = /:dagger:\s*\*\*(\w+)\*\*\s*matou\s*:skull:\s*\*\*(\w+)\*\*/i;
-  const mapPatternDoubleAsterisks = /\*\*PvP Square\*\*\s*-\s*\*\*\[Server: Boss Event PvP\]\*\*/i;
   
   // Pattern with single asterisks: *name*
   const killPatternSingleAsterisks = /:dagger:\s*\*(\w+)\*\s*matou\s*:skull:\s*\*(\w+)\*/i;
-  const mapPatternSingleAsterisks = /\*PvP Square\*\s*-\s*\*\[Server: Boss Event PvP\]\*/i;
   
   // Pattern without asterisks (TXT format)
   const killPatternNoAsterisks = /:dagger:\s*(\w+)\s+matou\s+:skull:\s*(\w+)\s+no mapa/i;
-  const mapPatternNoAsterisks = /PvP Square\s*-\s*\[Server: Boss Event PvP\]/i;
+  
+  // Map patterns for Boss Event (PvP Square)
+  const mapPatternPvPSquareDoubleAsterisks = /\*\*PvP Square\*\*\s*-\s*\*\*\[Server: Boss Event PvP\]\*\*/i;
+  const mapPatternPvPSquareSingleAsterisks = /\*PvP Square\*\s*-\s*\*\[Server: Boss Event PvP\]\*/i;
+  const mapPatternPvPSquareNoAsterisks = /PvP Square\s*-\s*\[Server: Boss Event PvP\]/i;
+  
+  // Map patterns for Throne Conquest (Devias)
+  const mapPatternDeviasDoubleAsterisks = /\*\*Devias\*\*\s*-\s*\*\*\[Server: Boss Event PvP\]\*\*/i;
+  const mapPatternDeviasSingleAsterisks = /\*Devias\*\s*-\s*\*\[Server: Boss Event PvP\]\*/i;
+  const mapPatternDeviasNoAsterisks = /Devias\s*-\s*\[Server: Boss Event PvP\]/i;
   
   const datePattern = /(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/;
 
@@ -59,23 +70,37 @@ export const parseExternalDbContent = (logs: ExternalLogEntry[]): ParseResult =>
 
     const content = log.content;
 
-    // Check if it's a valid PvP map (any format)
-    const hasValidMap = mapPatternDoubleAsterisks.test(content) || 
-                        mapPatternSingleAsterisks.test(content) || 
-                        mapPatternNoAsterisks.test(content);
+    // Check if it's a valid PvP Square map (Boss Event)
+    const isPvPSquareMap = mapPatternPvPSquareDoubleAsterisks.test(content) || 
+                           mapPatternPvPSquareSingleAsterisks.test(content) || 
+                           mapPatternPvPSquareNoAsterisks.test(content);
     
-    if (!hasValidMap) {
-      continue;
+    // Check if it's a valid Devias map (Throne Conquest)
+    const isDeviasMap = mapPatternDeviasDoubleAsterisks.test(content) || 
+                        mapPatternDeviasSingleAsterisks.test(content) || 
+                        mapPatternDeviasNoAsterisks.test(content);
+    
+    // If target event type is specified, filter by it
+    if (targetEventType === 'boss_event' && !isPvPSquareMap) continue;
+    if (targetEventType === 'throne_conquest' && !isDeviasMap) continue;
+    
+    // If no target specified, accept any valid map
+    if (!targetEventType && !isPvPSquareMap && !isDeviasMap) continue;
+
+    // Detect event type from first valid entry
+    if (matchedEntries === 0) {
+      detectedEventType = isDeviasMap ? 'throne_conquest' : 'boss_event';
     }
 
-    // Extract date for boss label from first valid entry
+    // Extract date for boss/throne label from first valid entry
     if (!bossLabel) {
       const dateMatch = content.match(datePattern);
       if (dateMatch) {
         const day = dateMatch[1];
         const month = dateMatch[2];
         const hour = parseInt(dateMatch[4]);
-        bossLabel = `boss ${day}/${month} ${hour} horas`;
+        const labelPrefix = isDeviasMap ? 'throne' : 'boss';
+        bossLabel = `${labelPrefix} ${day}/${month} ${hour} horas`;
       }
     }
 
@@ -122,10 +147,10 @@ export const parseExternalDbContent = (logs: ExternalLogEntry[]): ParseResult =>
     kda: stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths,
   }));
 
-  return { players, bossLabel, killLogs };
+  return { players, bossLabel, killLogs, eventType: detectedEventType };
 };
 
-export const parseTxtFile = (content: string): ParseResult => {
+export const parseTxtFile = (content: string, targetEventType?: EventType): ParseResult => {
   const MAX_LINES = 10000;
   const MAX_CONTENT_SIZE = 1024 * 1024; // 1MB
 
@@ -144,11 +169,14 @@ export const parseTxtFile = (content: string): ParseResult => {
   const killLogs: KillLog[] = [];
   let bossLabel: string | null = null;
   let matchedEntries = 0;
+  let detectedEventType: EventType = 'boss_event';
 
   // Single-line format (most common):
   // 07/12/2025 20:01:02 - :dagger: Freezing matou :skull: HulkSmash no mapa :map: PvP Square - [Server: Boss Event PvP]
-  const singleLinePattern = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})\s*-\s*:dagger:\s*(\w+)\s+matou\s+:skull:\s*(\w+)\s+no mapa\s+:map:\s*(.+)$/i;
-  const validMapSingleLine = /^PvP Square\s*-\s*\[Server: Boss Event PvP\]$/i;
+  // 27/01/2026 22:05:56 - :dagger: **ViidaBoa** matou :skull: **LOGAN** no mapa :map: **Devias** - **[Server: Boss Event PvP]**
+  const singleLinePattern = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})\s*-\s*:dagger:\s*\*{0,2}(\w+)\*{0,2}\s+matou\s+:skull:\s*\*{0,2}(\w+)\*{0,2}\s+no mapa\s+:map:\s*(.+)$/i;
+  const validMapPvPSquare = /^\*{0,2}PvP Square\*{0,2}\s*-\s*\*{0,2}\[Server: Boss Event PvP\]\*{0,2}$/i;
+  const validMapDevias = /^\*{0,2}Devias\*{0,2}\s*-\s*\*{0,2}\[Server: Boss Event PvP\]\*{0,2}$/i;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -164,35 +192,57 @@ export const parseTxtFile = (content: string): ParseResult => {
       const victim = singleMatch[8];
       const mapPart = singleMatch[9].trim();
 
-      // Extract boss label from first valid entry
-      if (!bossLabel) {
-        bossLabel = `boss ${day}/${month} ${hour} horas`;
+      // Check which map type this is
+      const isPvPSquare = validMapPvPSquare.test(mapPart);
+      const isDevias = validMapDevias.test(mapPart);
+      
+      // If target event type is specified, filter by it
+      if (targetEventType === 'boss_event' && !isPvPSquare) {
+        console.log(`[TXT Parser] Skipped (filtering for boss_event): "${mapPart}"`);
+        continue;
+      }
+      if (targetEventType === 'throne_conquest' && !isDevias) {
+        console.log(`[TXT Parser] Skipped (filtering for throne_conquest): "${mapPart}"`);
+        continue;
+      }
+      
+      // If no target specified, accept any valid map
+      if (!targetEventType && !isPvPSquare && !isDevias) {
+        console.log(`[TXT Parser] Skipped (wrong map): "${mapPart}"`);
+        continue;
       }
 
-      // Validate map
-      if (validMapSingleLine.test(mapPart)) {
-        matchedEntries++;
-        try {
-          const validKiller = playerNameSchema.parse(killer.trim());
-          const validVictim = playerNameSchema.parse(victim.trim());
+      // Detect event type from first valid entry
+      if (matchedEntries === 0) {
+        detectedEventType = isDevias ? 'throne_conquest' : 'boss_event';
+      }
 
-          // Add to kill logs
-          killLogs.push({ killer: validKiller, victim: validVictim });
+      // Extract boss/throne label from first valid entry
+      if (!bossLabel) {
+        const labelPrefix = isDevias ? 'throne' : 'boss';
+        bossLabel = `${labelPrefix} ${day}/${month} ${hour} horas`;
+      }
 
-          // Update killer stats
-          const killerStats = playerMap.get(validKiller) || { kills: 0, deaths: 0 };
-          killerStats.kills += 1;
-          playerMap.set(validKiller, killerStats);
+      // Validate map - now we know it's valid
+      matchedEntries++;
+      try {
+        const validKiller = playerNameSchema.parse(killer.trim());
+        const validVictim = playerNameSchema.parse(victim.trim());
 
-          // Update victim stats
-          const victimStats = playerMap.get(validVictim) || { kills: 0, deaths: 0 };
-          victimStats.deaths += 1;
-          playerMap.set(validVictim, victimStats);
-        } catch {
-          console.warn('[TXT Parser] Invalid player name, skipping');
-        }
-      } else {
-        console.log(`[TXT Parser] Skipped (wrong map): "${mapPart}"`);
+        // Add to kill logs
+        killLogs.push({ killer: validKiller, victim: validVictim });
+
+        // Update killer stats
+        const killerStats = playerMap.get(validKiller) || { kills: 0, deaths: 0 };
+        killerStats.kills += 1;
+        playerMap.set(validKiller, killerStats);
+
+        // Update victim stats
+        const victimStats = playerMap.get(validVictim) || { kills: 0, deaths: 0 };
+        victimStats.deaths += 1;
+        playerMap.set(validVictim, victimStats);
+      } catch {
+        console.warn('[TXT Parser] Invalid player name, skipping');
       }
       continue;
     }
@@ -245,7 +295,7 @@ export const parseTxtFile = (content: string): ParseResult => {
     }
   }
 
-  console.log(`[TXT Parser] Matched entries from Boss Event PvP: ${matchedEntries}`);
+  console.log(`[TXT Parser] Matched entries from ${detectedEventType}: ${matchedEntries}`);
 
   // Convert to array and calculate KDA
   const players: PlayerStats[] = Array.from(playerMap.entries()).map(([name, stats]) => ({
@@ -255,5 +305,5 @@ export const parseTxtFile = (content: string): ParseResult => {
     kda: stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths,
   }));
 
-  return { players, bossLabel, killLogs };
+  return { players, bossLabel, killLogs, eventType: detectedEventType };
 };

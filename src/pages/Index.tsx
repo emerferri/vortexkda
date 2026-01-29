@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FileUpload } from '@/components/FileUpload';
 import { Scoreboard, PlayerStats } from '@/components/Scoreboard';
 import { RankingGeral } from '@/components/RankingGeral';
+import { RankingThroneConquest } from '@/components/RankingThroneConquest';
 import { ClassGuildRanking } from '@/components/ClassGuildRanking';
 import { PutinhaRanking } from '@/components/PutinhaRanking';
 import { MuralDaVergonha } from '@/components/MuralDaVergonha';
@@ -11,7 +12,7 @@ import { ReisDoPVP } from '@/components/ReisDoPVP';
 import { DatabaseManager } from '@/components/DatabaseManager';
 import { DatabaseImport } from '@/components/DatabaseImport';
 import { parseTxtFile, ParseResult } from '@/utils/txtParser';
-import { Swords, LogIn, LogOut, User, FileText, Database } from 'lucide-react';
+import { Swords, LogIn, LogOut, User, FileText, Database, Crown } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ const Index = () => {
   const [players, setPlayers] = useState<PlayerStats[]>([]);
   const [bossLabel, setBossLabel] = useState<string | null>(null);
   const [killLogs, setKillLogs] = useState<any[]>([]);
+  const [eventType, setEventType] = useState<'boss_event' | 'throne_conquest'>('boss_event');
   const { user, signOut } = useAuth();
   const { isAdmin, canEditData } = useUserRole();
   const navigate = useNavigate();
@@ -68,12 +70,14 @@ const Index = () => {
     setPlayers(result.players);
     setBossLabel(result.bossLabel);
     setKillLogs(result.killLogs);
+    setEventType(result.eventType);
   };
 
   const handleDatabaseImport = (result: ParseResult) => {
     setPlayers(result.players);
     setBossLabel(result.bossLabel);
     setKillLogs(result.killLogs);
+    setEventType(result.eventType);
   };
 
   return (
@@ -125,7 +129,7 @@ const Index = () => {
 
         <div className="space-y-8">
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className={`grid w-full max-w-6xl mx-auto ${isAdmin ? 'grid-cols-8' : canEditData ? 'grid-cols-7' : 'grid-cols-6'} mb-8`}>
+            <TabsList className={`grid w-full max-w-6xl mx-auto ${isAdmin ? 'grid-cols-9' : canEditData ? 'grid-cols-8' : 'grid-cols-7'} mb-8`}>
               {canEditData && (
                 <TabsTrigger value="placar" className="text-base font-semibold">
                   Incluir Dados
@@ -133,6 +137,10 @@ const Index = () => {
               )}
               <TabsTrigger value="ranking" className="text-base font-semibold">
                 Ranking Geral
+              </TabsTrigger>
+              <TabsTrigger value="throne" className="text-base font-semibold flex items-center gap-1">
+                <Crown className="w-4 h-4" />
+                Throne
               </TabsTrigger>
               <TabsTrigger value="reis" className="text-base font-semibold">
                 Rei/Cone PVP
@@ -188,12 +196,16 @@ const Index = () => {
                   <DatabaseImport onDataLoaded={handleDatabaseImport} />
                 )}
                 
-                <Scoreboard players={players} bossLabel={bossLabel} killLogs={killLogs} />
+                <Scoreboard players={players} bossLabel={bossLabel} killLogs={killLogs} eventType={eventType} />
               </TabsContent>
             )}
             
             <TabsContent value="ranking">
               <RankingGeral />
+            </TabsContent>
+
+            <TabsContent value="throne">
+              <RankingThroneConquest />
             </TabsContent>
 
             <TabsContent value="reis">

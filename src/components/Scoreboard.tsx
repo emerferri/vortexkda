@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 
-import { KillLog } from '@/utils/txtParser';
+import { KillLog, EventType } from '@/utils/txtParser';
 
 export interface PlayerStats {
   name: string;
@@ -22,11 +22,12 @@ interface ScoreboardProps {
   players: PlayerStats[];
   bossLabel?: string | null;
   killLogs?: KillLog[];
+  eventType?: EventType;
 }
 
 type SortKey = 'kills' | 'deaths' | 'kda';
 
-export const Scoreboard = ({ players, bossLabel, killLogs = [] }: ScoreboardProps) => {
+export const Scoreboard = ({ players, bossLabel, killLogs = [], eventType = 'boss_event' }: ScoreboardProps) => {
   const [sortBy, setSortBy] = useState<SortKey>('kills');
   const scoreboardRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
@@ -125,25 +126,29 @@ export const Scoreboard = ({ players, bossLabel, killLogs = [] }: ScoreboardProp
     }
 
     try {
-      // Parse date and hour from boss label (format: "boss DD/MM HH horas")
-      const match = bossLabel.match(/boss (\d{2})\/(\d{2}) (\d{1,2}) horas/);
+      // Detect event type from boss label prefix if not provided
+      const detectedEventType = bossLabel?.startsWith('throne') ? 'throne_conquest' : eventType;
+      
+      // Parse date and hour from boss/throne label (format: "boss DD/MM HH horas" or "throne DD/MM HH horas")
+      const match = bossLabel.match(/(boss|throne) (\d{2})\/(\d{2}) (\d{1,2}) horas/);
       if (!match) {
         throw new Error("Formato de label inválido");
       }
 
-      const day = parseInt(match[1]);
-      const month = parseInt(match[2]);
-      const hour = parseInt(match[3]);
+      const day = parseInt(match[2]);
+      const month = parseInt(match[3]);
+      const hour = parseInt(match[4]);
       const year = new Date().getFullYear();
       const matchDate = new Date(year, month - 1, day);
       const formattedDate = matchDate.toISOString().split('T')[0];
 
-      // Check if match already exists
+      // Check if match already exists (with same event_type)
       const { data: existingMatch } = await supabase
         .from('pvp_matches')
         .select('id')
         .eq('match_date', formattedDate)
         .eq('match_hour', hour)
+        .eq('event_type', detectedEventType)
         .maybeSingle();
 
       if (existingMatch) {
@@ -155,13 +160,14 @@ export const Scoreboard = ({ players, bossLabel, killLogs = [] }: ScoreboardProp
         return;
       }
 
-      // Insert match
+      // Insert match with event_type
       const { data: matchData, error: matchError } = await supabase
         .from('pvp_matches')
         .insert({
           boss_label: bossLabel,
           match_date: formattedDate,
-          match_hour: hour
+          match_hour: hour,
+          event_type: detectedEventType
         })
         .select()
         .single();
