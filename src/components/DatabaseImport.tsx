@@ -10,9 +10,10 @@ import { toast } from '@/components/ui/use-toast';
 
 interface DatabaseImportProps {
   onDataLoaded: (result: ParseResult) => void;
+  eventType?: 'boss_event' | 'throne_conquest';
 }
 
-export const DatabaseImport = ({ onDataLoaded }: DatabaseImportProps) => {
+export const DatabaseImport = ({ onDataLoaded, eventType = 'boss_event' }: DatabaseImportProps) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -26,6 +27,8 @@ export const DatabaseImport = ({ onDataLoaded }: DatabaseImportProps) => {
       const params = new URLSearchParams();
       if (startDate) params.set('startDate', startDate);
       if (endDate) params.set('endDate', endDate);
+      // Add map filter based on event type
+      params.set('map', eventType === 'throne_conquest' ? 'devias' : 'pvp_square');
 
       const { data, error } = await supabase.functions.invoke('fetch-external-logs', {
         body: null,
@@ -97,9 +100,13 @@ export const DatabaseImport = ({ onDataLoaded }: DatabaseImportProps) => {
         <CardTitle className="flex items-center gap-2">
           <Database className="w-5 h-5 text-primary" />
           Importar do Banco de Dados Externo
+          {eventType === 'throne_conquest' && (
+            <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">Throne Conquest (Devias)</span>
+          )}
         </CardTitle>
         <CardDescription>
           Buscar logs de PvP diretamente do banco de dados externo
+          {eventType === 'throne_conquest' ? ' - Filtrando mapa Devias' : ' - Filtrando mapa PvP Square'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
