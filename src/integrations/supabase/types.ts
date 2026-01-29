@@ -115,6 +115,7 @@ export type Database = {
         Row: {
           boss_label: string
           created_at: string
+          event_type: string
           id: string
           match_date: string
           match_hour: number
@@ -122,6 +123,7 @@ export type Database = {
         Insert: {
           boss_label: string
           created_at?: string
+          event_type?: string
           id?: string
           match_date: string
           match_hour: number
@@ -129,6 +131,7 @@ export type Database = {
         Update: {
           boss_label?: string
           created_at?: string
+          event_type?: string
           id?: string
           match_date?: string
           match_hour?: number
