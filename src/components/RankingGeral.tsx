@@ -475,6 +475,7 @@ export const RankingGeral = () => {
     try {
       const payload = {
         environment,
+        eventType: 'boss_event',
         filters: {
           class: classFilter,
           dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
