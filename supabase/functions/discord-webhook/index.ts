@@ -27,6 +27,14 @@ interface Filters {
   sortBy?: string;
 }
 
+interface GuildData {
+  guild: string;
+  playerCount: number;
+  kills: number;
+  deaths: number;
+  score: number;
+}
+
 interface GeneralRankingBody {
   type?: 'general';
   environment: 'homolog' | 'prod';
@@ -39,7 +47,8 @@ interface GeneralRankingBody {
     deaths: number;
     playerCount: number;
   };
-  guildSummary: Record<string, number>;
+  guildSummary: Record<string, number>; // Legacy format (backward compatibility)
+  guildRanking?: GuildData[]; // New format with full stats
 }
 
 interface KillStreakBody {
@@ -54,6 +63,38 @@ interface KillStreakBody {
 }
 
 type RequestBody = GeneralRankingBody | KillStreakBody;
+
+// Format guild ranking as monospaced table for Discord (same as auto-process-ranking)
+function formatGuildRankingTable(guilds: GuildData[]): string {
+  if (!guilds || guilds.length === 0) return 'Nenhuma guild registrada';
+  
+  const maxGuildLen = Math.max(5, ...guilds.map(g => g.guild.length));
+  
+  let table = '⚔️ RANKING POR GUILD\n';
+  table += '═'.repeat(55) + '\n\n';
+  table += ' Pos  ' + 'Guild'.padEnd(maxGuildLen + 2) + 'Jogadores    K     D    Score\n';
+  table += '─'.repeat(55) + '\n';
+  
+  guilds.forEach((guild, index) => {
+    const pos = index + 1;
+    let posStr: string;
+    
+    if (pos === 1) posStr = ' 🥇  ';
+    else if (pos === 2) posStr = ' 🥈  ';
+    else if (pos === 3) posStr = ' 🥉  ';
+    else posStr = ` #${pos.toString().padStart(2)} `;
+    
+    const guildStr = guild.guild.padEnd(maxGuildLen + 2);
+    const playersStr = guild.playerCount.toString().padStart(9);
+    const killsStr = guild.kills.toString().padStart(5);
+    const deathsStr = guild.deaths.toString().padStart(5);
+    const scoreStr = guild.score.toFixed(2).padStart(9);
+    
+    table += `${posStr} ${guildStr}${playersStr}${killsStr}${deathsStr}${scoreStr}\n`;
+  });
+  
+  return table;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -296,11 +337,13 @@ serve(async (req) => {
             inline: false
           },
           {
-            name: '⚔️ Resumo por Guild',
-            value: Object.entries(generalBody.guildSummary)
-              .sort((a, b) => b[1] - a[1])
-              .map(([guild, count]) => `**${guild}**: ${count} ${count === 1 ? 'jogador' : 'jogadores'}`)
-              .join('\n') || 'Nenhuma guild registrada',
+            name: '⚔️ Ranking por Guild',
+            value: generalBody.guildRanking && generalBody.guildRanking.length > 0
+              ? '```\n' + formatGuildRankingTable(generalBody.guildRanking).substring(0, 1000) + '\n```'
+              : Object.entries(generalBody.guildSummary)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([guild, count]) => `**${guild}**: ${count} ${count === 1 ? 'jogador' : 'jogadores'}`)
+                  .join('\n') || 'Nenhuma guild registrada',
             inline: false
           }
         ],
