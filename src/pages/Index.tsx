@@ -64,6 +64,7 @@ const Index = () => {
   };
 
   const [importSource, setImportSource] = useState<'txt' | 'database'>('txt');
+  const [importEventType, setImportEventType] = useState<'boss_event' | 'throne_conquest'>('boss_event');
 
   const handleFileUpload = (content: string) => {
     const result = parseTxtFile(content);
@@ -167,34 +168,59 @@ const Index = () => {
             {canEditData && (
               <TabsContent value="placar" className="space-y-8">
                 {/* Import Source Toggle */}
-                <div className="flex justify-center gap-2 p-1 bg-muted/50 rounded-lg w-fit mx-auto">
-                  <Button
-                    variant={importSource === 'txt' ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setImportSource('txt')}
-                    className="gap-2"
-                  >
-                    <FileText className="w-4 h-4" />
-                    Arquivo TXT
-                  </Button>
-                  <Button
-                    variant={importSource === 'database' ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setImportSource('database')}
-                    className="gap-2"
-                  >
-                    <Database className="w-4 h-4" />
-                    Banco de Dados
-                  </Button>
-                </div>
+                <div className="flex flex-col items-center gap-4">
+                  <div className="flex gap-2 p-1 bg-muted/50 rounded-lg">
+                    <Button
+                      variant={importSource === 'txt' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setImportSource('txt')}
+                      className="gap-2"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Arquivo TXT
+                    </Button>
+                    <Button
+                      variant={importSource === 'database' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setImportSource('database')}
+                      className="gap-2"
+                    >
+                      <Database className="w-4 h-4" />
+                      Banco de Dados
+                    </Button>
+                  </div>
 
-                {/* Show appropriate import component */}
+                  {/* Event Type Toggle - only show for database import */}
+                  {importSource === 'database' && (
+                    <div className="flex gap-2 p-1 bg-muted/30 rounded-lg">
+                      <Button
+                        variant={importEventType === 'boss_event' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setImportEventType('boss_event')}
+                        className="gap-2"
+                      >
+                        <Swords className="w-4 h-4" />
+                        Boss Event (PvP Square)
+                      </Button>
+                      <Button
+                        variant={importEventType === 'throne_conquest' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setImportEventType('throne_conquest')}
+                        className="gap-2"
+                      >
+                        <Crown className="w-4 h-4" />
+                        Throne Conquest (Devias)
+                      </Button>
+                    </div>
+                  )}
+
                 {importSource === 'txt' && (
                   <FileUpload onFileUpload={handleFileUpload} />
                 )}
                 {importSource === 'database' && (
-                  <DatabaseImport onDataLoaded={handleDatabaseImport} />
+                  <DatabaseImport onDataLoaded={handleDatabaseImport} eventType={importEventType} />
                 )}
+                </div>
                 
                 <Scoreboard players={players} bossLabel={bossLabel} killLogs={killLogs} eventType={eventType} />
               </TabsContent>

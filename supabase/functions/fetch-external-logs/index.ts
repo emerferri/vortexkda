@@ -54,9 +54,10 @@ Deno.serve(async (req) => {
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+    const mapFilter = searchParams.get('map'); // 'devias' or 'pvp_square'
     const limit = parseInt(searchParams.get('limit') || '1000');
 
-    console.log(`Fetching external logs with filters: startDate=${startDate}, endDate=${endDate}, limit=${limit}`);
+    console.log(`Fetching external logs with filters: startDate=${startDate}, endDate=${endDate}, map=${mapFilter}, limit=${limit}`);
 
     // Connect to external Supabase
     const externalUrl = Deno.env.get('EXTERNAL_SUPABASE_URL');
@@ -84,6 +85,13 @@ Deno.serve(async (req) => {
     }
     if (endDate) {
       query = query.lte('timestamp', endDate);
+    }
+
+    // Apply map filter if provided
+    if (mapFilter === 'devias') {
+      query = query.ilike('content', '%Devias%[Server: Boss Event PvP]%');
+    } else if (mapFilter === 'pvp_square') {
+      query = query.ilike('content', '%PvP Square%[Server: Boss Event PvP]%');
     }
 
     const { data: logs, error: logsError } = await query;
