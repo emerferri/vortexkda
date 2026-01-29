@@ -587,7 +587,14 @@ export const RankingGeral = () => {
               return { guild, ...stats, score };
             })
             .sort((a, b) => b.score - a.score);
-        })()
+        })(),
+        playerRanking: sortedPlayers.map(p => ({
+          name: p.name,
+          kills: p.kills,
+          deaths: p.deaths,
+          kda: p.kda,
+          eventScore: p.eventScore
+        }))
       };
 
       const { data, error } = await supabase.functions.invoke('discord-webhook', {
