@@ -58,6 +58,7 @@ interface GeneralRankingBody {
   guildSummary: Record<string, number>; // Legacy format (backward compatibility)
   guildRanking?: GuildData[]; // New format with full stats
   playerRanking?: PlayerData[]; // Player ranking for text table
+  eventType?: 'boss_event' | 'throne_conquest'; // Type of event
 }
 
 interface KillStreakBody {
@@ -289,10 +290,18 @@ serve(async (req) => {
     } else {
       // Ranking Geral - texto apenas, sem imagens
       const generalBody = body as GeneralRankingBody;
+      const isThrone = generalBody.eventType === 'throne_conquest';
+      
+      // Títulos dinâmicos baseados no tipo de evento
+      const rankingTitle = isThrone ? '📊 Ranking Throne Conquest' : '📊 Ranking BOSS Diário';
+      const reiTitle = isThrone ? '👑 Rei do Trono!' : '👑 Rei do PVP';
+      const footerMessage = isThrone
+        ? `Esse é o resultado do Throne Conquest! **${generalBody.specialRankings.reiDoPVP.name}** conquistou o trono, já nosso amigo **${generalBody.specialRankings.coneMonodedo.name}** passou fome!`
+        : `Esse é o resultado do BOSSx2 diário! **${generalBody.specialRankings.reiDoPVP.name}** Amassou hoje, já nosso amigo **${generalBody.specialRankings.coneMonodedo.name}** passou fome!`;
       
       const embed1 = {
-        title: '📊 Ranking BOSS Diário',
-        color: 0x10B981,
+        title: rankingTitle,
+        color: isThrone ? 0xF59E0B : 0x10B981, // Amarelo para throne, verde para boss
         fields: [
           {
             name: '🔍 Filtros Aplicados',
@@ -300,7 +309,7 @@ serve(async (req) => {
             inline: false
           },
           {
-            name: '👑 Rei do PVP',
+            name: reiTitle,
             value: `**${generalBody.specialRankings.reiDoPVP.name}**\n${generalBody.specialRankings.reiDoPVP.kills} kills • ${generalBody.specialRankings.reiDoPVP.deaths} deaths`,
             inline: true
           },
@@ -337,12 +346,12 @@ serve(async (req) => {
       const embed2 = generalBody.playerRanking && generalBody.playerRanking.length > 0
         ? {
             description: '```\n' + formatRankingTable(generalBody.playerRanking).substring(0, 4000) + '\n```',
-            color: 0x10B981
+            color: isThrone ? 0xF59E0B : 0x10B981
           }
         : null;
       
       const embed3 = {
-        description: `Esse é o resultado do BOSSx2 diário! **${generalBody.specialRankings.reiDoPVP.name}** Amassou hoje, já nosso amigo **${generalBody.specialRankings.coneMonodedo.name}** passou fome!`,
+        description: footerMessage,
         color: 0x9b87f5
       };
       
