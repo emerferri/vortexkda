@@ -35,6 +35,14 @@ interface GuildData {
   score: number;
 }
 
+interface PlayerData {
+  name: string;
+  kills: number;
+  deaths: number;
+  kda: number;
+  eventScore: number;
+}
+
 interface GeneralRankingBody {
   type?: 'general';
   environment: 'homolog' | 'prod';
@@ -49,6 +57,7 @@ interface GeneralRankingBody {
   };
   guildSummary: Record<string, number>; // Legacy format (backward compatibility)
   guildRanking?: GuildData[]; // New format with full stats
+  playerRanking?: PlayerData[]; // Player ranking for text table
 }
 
 interface KillStreakBody {
@@ -91,6 +100,38 @@ function formatGuildRankingTable(guilds: GuildData[]): string {
     const scoreStr = guild.score.toFixed(2).padStart(9);
     
     table += `${posStr} ${guildStr}${playersStr}${killsStr}${deathsStr}${scoreStr}\n`;
+  });
+  
+  return table;
+}
+
+// Format player ranking as monospaced table for Discord (same as auto-process-ranking)
+function formatRankingTable(players: PlayerData[]): string {
+  if (!players || players.length === 0) return '';
+  
+  const maxNameLen = Math.max(7, ...players.map(p => p.name.length));
+  
+  let table = '🏆 RANKING PVP\n';
+  table += '═'.repeat(52) + '\n\n';
+  table += ' Pos  ' + 'Jogador'.padEnd(maxNameLen + 2) + '  K    D    KDA     Score\n';
+  table += '─'.repeat(52) + '\n';
+  
+  players.forEach((player, index) => {
+    const pos = index + 1;
+    let posStr: string;
+    
+    if (pos === 1) posStr = ' 🥇  ';
+    else if (pos === 2) posStr = ' 🥈  ';
+    else if (pos === 3) posStr = ' 🥉  ';
+    else posStr = ` #${pos.toString().padStart(2)} `;
+    
+    const nameStr = player.name.padEnd(maxNameLen + 2);
+    const killsStr = player.kills.toString().padStart(3);
+    const deathsStr = player.deaths.toString().padStart(4);
+    const kdaStr = player.kda.toFixed(2).padStart(7);
+    const scoreStr = player.eventScore.toFixed(2).padStart(9);
+    
+    table += `${posStr} ${nameStr}${killsStr}${deathsStr}${kdaStr}${scoreStr}\n`;
   });
   
   return table;
@@ -359,12 +400,20 @@ serve(async (req) => {
         }
       };
       
-      const embed3 = {
+      // Embed with player ranking table (text format)
+      const embed3 = generalBody.playerRanking && generalBody.playerRanking.length > 0
+        ? {
+            description: '```\n' + formatRankingTable(generalBody.playerRanking).substring(0, 4000) + '\n```',
+            color: 0x10B981
+          }
+        : null;
+      
+      const embed4 = {
         description: `Esse é o resultado do BOSSx2 diário! **${generalBody.specialRankings.reiDoPVP.name}** Amassou hoje, já nosso amigo **${generalBody.specialRankings.coneMonodedo.name}** passou fome!`,
         color: 0x9b87f5
       };
       
-      embeds = [embed1, embed2, embed3];
+      embeds = [embed1, embed2, embed3, embed4].filter(Boolean);
     }
 
     formData.append('payload_json', JSON.stringify({ embeds }));
