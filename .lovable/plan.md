@@ -1,130 +1,77 @@
 
-# Plano: Adicionar Classe na Tabela do Ranking Discord
+
+# Plano: Expandir Resumo por Guild com Estatísticas Completas
 
 ## Objetivo
-Modificar a Edge Function `auto-process-ranking` para incluir a coluna **Classe** na tabela do ranking postada no Discord, e em seguida repostar o ranking das 21:00 de hoje (27/01).
+Transformar o resumo simples de contagem de jogadores por guild em uma tabela completa com kills, deaths e score da guild, seguindo o mesmo formato visual do ranking de jogadores.
 
 ---
 
-## Análise Atual
+## Estado Atual
 
-A função já busca os dados de classe dos personagens (linha 464-466):
-```typescript
-const { data: characters } = await internalClient
-  .from('characters')
-  .select('name, guild, class, banned')
-  .in('name', playerNames);
+O resumo por guild atualmente mostra apenas:
+```text
+⚔️ Resumo por Guild
+PHOENIX: 18 jogadores 
+BADBOYS: 5 jogadores
+OsGoDs: 5 jogadores
 ```
 
-Porém, a função `formatRankingTable` (linhas 42-72) atualmente formata apenas:
-- Posição, Jogador, K, D, KDA, Score
+---
+
+## Novo Formato Proposto
+
+Transformar em uma tabela formatada semelhante ao ranking de jogadores:
+
+```text
+⚔️ RANKING POR GUILD
+═══════════════════════════════════════════════════
+
+ Pos  Guild               Jogadores    K     D    Score
+────────────────────────────────────────────────────
+ 🥇  PHOENIX                    18   125    87   292.50
+ 🥈  BADBOYS                     5    42    35   112.30
+ 🥉  OsGoDs                      5    38    40    89.20
+ #4  MARVEL                      4    28    32    65.00
+ #5  TITANS                      1     8    12    18.00
+```
+
+---
+
+## Cálculo do Score da Guild
+
+Usando a mesma fórmula do score individual, aplicada à soma dos jogadores:
+
+```typescript
+guildScore = (totalKills * 3) + (totalKDA * 2) - (totalDeaths * 1.5)
+
+// Onde totalKDA = totalKills / totalDeaths (ou totalKills se deaths = 0)
+```
 
 ---
 
 ## Alterações Necessárias
 
-### 1. Atualizar Interface e Função `formatRankingTable`
+### 1. Criar Função `formatGuildRankingTable`
 
-Modificar a função para aceitar classe e incluir a coluna na tabela:
-
-**Novo formato da tabela:**
-```text
-🏆 RANKING PVP
-════════════════════════════════════════════════════════════════
-
- Pos  Jogador              Classe               K    D    KDA     Score
-────────────────────────────────────────────────────────────────
- 🥇  PlayerName           Force Emperor       25    5   5.00     72.50
- 🥈  PlayerTwo            Infinity Rune W...  20    8   2.50     55.00
- 🥉  PlayerThree          Knight              18   10   1.80     42.60
-```
-
-### 2. Passar dados de classe ao formatar
-
-Na construção de `playersWithScore` (linha 526), incluir a classe do `characterMap`:
+Nova função similar à `formatRankingTable`, mas para guilds:
 
 ```typescript
-const playersWithScore = nonBannedPlayers.map(player => {
-  const eventScore = (player.kills * 3) + (player.kda * 2) - (player.deaths * 1.5);
-  const charInfo = characterMap[player.name];
-  return { 
-    ...player, 
-    eventScore,
-    class: charInfo?.class || '—'
-  };
-});
-```
-
-### 3. Truncar nomes de classe longos
-
-Para evitar quebra de layout no Discord, truncar classes muito longas (ex: "Infinity Rune Wizard" para "Infinity Rune W...").
-
----
-
-## Simulação do Resultado
-
-Baseado nos dados reais do evento 27/01 às 21:00:
-
-```text
-🏆 RANKING PVP
-════════════════════════════════════════════════════════════════════════════
-
- Pos  Jogador              Classe               K    D    KDA     Score
-────────────────────────────────────────────────────────────────────────────
- 🥇  Oneka                Force Emperor       25   11   2.27     67.98
- 🥈  Yosaghi              Force Emperor       24    9   2.67     66.84
- 🥉  Vorgue               Infinity Rune W...  22   10   2.20     56.90
- #4  Tsjelly              Infinity Rune W...  19    9   2.11     47.72
- #5  Luslayer             Knight              18   12   1.50     36.00
- ...
-```
-
-**Caracteres estimados:** ~2.500 (dentro do limite de 4.000 do Discord)
-
----
-
-## Etapas de Implementação
-
-1. **Modificar `formatRankingTable`**
-   - Adicionar parâmetro `class` na interface do player
-   - Calcular largura dinâmica para coluna Classe
-   - Truncar nomes de classe > 18 caracteres
-
-2. **Atualizar construção de `playersWithScore`**
-   - Incluir classe do `characterMap`
-
-3. **Deploy da Edge Function**
-   - Fazer deploy automático da função atualizada
-
-4. **Repostar Ranking 21:00**
-   - Deletar o match existente de 27/01 às 21:00
-   - Disparar processamento forçado para recriar e postar
-
----
-
-## Detalhes Técnicos
-
-**Arquivo a modificar:** `supabase/functions/auto-process-ranking/index.ts`
-
-**Função `formatRankingTable` atualizada:**
-```typescript
-function formatRankingTable(players: Array<{
-  name: string, 
+function formatGuildRankingTable(guilds: Array<{
+  guild: string, 
+  playerCount: number, 
   kills: number, 
   deaths: number, 
-  kda: number, 
-  eventScore: number,
-  class?: string
+  score: number
 }>): string {
-  const maxNameLen = Math.max(7, ...players.map(p => p.name.length));
-  const maxClassLen = Math.min(18, Math.max(6, ...players.map(p => (p.class || '—').length)));
+  const maxGuildLen = Math.max(5, ...guilds.map(g => g.guild.length));
   
-  let table = '🏆 RANKING PVP\n';
-  table += '═'.repeat(60 + maxNameLen) + '\n\n';
-  table += ' Pos  ' + 'Jogador'.padEnd(maxNameLen + 2) + 'Classe'.padEnd(maxClassLen + 2) + '  K    D    KDA     Score\n';
-  table += '─'.repeat(60 + maxNameLen) + '\n';
+  let table = '⚔️ RANKING POR GUILD\n';
+  table += '═'.repeat(55) + '\n\n';
+  table += ' Pos  ' + 'Guild'.padEnd(maxGuildLen + 2) + 'Jogadores    K     D    Score\n';
+  table += '─'.repeat(55) + '\n';
   
-  players.forEach((player, index) => {
+  guilds.forEach((guild, index) => {
     const pos = index + 1;
     let posStr: string;
     if (pos === 1) posStr = ' 🥇  ';
@@ -132,20 +79,110 @@ function formatRankingTable(players: Array<{
     else if (pos === 3) posStr = ' 🥉  ';
     else posStr = ` #${pos.toString().padStart(2)} `;
     
-    let classStr = player.class || '—';
-    if (classStr.length > maxClassLen) {
-      classStr = classStr.substring(0, maxClassLen - 3) + '...';
-    }
+    const guildStr = guild.guild.padEnd(maxGuildLen + 2);
+    const playersStr = guild.playerCount.toString().padStart(9);
+    const killsStr = guild.kills.toString().padStart(5);
+    const deathsStr = guild.deaths.toString().padStart(5);
+    const scoreStr = guild.score.toFixed(2).padStart(9);
     
-    const nameStr = player.name.padEnd(maxNameLen + 2);
-    const classDisplay = classStr.padEnd(maxClassLen + 2);
-    // ... resto igual
+    table += `${posStr} ${guildStr}${playersStr}${killsStr}${deathsStr}${scoreStr}\n`;
   });
   
   return table;
 }
 ```
 
-**Processo de repostagem:**
-1. Deletar match de `pvp_matches` onde `match_date = '2025-01-27'` e `match_hour = 21`
-2. Chamar edge function com `{ attempt: 3, forceProcess: true, eventHour: 21 }`
+### 2. Modificar Cálculo do `guildSummary`
+
+Expandir a estrutura de dados para incluir todas as estatísticas:
+
+```typescript
+// Antes (linha 483-488):
+const guildSummary: Record<string, number> = {};
+for (const player of nonBannedPlayers) {
+  const charInfo = characterMap[player.name];
+  const guild = charInfo?.guild || 'Sem Guild';
+  guildSummary[guild] = (guildSummary[guild] || 0) + 1;
+}
+
+// Depois:
+interface GuildStats {
+  playerCount: number;
+  kills: number;
+  deaths: number;
+}
+
+const guildSummary: Record<string, GuildStats> = {};
+for (const player of nonBannedPlayers) {
+  const charInfo = characterMap[player.name];
+  const guild = charInfo?.guild || 'Sem Guild';
+  if (!guildSummary[guild]) {
+    guildSummary[guild] = { playerCount: 0, kills: 0, deaths: 0 };
+  }
+  guildSummary[guild].playerCount++;
+  guildSummary[guild].kills += player.kills;
+  guildSummary[guild].deaths += player.deaths;
+}
+```
+
+### 3. Calcular Score e Ordenar Guilds
+
+```typescript
+const guildsWithScore = Object.entries(guildSummary).map(([guild, stats]) => {
+  const guildKDA = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
+  const score = (stats.kills * 3) + (guildKDA * 2) - (stats.deaths * 1.5);
+  return { guild, ...stats, score };
+});
+
+const sortedGuilds = guildsWithScore.sort((a, b) => b.score - a.score);
+const guildRankingText = formatGuildRankingTable(sortedGuilds);
+```
+
+### 4. Atualizar Embed do Discord
+
+Modificar o campo "Resumo por Guild" para usar o novo formato:
+
+```typescript
+{
+  name: '⚔️ Ranking por Guild',
+  value: '```\n' + guildRankingText.substring(0, 1000) + '\n```',
+  inline: false,
+}
+```
+
+---
+
+## Simulação do Resultado
+
+Baseado nos dados típicos de um evento:
+
+```text
+⚔️ RANKING POR GUILD
+═══════════════════════════════════════════════════════
+
+ Pos  Guild               Jogadores    K     D    Score
+───────────────────────────────────────────────────────
+ 🥇  PHOENIX                    18   125    87   305.37
+ 🥈  BADBOYS                     5    42    35    98.90
+ 🥉  OsGoDs                      5    38    40    75.90
+ #4  MARVEL                      4    28    32    49.75
+ #5  TITANS                      1     8    12     8.33
+ #6  Sem Guild                   3    15    20    21.50
+```
+
+---
+
+## Detalhes Técnicos
+
+**Arquivo a modificar:** `supabase/functions/auto-process-ranking/index.ts`
+
+**Alterações:**
+1. Adicionar interface `GuildStats` (após linha 30)
+2. Adicionar função `formatGuildRankingTable` (após `formatRankingTable`, ~linha 69)
+3. Modificar bloco de cálculo do `guildSummary` (linhas 483-488)
+4. Adicionar cálculo de score e ordenação (após linha 488)
+5. Atualizar formatação do resumo (linhas 516-520)
+6. Modificar o embed field para usar code block com a tabela (linhas 568-571)
+
+**Limite de caracteres:** O campo do embed tem limite de ~1024 caracteres, então a tabela será truncada se necessário, mas tipicamente 5-8 guilds cabem facilmente.
+
