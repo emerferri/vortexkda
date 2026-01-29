@@ -30,6 +30,12 @@ interface ParseResult {
   killLogs: KillLog[];
 }
 
+interface GuildStats {
+  playerCount: number;
+  kills: number;
+  deaths: number;
+}
+
 interface RequestBody {
   trigger?: string;
   attempt?: number;        // 1, 2, or 3
@@ -63,6 +69,42 @@ function formatRankingTable(players: Array<{name: string, kills: number, deaths:
     const scoreStr = player.eventScore.toFixed(2).padStart(9);
     
     table += `${posStr} ${nameStr}${killsStr}${deathsStr}${kdaStr}${scoreStr}\n`;
+  });
+  
+  return table;
+}
+
+// Format guild ranking as monospaced table for Discord
+function formatGuildRankingTable(guilds: Array<{
+  guild: string;
+  playerCount: number;
+  kills: number;
+  deaths: number;
+  score: number;
+}>): string {
+  const maxGuildLen = Math.max(5, ...guilds.map(g => g.guild.length));
+  
+  let table = '⚔️ RANKING POR GUILD\n';
+  table += '═'.repeat(55) + '\n\n';
+  table += ' Pos  ' + 'Guild'.padEnd(maxGuildLen + 2) + 'Jogadores    K     D    Score\n';
+  table += '─'.repeat(55) + '\n';
+  
+  guilds.forEach((guild, index) => {
+    const pos = index + 1;
+    let posStr: string;
+    
+    if (pos === 1) posStr = ' 🥇  ';
+    else if (pos === 2) posStr = ' 🥈  ';
+    else if (pos === 3) posStr = ' 🥉  ';
+    else posStr = ` #${pos.toString().padStart(2)} `;
+    
+    const guildStr = guild.guild.padEnd(maxGuildLen + 2);
+    const playersStr = guild.playerCount.toString().padStart(9);
+    const killsStr = guild.kills.toString().padStart(5);
+    const deathsStr = guild.deaths.toString().padStart(5);
+    const scoreStr = guild.score.toFixed(2).padStart(9);
+    
+    table += `${posStr} ${guildStr}${playersStr}${killsStr}${deathsStr}${scoreStr}\n`;
   });
   
   return table;
@@ -479,13 +521,27 @@ Deno.serve(async (req) => {
     const nonBannedPlayers = Object.values(parseResult.players)
       .filter(p => !bannedPlayerNames.has(p.name));
 
-    // Calculate guild summary (only non-banned players)
-    const guildSummary: Record<string, number> = {};
+    // Calculate guild summary with full stats (only non-banned players)
+    const guildSummary: Record<string, GuildStats> = {};
     for (const player of nonBannedPlayers) {
       const charInfo = characterMap[player.name];
       const guild = charInfo?.guild || 'Sem Guild';
-      guildSummary[guild] = (guildSummary[guild] || 0) + 1;
+      if (!guildSummary[guild]) {
+        guildSummary[guild] = { playerCount: 0, kills: 0, deaths: 0 };
+      }
+      guildSummary[guild].playerCount++;
+      guildSummary[guild].kills += player.kills;
+      guildSummary[guild].deaths += player.deaths;
     }
+
+    // Calculate guild scores and sort
+    const guildsWithScore = Object.entries(guildSummary).map(([guild, stats]) => {
+      const guildKDA = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
+      const score = (stats.kills * 3) + (guildKDA * 2) - (stats.deaths * 1.5);
+      return { guild, ...stats, score };
+    });
+    const sortedGuilds = guildsWithScore.sort((a, b) => b.score - a.score);
+    const guildRankingText = formatGuildRankingTable(sortedGuilds);
 
     // Calculate special rankings using correct eventScore formula: (kills * 3) + (kda * 2) - (deaths * 1.5)
     const playersWithEventScore = nonBannedPlayers.map(p => ({
@@ -512,12 +568,6 @@ Deno.serve(async (req) => {
       deaths: nonBannedPlayers.reduce((sum, p) => sum + p.deaths, 0),
       playerCount: nonBannedPlayers.length,
     };
-
-    // Format guild summary - matching manual format
-    const guildSummaryLines = Object.entries(guildSummary)
-      .sort((a, b) => b[1] - a[1])
-      .map(([guild, count]) => `**${guild}**: ${count} ${count === 1 ? 'jogador' : 'jogadores'}`)
-      .join('\n');
 
     // Build ranking table text with correct eventScore formula: (kills * 3) + (kda * 2) - (deaths * 1.5) - excluding banned
     const playersWithScore = nonBannedPlayers.map(player => {
@@ -565,8 +615,8 @@ Deno.serve(async (req) => {
             inline: false,
           },
           {
-            name: '⚔️ Resumo por Guild',
-            value: guildSummaryLines || 'Nenhuma guild registrada',
+            name: '⚔️ Ranking por Guild',
+            value: '```\n' + guildRankingText.substring(0, 1000) + '\n```',
             inline: false,
           },
         ],
