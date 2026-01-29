@@ -224,35 +224,35 @@ export const RankingGeral = () => {
         return best.dist <= 1 ? { class: best.class, guild: best.guild } : { class: null, guild: null };
       };
 
-      // Se houver filtros de data/hora, filtramos pelos match_ids de pvp_matches
+      // SEMPRE filtramos por event_type = 'boss_event' para não misturar com Throne Conquest
+      // Adicionalmente, aplicamos filtros de data/hora se estiverem ativos
       const matchFilterActive = !!(debouncedDateFrom || debouncedDateTo || debouncedHourFrom !== undefined || debouncedHourTo !== undefined);
-      let matchIds: string[] | undefined = undefined;
-
-      if (matchFilterActive) {
-        const pageSize = 1000;
-        let from = 0;
-        let matchesAccum: any[] = [];
-        while (true) {
-          let mq = supabase
-            .from('pvp_matches')
-            .select('id, match_date, match_hour');
-          if (debouncedDateFrom) mq = mq.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
-          if (debouncedDateTo) mq = mq.lte('match_date', format(debouncedDateTo, 'yyyy-MM-dd'));
-          if (debouncedHourFrom !== undefined) mq = mq.gte('match_hour', debouncedHourFrom);
-          if (debouncedHourTo !== undefined) mq = mq.lte('match_hour', debouncedHourTo);
-          const { data: page, error } = await mq.range(from, from + pageSize - 1);
-          if (error) throw error;
-          if (page && page.length > 0) matchesAccum = matchesAccum.concat(page);
-          if (!page || page.length < pageSize) break;
-          from += pageSize;
-        }
-        matchIds = (matchesAccum || []).map((m: any) => m.id);
-        if (!matchIds.length) {
-          return { aggregated: [], brabissimoRecord: undefined, coneMonodedoName: '', characters: [] };
-        }
+      
+      // Buscar TODOS os match_ids de boss_event (com filtros opcionais de data/hora)
+      const pageSize = 1000;
+      let from = 0;
+      let matchesAccum: any[] = [];
+      while (true) {
+        let mq = supabase
+          .from('pvp_matches')
+          .select('id, match_date, match_hour')
+          .eq('event_type', 'boss_event'); // IMPORTANTE: filtra apenas boss_event
+        if (debouncedDateFrom) mq = mq.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
+        if (debouncedDateTo) mq = mq.lte('match_date', format(debouncedDateTo, 'yyyy-MM-dd'));
+        if (debouncedHourFrom !== undefined) mq = mq.gte('match_hour', debouncedHourFrom);
+        if (debouncedHourTo !== undefined) mq = mq.lte('match_hour', debouncedHourTo);
+        const { data: page, error } = await mq.range(from, from + pageSize - 1);
+        if (error) throw error;
+        if (page && page.length > 0) matchesAccum = matchesAccum.concat(page);
+        if (!page || page.length < pageSize) break;
+        from += pageSize;
+      }
+      const matchIds = (matchesAccum || []).map((m: any) => m.id);
+      if (!matchIds.length) {
+        return { aggregated: [], brabissimoRecord: undefined, coneMonodedoName: '', characters: [] };
       }
 
-      // Buscar todos os logs (paginado) e opcionalmente filtrar por match_ids
+      // Buscar todos os logs (paginado) filtrados por match_ids de boss_event
       const pageSizeLogs = 1000;
       let fromLogs = 0;
       let logs: any[] = [];
@@ -260,10 +260,8 @@ export const RankingGeral = () => {
         let ql = supabase
           .from('pvp_kill_logs')
           .select('killer_name, victim_name, match_id, created_at')
+          .in('match_id', matchIds) // Sempre filtra por boss_event matches
           .order('created_at', { ascending: false });
-        if (matchIds) {
-          ql = ql.in('match_id', matchIds);
-        }
         const { data: page, error } = await ql.range(fromLogs, fromLogs + pageSizeLogs - 1);
         if (error) throw error;
         if (page && page.length > 0) logs = logs.concat(page as any[]);
