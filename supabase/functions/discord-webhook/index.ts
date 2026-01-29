@@ -208,55 +208,22 @@ serve(async (req) => {
     }
     
     console.log(`Publishing to ${body.environment} environment`);
-
-    // Validar se as imagens existem
-    if (!body.image || typeof body.image !== 'string') {
-      throw new Error('Image data is missing or invalid');
-    }
-
-    // Para ranking geral, validar cards especiais
-    if (rankingType === 'general') {
-      const generalBody = body as GeneralRankingBody;
-      if (!generalBody.specialCardsImage || typeof generalBody.specialCardsImage !== 'string') {
-        throw new Error('Special cards image data is missing or invalid');
-      }
-    }
-
-    console.log('Image data size:', body.image.length, 'characters');
-
-    // Converter base64 para blob - Imagem principal
-    let base64Data: string;
-    let imageBuffer: Uint8Array;
-    
-    try {
-      base64Data = body.image.replace(/^data:image\/\w+;base64,/, '');
-      
-      if (!base64Data || base64Data.length === 0) {
-        throw new Error('Base64 data is empty after removing prefix');
-      }
-      
-      console.log('Base64 data size:', base64Data.length, 'characters');
-      
-      imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-      console.log('Image buffer size:', imageBuffer.length, 'bytes', `(${(imageBuffer.length / 1024 / 1024).toFixed(2)}MB)`);
-      
-      if (imageBuffer.length > 8 * 1024 * 1024) {
-        throw new Error(`Image too large: ${(imageBuffer.length / 1024 / 1024).toFixed(2)}MB (max 8MB)`);
-      }
-    } catch (conversionError: any) {
-      console.error('Error converting image:', conversionError);
-      throw new Error(`Failed to process image: ${conversionError.message}`);
-    }
-
-    // Criar FormData
-    const formData = new FormData();
-    const blob = new Blob([imageBuffer as unknown as BlobPart], { type: 'image/jpeg' });
     
     // Criar embeds baseado no tipo
     let embeds: any[];
+    const formData = new FormData();
     
     if (rankingType === 'killstreak') {
+      // Kill streak still uses image
       const killStreakBody = body as KillStreakBody;
+      
+      if (!body.image || typeof body.image !== 'string') {
+        throw new Error('Image data is missing or invalid for killstreak');
+      }
+      
+      const base64Data = body.image.replace(/^data:image\/\w+;base64,/, '');
+      const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+      const blob = new Blob([imageBuffer as unknown as BlobPart], { type: 'image/jpeg' });
       formData.append('file1', blob, 'kill-streak-ranking.jpg');
       
       const fields = [];
@@ -320,33 +287,8 @@ serve(async (req) => {
       
       embeds = [embed1, embed2, embed3];
     } else {
-      // Ranking Geral
+      // Ranking Geral - texto apenas, sem imagens
       const generalBody = body as GeneralRankingBody;
-      
-      // Converter special cards image
-      let specialCardsBase64Data: string;
-      let specialCardsImageBuffer: Uint8Array;
-      
-      try {
-        specialCardsBase64Data = generalBody.specialCardsImage.replace(/^data:image\/\w+;base64,/, '');
-        
-        if (!specialCardsBase64Data || specialCardsBase64Data.length === 0) {
-          throw new Error('Special cards base64 data is empty');
-        }
-        
-        specialCardsImageBuffer = Uint8Array.from(atob(specialCardsBase64Data), c => c.charCodeAt(0));
-        
-        if (specialCardsImageBuffer.length > 8 * 1024 * 1024) {
-          throw new Error(`Special cards image too large: ${(specialCardsImageBuffer.length / 1024 / 1024).toFixed(2)}MB`);
-        }
-      } catch (conversionError: any) {
-        console.error('Error converting special cards image:', conversionError);
-        throw new Error(`Failed to process special cards image: ${conversionError.message}`);
-      }
-      
-      formData.append('file1', blob, 'ranking.jpg');
-      const specialCardsBlob = new Blob([specialCardsImageBuffer as unknown as BlobPart], { type: 'image/jpeg' });
-      formData.append('file2', specialCardsBlob, 'special-rankings.jpg');
       
       const embed1 = {
         title: '📊 Ranking BOSS Diário',
@@ -388,32 +330,23 @@ serve(async (req) => {
             inline: false
           }
         ],
-        image: {
-          url: 'attachment://special-rankings.jpg'
-        },
         timestamp: new Date().toISOString()
       };
       
-      const embed2 = {
-        image: {
-          url: 'attachment://ranking.jpg'
-        }
-      };
-      
       // Embed with player ranking table (text format)
-      const embed3 = generalBody.playerRanking && generalBody.playerRanking.length > 0
+      const embed2 = generalBody.playerRanking && generalBody.playerRanking.length > 0
         ? {
             description: '```\n' + formatRankingTable(generalBody.playerRanking).substring(0, 4000) + '\n```',
             color: 0x10B981
           }
         : null;
       
-      const embed4 = {
+      const embed3 = {
         description: `Esse é o resultado do BOSSx2 diário! **${generalBody.specialRankings.reiDoPVP.name}** Amassou hoje, já nosso amigo **${generalBody.specialRankings.coneMonodedo.name}** passou fome!`,
         color: 0x9b87f5
       };
       
-      embeds = [embed1, embed2, embed3, embed4].filter(Boolean);
+      embeds = [embed1, embed2, embed3].filter(Boolean);
     }
 
     formData.append('payload_json', JSON.stringify({ embeds }));
