@@ -199,13 +199,23 @@ serve(async (req) => {
     const rankingType = body.type || 'general';
     console.log(`Received request to post ${rankingType} ranking to Discord from user ${user.email}`);
     
-    // Get Discord webhook URL from environment secrets
-    const webhookUrl = body.environment === 'prod' 
-      ? Deno.env.get('DISCORD_WEBHOOK_URL_PROD')
-      : Deno.env.get('DISCORD_WEBHOOK_URL');
+    // Get Discord webhook URL from environment secrets based on event type
+    const generalBody = rankingType === 'general' ? body as GeneralRankingBody : null;
+    const isThrone = generalBody?.eventType === 'throne_conquest';
+    
+    let webhookUrl: string | undefined;
+    if (isThrone) {
+      // Throne Conquest uses its own dedicated webhook
+      webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_THRONE');
+    } else if (body.environment === 'prod') {
+      webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_PROD');
+    } else {
+      webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL');
+    }
     
     if (!webhookUrl) {
-      throw new Error(`Webhook URL not configured for ${body.environment} environment`);
+      const webhookType = isThrone ? 'Throne Conquest' : body.environment;
+      throw new Error(`Webhook URL not configured for ${webhookType}`);
     }
     
     console.log(`Publishing to ${body.environment} environment`);
