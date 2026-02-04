@@ -42,6 +42,7 @@ interface RequestBody {
   forceProcess?: boolean;  // true on 3rd attempt
   eventHour?: number;      // boss hour (20, 21, 22)
   eventMinute?: number;    // boss minute (0 or 30)
+  eventType?: 'boss_event' | 'throne_conquest'; // Type of event
 }
 
 // Format ranking as monospaced table for Discord
@@ -110,14 +111,14 @@ function formatGuildRankingTable(guilds: Array<{
   return table;
 }
 
-// Parser logic
-function parseExternalDbContent(logs: ExternalLogEntry[]): ParseResult {
+// Parser logic for Boss Event (PvP Square map)
+function parseExternalDbContentBoss(logs: ExternalLogEntry[]): ParseResult {
   const players: Record<string, PlayerStats> = {};
   const killLogs: KillLog[] = [];
   let bossLabel = '';
   let matchedEntries = 0;
 
-  console.log(`[Auto Parser] Processing ${logs.length} logs`);
+  console.log(`[Auto Parser Boss] Processing ${logs.length} logs`);
 
   const killPatternDoubleAsterisks = /:dagger:\s*\*\*(\w+)\*\*\s*matou\s*:skull:\s*\*\*(\w+)\*\*/i;
   const mapPatternDoubleAsterisks = /\*\*PvP Square\*\*\s*-\s*\*\*\[Server: Boss Event PvP\]\*\*/i;
@@ -135,6 +136,7 @@ function parseExternalDbContent(logs: ExternalLogEntry[]): ParseResult {
 
     const content = log.content;
 
+    // STRICT: Only accept PvP Square map for Boss Events
     const hasValidMap = mapPatternDoubleAsterisks.test(content) ||
       mapPatternSingleAsterisks.test(content) ||
       mapPatternNoAsterisks.test(content);
@@ -177,27 +179,106 @@ function parseExternalDbContent(logs: ExternalLogEntry[]): ParseResult {
     player.kda = player.deaths === 0 ? player.kills : parseFloat((player.kills / player.deaths).toFixed(2));
   }
 
-  console.log(`[Auto Parser] Matched ${matchedEntries} valid entries, ${Object.keys(players).length} unique players`);
+  console.log(`[Auto Parser Boss] Matched ${matchedEntries} valid entries (PvP Square), ${Object.keys(players).length} unique players`);
 
   return { players, bossLabel, killLogs };
 }
 
-// Extract minute from the last log entry - ONLY from valid map logs
-function getLastKillMinute(logs: ExternalLogEntry[]): number | null {
+// Parser logic for Throne Conquest (Devias map)
+function parseExternalDbContentThrone(logs: ExternalLogEntry[]): ParseResult {
+  const players: Record<string, PlayerStats> = {};
+  const killLogs: KillLog[] = [];
+  let bossLabel = '';
+  let matchedEntries = 0;
+
+  console.log(`[Auto Parser Throne] Processing ${logs.length} logs`);
+
+  const killPatternDoubleAsterisks = /:dagger:\s*\*\*(\w+)\*\*\s*matou\s*:skull:\s*\*\*(\w+)\*\*/i;
+  const mapPatternDoubleAsterisks = /\*\*Devias\*\*\s*-\s*\*\*\[Server: Boss Event PvP\]\*\*/i;
+
+  const killPatternSingleAsterisks = /:dagger:\s*\*(\w+)\*\s*matou\s*:skull:\s*\*(\w+)\*/i;
+  const mapPatternSingleAsterisks = /\*Devias\*\s*-\s*\*\[Server: Boss Event PvP\]\*/i;
+
+  const killPatternNoAsterisks = /:dagger:\s*(\w+)\s+matou\s+:skull:\s*(\w+)\s+no mapa/i;
+  const mapPatternNoAsterisks = /Devias\s*-\s*\[Server: Boss Event PvP\]/i;
+
+  const datePattern = /(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/;
+
+  for (const log of logs) {
+    if (!log.content) continue;
+
+    const content = log.content;
+
+    // STRICT: Only accept Devias map for Throne Conquest
+    const hasValidMap = mapPatternDoubleAsterisks.test(content) ||
+      mapPatternSingleAsterisks.test(content) ||
+      mapPatternNoAsterisks.test(content);
+
+    if (!hasValidMap) continue;
+
+    if (!bossLabel) {
+      const dateMatch = content.match(datePattern);
+      if (dateMatch) {
+        const [, day, month, year, hour] = dateMatch;
+        bossLabel = `Throne ${day}/${month}/${year} ${hour}H`;
+      }
+    }
+
+    let killMatch = content.match(killPatternDoubleAsterisks);
+    if (!killMatch) killMatch = content.match(killPatternSingleAsterisks);
+    if (!killMatch) killMatch = content.match(killPatternNoAsterisks);
+
+    if (killMatch) {
+      const killer = killMatch[1];
+      const victim = killMatch[2];
+
+      matchedEntries++;
+
+      if (!players[killer]) {
+        players[killer] = { name: killer, kills: 0, deaths: 0, kda: 0 };
+      }
+      players[killer].kills++;
+
+      if (!players[victim]) {
+        players[victim] = { name: victim, kills: 0, deaths: 0, kda: 0 };
+      }
+      players[victim].deaths++;
+
+      killLogs.push({ killer, victim });
+    }
+  }
+
+  for (const player of Object.values(players)) {
+    player.kda = player.deaths === 0 ? player.kills : parseFloat((player.kills / player.deaths).toFixed(2));
+  }
+
+  console.log(`[Auto Parser Throne] Matched ${matchedEntries} valid entries (Devias), ${Object.keys(players).length} unique players`);
+
+  return { players, bossLabel, killLogs };
+}
+
+// Extract minute from the last log entry - filtered by map type
+function getLastKillMinute(logs: ExternalLogEntry[], eventType: 'boss_event' | 'throne_conquest'): number | null {
   if (!logs || logs.length === 0) return null;
   
-  // Map validation patterns (same as in parseExternalDbContent)
-  const mapPatternDoubleAsterisks = /\*\*PvP Square\*\*\s*-\s*\*\*\[Server: Boss Event PvP\]\*\*/i;
-  const mapPatternSingleAsterisks = /\*PvP Square\*\s*-\s*\*\[Server: Boss Event PvP\]\*/i;
-  const mapPatternNoAsterisks = /PvP Square\s*-\s*\[Server: Boss Event PvP\]/i;
+  // Map validation patterns based on event type
+  const mapPatterns = eventType === 'throne_conquest'
+    ? [
+        /\*\*Devias\*\*\s*-\s*\*\*\[Server: Boss Event PvP\]\*\*/i,
+        /\*Devias\*\s*-\s*\*\[Server: Boss Event PvP\]\*/i,
+        /Devias\s*-\s*\[Server: Boss Event PvP\]/i,
+      ]
+    : [
+        /\*\*PvP Square\*\*\s*-\s*\*\*\[Server: Boss Event PvP\]\*\*/i,
+        /\*PvP Square\*\s*-\s*\*\[Server: Boss Event PvP\]\*/i,
+        /PvP Square\s*-\s*\[Server: Boss Event PvP\]/i,
+      ];
   
   // Find the most recent log from the valid map (logs are ordered DESC)
   for (const log of logs) {
     if (!log.content) continue;
     
-    const hasValidMap = mapPatternDoubleAsterisks.test(log.content) ||
-      mapPatternSingleAsterisks.test(log.content) ||
-      mapPatternNoAsterisks.test(log.content);
+    const hasValidMap = mapPatterns.some(pattern => pattern.test(log.content));
     
     if (!hasValidMap) continue;
     
@@ -225,11 +306,12 @@ function getMinuteThreshold(attempt: number, eventHour: number, eventMinute: num
     if (attempt === 2) return 19; // 23:20 checks for 23:19
   } else if (eventHour === 22 && eventMinute === 30) {
     // Boss 22:30 (Tuesday/Thursday) - checks happen at 23:00, 23:20, 23:30
-    if (attempt === 1) return 29; // 23:00 checks for 22:59... wait, 22:30 boss
-    if (attempt === 2) return 49; // 23:20 checks for 23:19... hmm
-    // Actually for 22:30 boss:
-    // Attempt 1 at 23:00 should check if last kill >= minute 29 of 22:XX (event started at 22:30)
-    // Let me recalculate based on the plan
+    if (attempt === 1) return 29;
+    if (attempt === 2) return 49;
+  } else if (eventHour === 21 && eventMinute === 36) {
+    // Throne Conquest 21:36 - ends at 22:06
+    if (attempt === 1) return 5; // 22:10 checks for 22:05
+    if (attempt === 2) return 9; // 22:15 checks for 22:09
   } else if (eventHour === 20 || eventHour === 21) {
     // Boss 20:00 or 21:00
     if (attempt === 1) return 29; // XX:30 checks for XX:29
@@ -253,14 +335,10 @@ function shouldPostpone(attempt: number, forceProcess: boolean, lastKillMinute: 
     return false;
   }
   
-  // For 22:00 boss, we check the hour after (23:xx), so minute thresholds apply directly
-  // For 22:30 boss on attempt 1, we check if kills happened up to 22:59
-  // For 20:00/21:00 bosses, we check within the same hour
-  
   return lastKillMinute >= threshold;
 }
 
-function getEventTimeRange(eventHour?: number, eventMinute: number = 0): { startDate: string; endDate: string; matchDate: string; matchHour: number; localStartDate: string; localEndDate: string } {
+function getEventTimeRange(eventHour?: number, eventMinute: number = 0, eventType: 'boss_event' | 'throne_conquest' = 'boss_event'): { startDate: string; endDate: string; matchDate: string; matchHour: number; localStartDate: string; localEndDate: string } {
   // Brazil timezone offset (UTC-3)
   const BRAZIL_OFFSET = -3;
   
@@ -272,9 +350,10 @@ function getEventTimeRange(eventHour?: number, eventMinute: number = 0): { start
   const dayOfWeek = brazilTime.getDay();
   const currentHour = brazilTime.getHours();
   
-  console.log(`[Auto Process] Brazil time: ${brazilTime.toISOString()}, day: ${dayOfWeek}, hour: ${currentHour}`);
+  console.log(`[Auto Process] Brazil time: ${brazilTime.toISOString()}, day: ${dayOfWeek}, hour: ${currentHour}, eventType: ${eventType}`);
 
   let targetEventHour: number;
+  let targetEventMinute: number = eventMinute;
 
   // Use provided eventHour if available, otherwise determine from current time
   if (eventHour !== undefined) {
@@ -301,22 +380,24 @@ function getEventTimeRange(eventHour?: number, eventMinute: number = 0): { start
 
   // Create event date in Brazil time
   const eventDateBrazil = new Date(brazilTime);
-  eventDateBrazil.setHours(targetEventHour, eventMinute, 0, 0);
+  eventDateBrazil.setHours(targetEventHour, targetEventMinute, 0, 0);
 
   // Only go back a day if we haven't reached the event time yet AND no eventHour was explicitly provided
   // When eventHour is provided via cron, we trust that the event already happened today
   if (eventHour === undefined && eventDateBrazil > brazilTime) {
     eventDateBrazil.setDate(eventDateBrazil.getDate() - 1);
-    // Don't change the hour - keep the determined targetEventHour
   }
 
   // Convert Brazil time back to UTC for database query
   const startDateUTC = new Date(eventDateBrazil.getTime() - (BRAZIL_OFFSET * 3600000));
   
-  // For 22:00 boss, extend end time to 23:30 to capture extended events
+  // Determine end time based on event type
   let endOffsetMs = 3600000; // Default +1 hour
-  if (targetEventHour === 22) {
-    endOffsetMs = 5400000; // +1.5 hours (until 23:30)
+  if (eventType === 'throne_conquest') {
+    // Throne Conquest: 21:36 to 22:06 = 30 minutes + buffer
+    endOffsetMs = 2700000; // +45 minutes
+  } else if (targetEventHour === 22) {
+    endOffsetMs = 5400000; // +1.5 hours (until 23:30) for Boss
   }
   const endDateUTC = new Date(startDateUTC.getTime() + endOffsetMs);
 
@@ -324,21 +405,25 @@ function getEventTimeRange(eventHour?: number, eventMinute: number = 0): { start
   const matchDate = `${eventDateBrazil.getFullYear()}-${String(eventDateBrazil.getMonth() + 1).padStart(2, '0')}-${String(eventDateBrazil.getDate()).padStart(2, '0')}`;
 
   // Format local Brazil time strings for external database query (which stores in local time)
-  // For 22:00 boss, extend to 23:29 to capture late kills
   let localEndHour = targetEventHour;
   let localEndMinute = 59;
-  if (targetEventHour === 22 && eventMinute === 0) {
+  
+  if (eventType === 'throne_conquest') {
+    // Throne: 21:36 to 22:10 (with buffer)
+    localEndHour = 22;
+    localEndMinute = 10;
+  } else if (targetEventHour === 22 && targetEventMinute === 0) {
     localEndHour = 23;
     localEndMinute = 29;
-  } else if (targetEventHour === 22 && eventMinute === 30) {
+  } else if (targetEventHour === 22 && targetEventMinute === 30) {
     localEndHour = 23;
     localEndMinute = 29;
   }
   
-  const localStartDate = `${matchDate}T${String(targetEventHour).padStart(2, '0')}:${String(eventMinute).padStart(2, '0')}`;
+  const localStartDate = `${matchDate}T${String(targetEventHour).padStart(2, '0')}:${String(targetEventMinute).padStart(2, '0')}`;
   const localEndDate = `${matchDate}T${String(localEndHour).padStart(2, '0')}:${String(localEndMinute).padStart(2, '0')}`;
 
-  console.log(`[Auto Process] Event: ${matchDate} ${targetEventHour}:${String(eventMinute).padStart(2, '0')} BRT`);
+  console.log(`[Auto Process] Event: ${matchDate} ${targetEventHour}:${String(targetEventMinute).padStart(2, '0')} BRT (${eventType})`);
   console.log(`[Auto Process] Local query range: ${localStartDate} to ${localEndDate}`);
   console.log(`[Auto Process] UTC query range: ${startDateUTC.toISOString()} to ${endDateUTC.toISOString()}`);
 
@@ -363,33 +448,35 @@ Deno.serve(async (req) => {
     const forceProcess = body.forceProcess || false;
     const eventHour = body.eventHour;
     const eventMinute = body.eventMinute || 0;
+    const eventType = body.eventType || 'boss_event';
     
-    console.log(`[Auto Process] Starting automatic ranking processing... Attempt: ${attempt}, Force: ${forceProcess}, EventHour: ${eventHour}, EventMinute: ${eventMinute}`);
+    console.log(`[Auto Process] Starting automatic ranking processing... Attempt: ${attempt}, Force: ${forceProcess}, EventHour: ${eventHour}, EventMinute: ${eventMinute}, EventType: ${eventType}`);
 
     const internalSupabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const internalServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const internalClient = createClient(internalSupabaseUrl, internalServiceKey);
 
-    const { startDate, endDate, matchDate, matchHour, localStartDate, localEndDate } = getEventTimeRange(eventHour, eventMinute);
-    console.log(`[Auto Process] Fetching logs for ${matchDate} ${matchHour}:${String(eventMinute).padStart(2, '0')}`);
+    const { startDate, endDate, matchDate, matchHour, localStartDate, localEndDate } = getEventTimeRange(eventHour, eventMinute, eventType);
+    console.log(`[Auto Process] Fetching logs for ${matchDate} ${matchHour}:${String(eventMinute).padStart(2, '0')} (${eventType})`);
 
-    // Check if this match already exists - IMPORTANT: filter by event_type to avoid conflicts with throne_conquest
+    // Check if this match already exists - filter by event_type to allow same hour different event types
     const { data: existingMatch } = await internalClient
       .from('pvp_matches')
       .select('id')
       .eq('match_date', matchDate)
       .eq('match_hour', matchHour)
-      .eq('event_type', 'boss_event')
+      .eq('event_type', eventType)
       .maybeSingle();
 
     if (existingMatch) {
-      console.log(`[Auto Process] Boss event match already exists for ${matchDate} ${matchHour}:00, skipping`);
+      console.log(`[Auto Process] ${eventType} match already exists for ${matchDate} ${matchHour}:00, skipping`);
       return {
         success: true,
         status: 'already_exists',
         message: 'Match already processed',
         matchDate,
         matchHour,
+        eventType,
       };
     }
 
@@ -420,12 +507,12 @@ Deno.serve(async (req) => {
 
     if (!logs || logs.length === 0) {
       console.log('[Auto Process] No logs found for this time period');
-      return { success: true, status: 'no_logs', message: 'No logs found', matchDate, matchHour, attempt };
+      return { success: true, status: 'no_logs', message: 'No logs found', matchDate, matchHour, attempt, eventType };
     }
 
     // Check if we should postpone based on last kill time
-    const lastKillMinute = getLastKillMinute(logs);
-    console.log(`[Auto Process] Last kill minute: ${lastKillMinute}`);
+    const lastKillMinute = getLastKillMinute(logs, eventType);
+    console.log(`[Auto Process] Last kill minute (${eventType}): ${lastKillMinute}`);
     
     if (shouldPostpone(attempt, forceProcess, lastKillMinute, matchHour, eventMinute)) {
       const threshold = getMinuteThreshold(attempt, matchHour, eventMinute);
@@ -436,26 +523,33 @@ Deno.serve(async (req) => {
         attempt,
         lastKillMinute,
         threshold,
+        eventType,
         message: 'Event may still be active, waiting for next attempt',
       };
     }
 
-    const parseResult = parseExternalDbContent(logs);
+    // Parse logs using the appropriate parser based on event type
+    const parseResult = eventType === 'throne_conquest'
+      ? parseExternalDbContentThrone(logs)
+      : parseExternalDbContentBoss(logs);
 
     if (Object.keys(parseResult.players).length === 0) {
-      console.log('[Auto Process] No valid player data found after parsing');
-      return { success: true, status: 'no_players', message: 'No valid player data', matchDate, matchHour };
+      console.log(`[Auto Process] No valid player data found after parsing for ${eventType}`);
+      return { success: true, status: 'no_players', message: 'No valid player data', matchDate, matchHour, eventType };
     }
 
-    const bossLabel = parseResult.bossLabel || `BOSSx2 ${matchDate} ${matchHour}H`;
+    const bossLabel = parseResult.bossLabel || (eventType === 'throne_conquest' 
+      ? `Throne ${matchDate} ${matchHour}H`
+      : `BOSSx2 ${matchDate} ${matchHour}H`);
 
-    // Insert match
+    // Insert match with event_type
     const { data: newMatch, error: matchError } = await internalClient
       .from('pvp_matches')
       .insert({
         match_date: matchDate,
         match_hour: matchHour,
         boss_label: bossLabel,
+        event_type: eventType,
       })
       .select()
       .single();
@@ -464,7 +558,7 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to insert match: ${matchError.message}`);
     }
 
-    console.log(`[Auto Process] Created match with ID: ${newMatch.id}`);
+    console.log(`[Auto Process] Created ${eventType} match with ID: ${newMatch.id}`);
 
     // Insert players
     const playerInserts = Object.values(parseResult.players).map(player => ({
@@ -554,7 +648,7 @@ Deno.serve(async (req) => {
     const sortedByEventScore = [...playersWithEventScore].sort((a, b) => a.eventScore - b.eventScore);
     const coneMonodedo = sortedByEventScore[0];
 
-    // Rei do PVP = best eventScore (highest), excluding cone monodedo
+    // Rei do PVP / Rei do Trono = best eventScore (highest), excluding cone monodedo
     const eligibleForRei = playersWithEventScore.filter(p => p.name !== coneMonodedo?.name);
     const reiDoPVP = [...eligibleForRei].sort((a, b) => b.eventScore - a.eventScore)[0];
 
@@ -570,7 +664,7 @@ Deno.serve(async (req) => {
       playerCount: nonBannedPlayers.length,
     };
 
-    // Build ranking table text with correct eventScore formula: (kills * 3) + (kda * 2) - (deaths * 1.5) - excluding banned
+    // Build ranking table text with correct eventScore formula - excluding banned
     const playersWithScore = nonBannedPlayers.map(player => {
       const eventScore = (player.kills * 3) + (player.kda * 2) - (player.deaths * 1.5);
       return { ...player, eventScore };
@@ -578,25 +672,39 @@ Deno.serve(async (req) => {
     const sortedPlayers = playersWithScore.sort((a, b) => b.eventScore - a.eventScore);
     const rankingTableText = formatRankingTable(sortedPlayers);
 
-    // Post to Discord - matching manual format exactly
-    const webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_PROD') || Deno.env.get('DISCORD_WEBHOOK_URL');
+    // Post to Discord - select webhook based on event type
+    let webhookUrl: string | undefined;
+    if (eventType === 'throne_conquest') {
+      webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_THRONE');
+    } else {
+      webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_PROD') || Deno.env.get('DISCORD_WEBHOOK_URL');
+    }
 
     if (webhookUrl) {
       const [year, month, day] = matchDate.split('-');
       const formattedDate = `${day}/${month}/${year}`;
 
-      // Embed 1: Main info - matching manual format
+      // Dynamic titles based on event type
+      const isThrone = eventType === 'throne_conquest';
+      const rankingTitle = isThrone ? '📊 Ranking Throne Conquest' : '📊 Ranking BOSS Diário';
+      const reiTitle = isThrone ? '👑 Rei do Trono!' : '👑 Rei do PVP';
+      const embedColor = isThrone ? 0xF59E0B : 0x10B981; // Yellow for throne, green for boss
+      const footerMessage = isThrone
+        ? `Esse é o resultado do Throne Conquest! **${reiDoPVP?.name || 'N/A'}** conquistou o trono, já nosso amigo **${coneMonodedo?.name || 'N/A'}** passou fome!`
+        : `Esse é o resultado do BOSSx2 diário! **${reiDoPVP?.name || 'N/A'}** Amassou hoje, já nosso amigo **${coneMonodedo?.name || 'N/A'}** passou fome!`;
+
+      // Embed 1: Main info
       const embed1 = {
-        title: '📊 Ranking BOSS Diário',
-        color: 0x10B981,
+        title: rankingTitle,
+        color: embedColor,
         fields: [
           {
             name: '🔍 Filtros Aplicados',
-            value: `A partir de: **${formattedDate}**\nHora inicial: **${matchHour}:00**\nOrdenação: **eventScore**`,
+            value: `A partir de: **${formattedDate}**\nHora inicial: **${matchHour}:${String(eventMinute).padStart(2, '0')}**\nOrdenação: **eventScore**`,
             inline: false,
           },
           {
-            name: '👑 Rei do PVP',
+            name: reiTitle,
             value: reiDoPVP ? `**${reiDoPVP.name}**\nScore: ${reiDoPVP.eventScore.toFixed(2)} • ${reiDoPVP.kills}K/${reiDoPVP.deaths}D` : 'N/A',
             inline: true,
           },
@@ -622,7 +730,7 @@ Deno.serve(async (req) => {
           },
         ],
         footer: {
-          text: `Hoje às ${String(matchHour).padStart(2, '0')}:00 • Tentativa ${attempt}${forceProcess ? ' (forçado)' : ''}`,
+          text: `Hoje às ${String(matchHour).padStart(2, '0')}:${String(eventMinute).padStart(2, '0')} • Tentativa ${attempt}${forceProcess ? ' (forçado)' : ''}`,
         },
         timestamp: new Date().toISOString(),
       };
@@ -631,16 +739,17 @@ Deno.serve(async (req) => {
       const embed2 = {
         title: '🏆 Ranking Completo',
         description: '```\n' + rankingTableText.substring(0, 3990) + '\n```',
-        color: 0x3b82f6,
+        color: embedColor,
       };
 
-      // Embed 3: Closing message with link - matching manual format
+      // Embed 3: Closing message with link
       const frontendUrlRaw = Deno.env.get('FRONTEND_URL') || 'https://rankingpvpboss.lovable.app';
       const frontendUrl = frontendUrlRaw.replace(/\/+$/, ''); // Remove trailing slashes
-      const rankingLink = `${frontendUrl}/?tab=ranking&date=${matchDate}&hour=${matchHour}`;
+      const tabParam = isThrone ? 'throne' : 'ranking';
+      const rankingLink = `${frontendUrl}/?tab=${tabParam}&date=${matchDate}&hour=${matchHour}`;
       
       const embed3 = {
-        description: `Esse é o resultado do BOSSx2 diário! **${reiDoPVP?.name || 'N/A'}** Amassou hoje, já nosso amigo **${coneMonodedo?.name || 'N/A'}** passou fome!\n\n🔗 **[Ver ranking completo no site](${rankingLink})**`,
+        description: `${footerMessage}\n\n🔗 **[Ver ranking completo no site](${rankingLink})**`,
         color: 0x9b87f5,
       };
 
@@ -653,13 +762,13 @@ Deno.serve(async (req) => {
       if (!discordResponse.ok) {
         console.error('[Auto Process] Failed to post to Discord:', await discordResponse.text());
       } else {
-        console.log('[Auto Process] Successfully posted to Discord');
+        console.log(`[Auto Process] Successfully posted ${eventType} to Discord`);
       }
     } else {
-      console.log('[Auto Process] No Discord webhook configured');
+      console.log(`[Auto Process] No Discord webhook configured for ${eventType}`);
     }
 
-    console.log('[Auto Process] Completed successfully');
+    console.log(`[Auto Process] Completed ${eventType} successfully`);
 
     return {
       success: true,
@@ -671,6 +780,7 @@ Deno.serve(async (req) => {
       totalKills: totals.kills,
       attempt,
       forceProcess,
+      eventType,
     };
   };
 

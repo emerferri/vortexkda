@@ -2,7 +2,17 @@
 # Plano: Ranking Throne Conquest ✅ CONCLUÍDO
 
 ## Resumo
-Sistema de ranking para o evento **Throne Conquest** que ocorre toda **terça-feira das 21:36 as 22:06 de Brasilia**, replicando as funcionalidades do Ranking Geral mas filtrando pelo mapa **Devias - [Server: Boss Event PvP]**.
+Sistema de ranking para o evento **Throne Conquest** que ocorre toda **terça-feira das 21:36 às 22:06 de Brasília**, replicando as funcionalidades do Ranking Geral mas filtrando pelo mapa **Devias - [Server: Boss Event PvP]**.
+
+---
+
+## Regras de Mapas (CRÍTICO)
+- **Boss Event**: SEMPRE no mapa **PvP Square - [Server: Boss Event PvP]**
+  - Segunda: 21:00 e 22:00
+  - Terça/Quinta: 20:00 e 22:30
+  - Demais dias: 20:00 e 22:00
+- **Throne Conquest**: SEMPRE no mapa **Devias - [Server: Boss Event PvP]**
+  - Somente terça-feira: 21:36 às 22:06
 
 ---
 
@@ -33,6 +43,14 @@ Sistema de ranking para o evento **Throne Conquest** que ocorre toda **terça-fe
 - Aba "Throne" com ícone de coroa adicionada
 - Visível para todos os usuários
 
+### ✅ Edge Function auto-process-ranking (Atualizado 04/02/2026)
+- Suporte ao parâmetro `eventType: 'boss_event' | 'throne_conquest'`
+- Parser separado para Boss (PvP Square) e Throne (Devias)
+- Seleção automática de webhook baseado no tipo de evento:
+  - Boss: `DISCORD_WEBHOOK_URL_PROD`
+  - Throne: `DISCORD_WEBHOOK_URL_THRONE`
+- Verificação de duplicatas por `match_date + match_hour + event_type`
+
 ---
 
 ## Formato do Log Suportado
@@ -42,7 +60,13 @@ Sistema de ranking para o evento **Throne Conquest** que ocorre toda **terça-fe
 
 ---
 
-## Automação Futura (não incluso)
-A automação via Edge Function pode ser expandida futuramente para:
-- Processar logs do Throne Conquest automaticamente toda terça-feira às 22:10
-- Postar no Discord com formato similar ao Boss Event
+## Cron Jobs para Throne Conquest (Pendente)
+Para automatizar o Throne Conquest às terças-feiras:
+- T1: 22:10 UTC-3 (01:10 UTC quarta) - primeira tentativa
+- T2: 22:15 UTC-3 (01:15 UTC quarta) - segunda tentativa
+- T3: 22:20 UTC-3 (01:20 UTC quarta) - processamento forçado
+
+Payload esperado:
+```json
+{"eventHour": 21, "eventMinute": 36, "eventType": "throne_conquest", "trigger": "cron", "attempt": 1}
+```
