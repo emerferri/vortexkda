@@ -373,16 +373,17 @@ Deno.serve(async (req) => {
     const { startDate, endDate, matchDate, matchHour, localStartDate, localEndDate } = getEventTimeRange(eventHour, eventMinute);
     console.log(`[Auto Process] Fetching logs for ${matchDate} ${matchHour}:${String(eventMinute).padStart(2, '0')}`);
 
-    // Check if this match already exists
+    // Check if this match already exists - IMPORTANT: filter by event_type to avoid conflicts with throne_conquest
     const { data: existingMatch } = await internalClient
       .from('pvp_matches')
       .select('id')
       .eq('match_date', matchDate)
       .eq('match_hour', matchHour)
+      .eq('event_type', 'boss_event')
       .maybeSingle();
 
     if (existingMatch) {
-      console.log(`[Auto Process] Match already exists for ${matchDate} ${matchHour}:00, skipping`);
+      console.log(`[Auto Process] Boss event match already exists for ${matchDate} ${matchHour}:00, skipping`);
       return {
         success: true,
         status: 'already_exists',
