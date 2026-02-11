@@ -12,7 +12,7 @@ Sistema de ranking para o evento **Throne Conquest** que ocorre toda **terça-fe
   - Terça/Quinta: 20:00 e 22:30
   - Demais dias: 20:00 e 22:00
 - **Throne Conquest**: SEMPRE no mapa **Devias - [Server: Boss Event PvP]**
-  - Somente terça-feira: 21:36 às 22:06
+  - Somente terça-feira: 21:36 às 22:36
 
 ---
 
@@ -62,9 +62,9 @@ Sistema de ranking para o evento **Throne Conquest** que ocorre toda **terça-fe
 
 ## Cron Jobs para Throne Conquest (Pendente)
 Para automatizar o Throne Conquest às terças-feiras:
-- T1: 22:10 UTC-3 (01:10 UTC quarta) - primeira tentativa
-- T2: 22:15 UTC-3 (01:15 UTC quarta) - segunda tentativa
-- T3: 22:20 UTC-3 (01:20 UTC quarta) - processamento forçado
+- T1: 22:40 UTC-3 (01:40 UTC quarta) - primeira tentativa
+- T2: 22:45 UTC-3 (01:45 UTC quarta) - segunda tentativa
+- T3: 22:50 UTC-3 (01:50 UTC quarta) - processamento forçado
 
 Payload esperado:
 ```json

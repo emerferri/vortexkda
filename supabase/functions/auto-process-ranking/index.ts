@@ -309,9 +309,9 @@ function getMinuteThreshold(attempt: number, eventHour: number, eventMinute: num
     if (attempt === 1) return 29;
     if (attempt === 2) return 49;
   } else if (eventHour === 21 && eventMinute === 36) {
-    // Throne Conquest 21:36 - ends at 22:06
-    if (attempt === 1) return 5; // 22:10 checks for 22:05
-    if (attempt === 2) return 9; // 22:15 checks for 22:09
+    // Throne Conquest 21:36 - ends at 22:36
+    if (attempt === 1) return 35; // 22:40 checks for 22:35
+    if (attempt === 2) return 39; // 22:45 checks for 22:39
   } else if (eventHour === 20 || eventHour === 21) {
     // Boss 20:00 or 21:00
     if (attempt === 1) return 29; // XX:30 checks for XX:29
@@ -394,8 +394,8 @@ function getEventTimeRange(eventHour?: number, eventMinute: number = 0, eventTyp
   // Determine end time based on event type
   let endOffsetMs = 3600000; // Default +1 hour
   if (eventType === 'throne_conquest') {
-    // Throne Conquest: 21:36 to 22:06 = 30 minutes + buffer
-    endOffsetMs = 2700000; // +45 minutes
+    // Throne Conquest: 21:36 to 22:36 = 60 minutes + buffer
+    endOffsetMs = 4500000; // +75 minutes
   } else if (targetEventHour === 22) {
     endOffsetMs = 5400000; // +1.5 hours (until 23:30) for Boss
   }
@@ -409,9 +409,9 @@ function getEventTimeRange(eventHour?: number, eventMinute: number = 0, eventTyp
   let localEndMinute = 59;
   
   if (eventType === 'throne_conquest') {
-    // Throne: 21:36 to 22:10 (with buffer)
+    // Throne: 21:36 to 22:40 (with buffer)
     localEndHour = 22;
-    localEndMinute = 10;
+    localEndMinute = 40;
   } else if (targetEventHour === 22 && targetEventMinute === 0) {
     localEndHour = 23;
     localEndMinute = 29;
