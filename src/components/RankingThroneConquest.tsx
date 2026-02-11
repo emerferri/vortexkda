@@ -532,7 +532,7 @@ export const RankingThroneConquest = () => {
       <div className="text-center py-12 text-muted-foreground">
         <Crown className="w-16 h-16 mx-auto mb-4 opacity-50" />
         <p>Nenhum dado encontrado para o Throne Conquest.</p>
-        <p className="text-sm mt-2">O evento ocorre toda terça-feira das 21:36 às 22:06.</p>
+        <p className="text-sm mt-2">O evento ocorre toda terça-feira das 21:36 às 22:36.</p>
       </div>
     );
   }
@@ -545,7 +545,7 @@ export const RankingThroneConquest = () => {
           <Crown className="w-8 h-8 text-primary" />
           <div>
             <h2 className="text-2xl font-bold text-primary">Throne Conquest</h2>
-            <p className="text-sm text-muted-foreground">Terça-feira 21:36 - 22:06 • Mapa: Devias</p>
+            <p className="text-sm text-muted-foreground">Terça-feira 21:36 - 22:36 • Mapa: Devias</p>
           </div>
           <Crown className="w-8 h-8 text-primary" />
         </div>
