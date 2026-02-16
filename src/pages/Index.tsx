@@ -9,39 +9,31 @@ import { PutinhaRanking } from '@/components/PutinhaRanking';
 import { MuralDaVergonha } from '@/components/MuralDaVergonha';
 import { KillStreakRanking } from '@/components/KillStreakRanking';
 import { ReisDoPVP } from '@/components/ReisDoPVP';
+import { BestPerClassRanking } from '@/components/BestPerClassRanking';
 import { DatabaseManager } from '@/components/DatabaseManager';
 import { DatabaseImport } from '@/components/DatabaseImport';
 import { parseTxtFile, ParseResult } from '@/utils/txtParser';
-import { Swords, LogIn, LogOut, User, FileText, Database, Crown } from 'lucide-react';
+import { Swords, FileText, Database, Crown } from 'lucide-react';
 import { Footer } from '@/components/Footer';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { AppSidebar } from '@/components/AppSidebar';
 
 const Index = () => {
   const [players, setPlayers] = useState<PlayerStats[]>([]);
   const [bossLabel, setBossLabel] = useState<string | null>(null);
   const [killLogs, setKillLogs] = useState<any[]>([]);
   const [eventType, setEventType] = useState<'boss_event' | 'throne_conquest'>('boss_event');
-  const { user, signOut } = useAuth();
-  const { isAdmin, canEditData } = useUserRole();
+  const { user } = useAuth();
+  const { canEditData } = useUserRole();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Default tab: ranking for non-logged users, placar for logged users with edit permission
   const [activeTab, setActiveTab] = useState(() => {
     const tab = searchParams.get('tab');
     if (tab) return tab;
-    return 'ranking'; // Default to ranking for all users initially
+    return 'ranking';
   });
 
   useEffect(() => {
@@ -49,15 +41,12 @@ const Index = () => {
     if (tab) {
       setActiveTab(tab);
     } else if (!user && activeTab === 'placar') {
-      // Redirect non-logged users away from placar tab
       setActiveTab('ranking');
     }
   }, [searchParams, user, activeTab]);
 
-  // Handler to change tabs and clean up URL params
   const handleTabChange = (newTab: string) => {
     setActiveTab(newTab);
-    // Clean URL when changing main tabs to avoid getting stuck
     if (searchParams.get('subtab') || searchParams.get('filter')) {
       navigate(`/?tab=${newTab}`, { replace: true });
     }
@@ -81,188 +70,83 @@ const Index = () => {
     setEventType(result.eventType);
   };
 
-  return (
-    <div className="min-h-screen bg-background gradient-gaming">
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <header className="text-center mb-12">
-          <div className="flex items-center justify-center gap-4 mb-4 relative">
-            <Swords className="w-12 h-12 text-primary animate-pulse" />
-            <h1 className="text-5xl font-bold text-foreground text-glow">
-              Ranking de Kill - PVP BOSS
-            </h1>
-            <Swords className="w-12 h-12 text-primary animate-pulse" />
-            
-            <div className="absolute right-0 top-0">
-              {user ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <User className="w-4 h-4" />
-                      {user.email?.split('@')[0]}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Minha conta</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={signOut}>
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Sair
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => navigate('/auth')}
-                  className="gap-2"
-                >
-                  <LogIn className="w-4 h-4" />
-                  Login
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'placar':
+        if (!canEditData) return null;
+        return (
+          <div className="space-y-8">
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex gap-2 p-1 bg-muted/50 rounded-lg">
+                <Button variant={importSource === 'txt' ? 'default' : 'ghost'} size="sm" onClick={() => setImportSource('txt')} className="gap-2">
+                  <FileText className="w-4 h-4" /> Arquivo TXT
                 </Button>
-              )}
-            </div>
-          </div>
-          <p className="text-lg text-muted-foreground">
-            Aqui separamos os homens das crianças, quem é superior no pvp? quem mais se destaca?
-          </p>
-        </header>
-
-        <div className="space-y-8">
-          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className={`grid w-full max-w-6xl mx-auto ${isAdmin ? 'grid-cols-9' : canEditData ? 'grid-cols-8' : 'grid-cols-7'} mb-8`}>
-              {canEditData && (
-                <TabsTrigger value="placar" className="text-base font-semibold">
-                  Incluir Dados
-                </TabsTrigger>
-              )}
-              <TabsTrigger value="ranking" className="text-base font-semibold">
-                Ranking Geral
-              </TabsTrigger>
-              <TabsTrigger value="throne" className="text-base font-semibold flex items-center gap-1">
-                <Crown className="w-4 h-4" />
-                Throne
-              </TabsTrigger>
-              <TabsTrigger value="reis" className="text-base font-semibold">
-                Rei/Cone PVP
-              </TabsTrigger>
-              <TabsTrigger value="classe-guild" className="text-base font-semibold">
-                Classe/Guild
-              </TabsTrigger>
-              <TabsTrigger value="putinha" className="text-base font-semibold">
-                Minha Putinha
-              </TabsTrigger>
-              <TabsTrigger value="vergonha" className="text-base font-semibold">
-                Mural da Vergonha
-              </TabsTrigger>
-              <TabsTrigger value="killstreak" className="text-base font-semibold">
-                Kill Streak
-              </TabsTrigger>
-              {isAdmin && (
-                <TabsTrigger value="admin" className="text-base font-semibold">
-                  Admin
-                </TabsTrigger>
-              )}
-            </TabsList>
-            
-            {canEditData && (
-              <TabsContent value="placar" className="space-y-8">
-                {/* Import Source Toggle */}
-                <div className="flex flex-col items-center gap-4">
-                  <div className="flex gap-2 p-1 bg-muted/50 rounded-lg">
-                    <Button
-                      variant={importSource === 'txt' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setImportSource('txt')}
-                      className="gap-2"
-                    >
-                      <FileText className="w-4 h-4" />
-                      Arquivo TXT
-                    </Button>
-                    <Button
-                      variant={importSource === 'database' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setImportSource('database')}
-                      className="gap-2"
-                    >
-                      <Database className="w-4 h-4" />
-                      Banco de Dados
-                    </Button>
-                  </div>
-
-                  {/* Event Type Toggle - only show for database import */}
-                  {importSource === 'database' && (
-                    <div className="flex gap-2 p-1 bg-muted/30 rounded-lg">
-                      <Button
-                        variant={importEventType === 'boss_event' ? 'default' : 'ghost'}
-                        size="sm"
-                        onClick={() => setImportEventType('boss_event')}
-                        className="gap-2"
-                      >
-                        <Swords className="w-4 h-4" />
-                        Boss Event (PvP Square)
-                      </Button>
-                      <Button
-                        variant={importEventType === 'throne_conquest' ? 'default' : 'ghost'}
-                        size="sm"
-                        onClick={() => setImportEventType('throne_conquest')}
-                        className="gap-2"
-                      >
-                        <Crown className="w-4 h-4" />
-                        Throne Conquest (Devias)
-                      </Button>
-                    </div>
-                  )}
-
-                {importSource === 'txt' && (
-                  <FileUpload onFileUpload={handleFileUpload} />
-                )}
-                {importSource === 'database' && (
-                  <DatabaseImport onDataLoaded={handleDatabaseImport} eventType={importEventType} />
-                )}
+                <Button variant={importSource === 'database' ? 'default' : 'ghost'} size="sm" onClick={() => setImportSource('database')} className="gap-2">
+                  <Database className="w-4 h-4" /> Banco de Dados
+                </Button>
+              </div>
+              {importSource === 'database' && (
+                <div className="flex gap-2 p-1 bg-muted/30 rounded-lg">
+                  <Button variant={importEventType === 'boss_event' ? 'default' : 'ghost'} size="sm" onClick={() => setImportEventType('boss_event')} className="gap-2">
+                    <Swords className="w-4 h-4" /> Boss Event (PvP Square)
+                  </Button>
+                  <Button variant={importEventType === 'throne_conquest' ? 'default' : 'ghost'} size="sm" onClick={() => setImportEventType('throne_conquest')} className="gap-2">
+                    <Crown className="w-4 h-4" /> Throne Conquest (Devias)
+                  </Button>
                 </div>
-                
-                <Scoreboard players={players} bossLabel={bossLabel} killLogs={killLogs} eventType={eventType} />
-              </TabsContent>
-            )}
-            
-            <TabsContent value="ranking">
-              <RankingGeral />
-            </TabsContent>
+              )}
+              {importSource === 'txt' && <FileUpload onFileUpload={handleFileUpload} />}
+              {importSource === 'database' && <DatabaseImport onDataLoaded={handleDatabaseImport} eventType={importEventType} />}
+            </div>
+            <Scoreboard players={players} bossLabel={bossLabel} killLogs={killLogs} eventType={eventType} />
+          </div>
+        );
+      case 'ranking':
+        return <RankingGeral />;
+      case 'throne':
+        return <RankingThroneConquest />;
+      case 'reis':
+        return <ReisDoPVP />;
+      case 'classe-guild':
+        return <ClassGuildRanking />;
+      case 'melhor-classe':
+        return <BestPerClassRanking />;
+      case 'putinha':
+        return <PutinhaRanking />;
+      case 'vergonha':
+        return <MuralDaVergonha />;
+      case 'killstreak':
+        return <KillStreakRanking />;
+      case 'admin':
+        return <DatabaseManager />;
+      default:
+        return <RankingGeral />;
+    }
+  };
 
-            <TabsContent value="throne">
-              <RankingThroneConquest />
-            </TabsContent>
+  return (
+    <div className="min-h-screen bg-background gradient-gaming flex">
+      <AppSidebar activeTab={activeTab} onTabChange={handleTabChange} />
 
-            <TabsContent value="reis">
-              <ReisDoPVP />
-            </TabsContent>
+      <div className="flex-1 flex flex-col min-h-screen">
+        <div className="container mx-auto px-4 py-8 max-w-6xl flex-1">
+          <header className="text-center mb-8">
+            <h1 className="text-3xl md:text-5xl font-bold text-foreground text-glow flex items-center justify-center gap-3">
+              <Swords className="w-8 h-8 md:w-12 md:h-12 text-primary animate-pulse" />
+              Ranking de Kill - PVP BOSS
+              <Swords className="w-8 h-8 md:w-12 md:h-12 text-primary animate-pulse" />
+            </h1>
+            <p className="text-sm md:text-lg text-muted-foreground mt-2">
+              Aqui separamos os homens das crianças, quem é superior no pvp? quem mais se destaca?
+            </p>
+          </header>
 
-            <TabsContent value="classe-guild">
-              <ClassGuildRanking />
-            </TabsContent>
-
-            <TabsContent value="putinha">
-              <PutinhaRanking />
-            </TabsContent>
-
-            <TabsContent value="vergonha">
-              <MuralDaVergonha />
-            </TabsContent>
-
-            <TabsContent value="killstreak">
-              <KillStreakRanking />
-            </TabsContent>
-
-            {isAdmin && (
-              <TabsContent value="admin">
-                <DatabaseManager />
-              </TabsContent>
-            )}
-          </Tabs>
+          <div className="space-y-8">
+            {renderContent()}
+          </div>
         </div>
+        <Footer />
       </div>
-      <Footer />
     </div>
   );
 };
