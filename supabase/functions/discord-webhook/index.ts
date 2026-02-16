@@ -416,8 +416,18 @@ serve(async (req) => {
           }
         : null;
       
+      // Build link with date/hour filters
+      const frontendUrl = 'https://rankingpvpboss.lovable.app';
+      const tabParam = isThrone ? 'throne' : 'ranking';
+      const dateParam = body.filters.dateFrom || '';
+      const hourParam = body.filters.hourFrom !== undefined ? body.filters.hourFrom : '';
+      const linkParts = [`tab=${tabParam}`];
+      if (dateParam) linkParts.push(`date=${dateParam}`);
+      if (hourParam !== '') linkParts.push(`hour=${hourParam}`);
+      const rankingLink = `${frontendUrl}/?${linkParts.join('&')}`;
+
       const embed3 = {
-        description: footerMessage,
+        description: `${footerMessage}\n\n🔗 **[Ver ranking completo no site](${rankingLink})**`,
         color: 0x9b87f5
       };
       
