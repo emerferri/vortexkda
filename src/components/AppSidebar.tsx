@@ -4,7 +4,8 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
   Swords, LogIn, LogOut, User, Crown, Skull, Users,
-  Trophy, Target, Flame, Award, Menu, X, Shield
+  Trophy, Target, Flame, Award, Menu, X, Shield,
+  ChevronsLeft, ChevronsRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
@@ -40,6 +41,7 @@ interface AppSidebarProps {
 
 export const AppSidebar = ({ activeTab, onTabChange }: AppSidebarProps) => {
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const { user, signOut } = useAuth();
   const { isAdmin, canEditData } = useUserRole();
   const navigate = useNavigate();
@@ -56,11 +58,11 @@ export const AppSidebar = ({ activeTab, onTabChange }: AppSidebarProps) => {
     setOpen(false);
   };
 
-  const NavContent = () => (
+  const NavContent = ({ mini = false, onToggleCollapse }: { mini?: boolean; onToggleCollapse?: () => void }) => (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 p-4 border-b border-border">
-        <Swords className="w-6 h-6 text-primary" />
-        <span className="font-bold text-lg text-foreground">PVP BOSS</span>
+      <div className={cn("flex items-center border-b border-border", mini ? "justify-center p-3" : "gap-2 p-4")}>
+        <Swords className="w-6 h-6 text-primary shrink-0" />
+        {!mini && <span className="font-bold text-lg text-foreground">PVP BOSS</span>}
       </div>
 
       <nav className="flex-1 py-2 overflow-y-auto">
@@ -71,8 +73,10 @@ export const AppSidebar = ({ activeTab, onTabChange }: AppSidebarProps) => {
             <button
               key={item.id}
               onClick={() => handleSelect(item.id)}
+              title={mini ? item.label : undefined}
               className={cn(
-                "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors",
+                "w-full flex items-center text-sm font-medium transition-colors",
+                mini ? "justify-center px-2 py-3" : "gap-3 px-4 py-3",
                 "hover:bg-accent/10 hover:text-accent",
                 isActive
                   ? "bg-primary/15 text-primary border-r-2 border-primary"
@@ -80,14 +84,31 @@ export const AppSidebar = ({ activeTab, onTabChange }: AppSidebarProps) => {
               )}
             >
               <Icon className="w-4 h-4 shrink-0" />
-              <span>{item.label}</span>
+              {!mini && <span>{item.label}</span>}
             </button>
           );
         })}
       </nav>
 
-      <div className="border-t border-border p-4">
-        {user ? (
+      {/* Collapse toggle - desktop only */}
+      {!isMobile && onToggleCollapse && (
+        <div className="border-t border-border p-2">
+          <button
+            onClick={onToggleCollapse}
+            className={cn(
+              "w-full flex items-center text-muted-foreground hover:text-foreground transition-colors py-2",
+              mini ? "justify-center" : "gap-3 px-2"
+            )}
+            title={mini ? "Expandir menu" : "Minimizar menu"}
+          >
+            {mini ? <ChevronsRight className="w-4 h-4" /> : <ChevronsLeft className="w-4 h-4" />}
+            {!mini && <span className="text-xs">Minimizar</span>}
+          </button>
+        </div>
+      )}
+
+      <div className={cn("border-t border-border", mini ? "p-2" : "p-2 px-4")}>
+        {!mini && user ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <User className="w-4 h-4" />
@@ -98,16 +119,21 @@ export const AppSidebar = ({ activeTab, onTabChange }: AppSidebarProps) => {
               Sair
             </Button>
           </div>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate('/auth')}
-            className="w-full gap-2"
-          >
+        ) : !mini ? (
+          <Button variant="outline" size="sm" onClick={() => navigate('/auth')} className="w-full gap-2">
             <LogIn className="w-4 h-4" />
             Login
           </Button>
+        ) : (
+          user ? (
+            <Button variant="ghost" size="icon" onClick={signOut} title="Sair" className="w-full">
+              <LogOut className="w-4 h-4" />
+            </Button>
+          ) : (
+            <Button variant="ghost" size="icon" onClick={() => navigate('/auth')} title="Login" className="w-full">
+              <LogIn className="w-4 h-4" />
+            </Button>
+          )
         )}
       </div>
     </div>
@@ -135,10 +161,13 @@ export const AppSidebar = ({ activeTab, onTabChange }: AppSidebarProps) => {
     );
   }
 
-  // Desktop: fixed sidebar
+  // Desktop: fixed sidebar with collapse
   return (
-    <aside className="w-60 shrink-0 bg-card border-r border-border h-screen sticky top-0 overflow-hidden">
-      <NavContent />
+    <aside className={cn(
+      "shrink-0 bg-card border-r border-border h-screen sticky top-0 overflow-hidden transition-all duration-200",
+      collapsed ? "w-14" : "w-60"
+    )}>
+      <NavContent mini={collapsed} onToggleCollapse={() => setCollapsed(!collapsed)} />
     </aside>
   );
 };
