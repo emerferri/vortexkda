@@ -43,6 +43,11 @@ interface PlayerData {
   eventScore: number;
 }
 
+interface KillLogEntry {
+  killer_name: string;
+  victim_name: string;
+}
+
 interface GeneralRankingBody {
   type?: 'general';
   environment: 'homolog' | 'prod';
@@ -58,6 +63,7 @@ interface GeneralRankingBody {
   guildSummary: Record<string, number>; // Legacy format (backward compatibility)
   guildRanking?: GuildData[]; // New format with full stats
   playerRanking?: PlayerData[]; // Player ranking for text table
+  killLogs?: KillLogEntry[]; // Kill logs for streak calculation
   eventType?: 'boss_event' | 'throne_conquest'; // Type of event
 }
 
@@ -136,6 +142,38 @@ function formatRankingTable(players: PlayerData[]): string {
   });
   
   return table;
+}
+
+// Calculate best kill streak from kill log entries
+function calculateBestKillStreakFromLogs(killLogs: KillLogEntry[]): { name: string; streak: number } | null {
+  if (!killLogs || killLogs.length === 0) return null;
+
+  const playerStreaks = new Map<string, number>();
+  const playerMaxStreaks = new Map<string, number>();
+
+  for (const log of killLogs) {
+    const killer = log.killer_name;
+    const victim = log.victim_name;
+
+    const currentStreak = (playerStreaks.get(killer) || 0) + 1;
+    playerStreaks.set(killer, currentStreak);
+
+    const globalMax = playerMaxStreaks.get(killer) || 0;
+    if (currentStreak > globalMax) {
+      playerMaxStreaks.set(killer, currentStreak);
+    }
+
+    playerStreaks.set(victim, 0);
+  }
+
+  let best: { name: string; streak: number } | null = null;
+  for (const [name, streak] of playerMaxStreaks.entries()) {
+    if (streak >= 2 && (!best || streak > best.streak)) {
+      best = { name, streak };
+    }
+  }
+
+  return best;
 }
 
 serve(async (req) => {
@@ -305,9 +343,27 @@ serve(async (req) => {
       // Títulos dinâmicos baseados no tipo de evento
       const rankingTitle = isThrone ? '📊 Ranking Throne Conquest' : '📊 Ranking BOSS Diário';
       const reiTitle = isThrone ? '👑 Rei do Trono!' : '👑 Rei do PVP';
-      const footerMessage = isThrone
-        ? `Esse é o resultado do Throne Conquest! **${generalBody.specialRankings.reiDoPVP.name}** conquistou o trono, já nosso amigo **${generalBody.specialRankings.coneMonodedo.name}** passou fome!`
-        : `Esse é o resultado do BOSSx2 diário! **${generalBody.specialRankings.reiDoPVP.name}** Amassou hoje, já nosso amigo **${generalBody.specialRankings.coneMonodedo.name}** passou fome!`;
+      
+      // Calculate kill streak from kill logs if available
+      const bestStreak = generalBody.killLogs ? calculateBestKillStreakFromLogs(generalBody.killLogs) : null;
+      
+      // Best KDA player (brabissimo)
+      const bestKDAPlayer = generalBody.specialRankings.brabissimo;
+      const conePlayer = generalBody.specialRankings.coneMonodedo;
+      
+      const eventLabel = isThrone ? 'Throne Conquest' : 'Boss/evento';
+      const footerLines: string[] = [`**Destaques ${eventLabel}:**`];
+      if (bestStreak) {
+        footerLines.push(`1 - **${bestStreak.name}** matou ${bestStreak.streak} vezes sem morrer! é um monstro do PVP.`);
+      }
+      if (bestKDAPlayer && bestKDAPlayer.name) {
+        const kdaValue = generalBody.playerRanking?.find(p => p.name === bestKDAPlayer.name)?.kda;
+        footerLines.push(`2 - **${bestKDAPlayer.name}** esse manja de posicionamento, KDA implacável ${kdaValue?.toFixed(2) || 'N/A'}`);
+      }
+      if (conePlayer && conePlayer.name) {
+        footerLines.push(`3 - **${conePlayer.name}** Esse deve estar jogando sem mouse! morreu ${conePlayer.deaths} vezes!`);
+      }
+      const footerMessage = footerLines.join('\n');
       
       const embed1 = {
         title: rankingTitle,
