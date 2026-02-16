@@ -842,8 +842,23 @@ Deno.serve(async (req) => {
       // No body or invalid JSON, use defaults
     }
 
-    // If this invocation came from cron, run in background and ACK quickly.
+    // --- Authentication ---
+    const authHeader = req.headers.get('Authorization');
+
     if (body.trigger === 'cron') {
+      // Cron calls come from pg_net with the service role or anon key.
+      // Validate that the bearer token matches the service role key or anon key.
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+      const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+      const token = authHeader?.replace('Bearer ', '') || '';
+      if (!token || (token !== serviceRoleKey && token !== anonKey)) {
+        console.error('[Auto Process] Unauthorized cron trigger attempt');
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
       const edgeRuntime = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
       if (edgeRuntime?.waitUntil) {
         edgeRuntime.waitUntil(
@@ -852,13 +867,55 @@ Deno.serve(async (req) => {
           }),
         );
       } else {
-        // Fallback: run inline if waitUntil isn't available.
         await processRanking(body);
       }
 
       return new Response(
         JSON.stringify({ accepted: true, trigger: 'cron' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // Manual / UI calls: require authenticated admin or moderator
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    const supabaseAuth = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    const userId = claimsData.claims.sub as string;
+
+    // Check admin or moderator role using service role client
+    const adminClient = createClient(supabaseUrl, serviceKey);
+    const { data: roleData } = await adminClient
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .in('role', ['admin', 'moderator'])
+      .maybeSingle();
+
+    if (!roleData) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: admin or moderator role required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
