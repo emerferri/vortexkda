@@ -28,7 +28,7 @@ export const BestPerClassRanking = () => {
     queryKey: ['best-per-class', startDate, endDate],
     queryFn: async () => {
       // 1. Fetch matches (with optional date filter)
-      let matchQuery = supabase.from('pvp_matches').select('id, match_date');
+      let matchQuery = supabase.from('pvp_matches').select('id, match_date').eq('event_type', 'boss_event');
       if (startDate) matchQuery = matchQuery.gte('match_date', startDate);
       if (endDate) matchQuery = matchQuery.lte('match_date', endDate);
       const { data: matches, error: mErr } = await matchQuery;
