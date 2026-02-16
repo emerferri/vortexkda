@@ -3,9 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Crown, Trophy, Target, TrendingUp, TrendingDown, Skull } from 'lucide-react';
+import { Crown, Trophy, Target, TrendingUp, TrendingDown, Skull, Calendar, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface PlayerStats {
   player_name: string;
@@ -25,15 +26,22 @@ type ViewMode = 'rei' | 'cone';
 
 export const ReisDoPVP = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('rei');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const { data: rankingData, isLoading } = useQuery({
-    queryKey: ['reis-cone-pvp'],
-    staleTime: 0, // Always refetch
+    queryKey: ['reis-cone-pvp', startDate, endDate],
+    staleTime: 0,
     queryFn: async () => {
       console.log('[ReisDoPVP] Starting query...');
-      const { data: matches, error: matchesError } = await supabase
+      let query = supabase
         .from('pvp_matches')
         .select('id, match_date, match_hour');
+
+      if (startDate) query = query.gte('match_date', startDate);
+      if (endDate) query = query.lte('match_date', endDate);
+
+      const { data: matches, error: matchesError } = await query;
 
       if (matchesError) throw matchesError;
       console.log('[ReisDoPVP] Fetched matches:', matches?.length);
@@ -246,6 +254,39 @@ export const ReisDoPVP = () => {
           <Skull className="w-4 h-4" />
           Cones Monodedo
         </Button>
+      </div>
+
+      {/* Date Filters */}
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-muted-foreground" />
+          <Input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="w-40 h-9 text-sm"
+            placeholder="Data início"
+          />
+          <span className="text-muted-foreground text-sm">até</span>
+          <Input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="w-40 h-9 text-sm"
+            placeholder="Data fim"
+          />
+        </div>
+        {(startDate || endDate) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { setStartDate(''); setEndDate(''); }}
+            className="gap-1 text-muted-foreground"
+          >
+            <X className="w-3 h-3" />
+            Limpar
+          </Button>
+        )}
       </div>
 
       {/* Highlights Cards */}
