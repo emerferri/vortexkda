@@ -144,6 +144,12 @@ export const PutinhaRanking = () => {
       });
 
       // 6) Map to final format and sort by deaths
+      // Pre-compute total kills per killer for sorting
+      const killerTotals = new Map<string, number>();
+      for (const r of filteredRelations) {
+        killerTotals.set(r.killer, (killerTotals.get(r.killer) || 0) + r.count);
+      }
+
       const putinhaRelations: PutinhaRelation[] = filteredRelations
         .map((r) => ({
           victim: r.victim,
@@ -152,7 +158,12 @@ export const PutinhaRanking = () => {
           victimGuild: characterMap.get(r.victim),
           killerGuild: characterMap.get(r.killer),
         }))
-        .sort((a, b) => b.deaths - a.deaths);
+        .sort((a, b) => {
+          if (a.killer !== b.killer) {
+            return (killerTotals.get(b.killer) || 0) - (killerTotals.get(a.killer) || 0);
+          }
+          return b.deaths - a.deaths;
+        });
 
       return putinhaRelations;
     }
