@@ -257,6 +257,43 @@ function parseExternalDbContentThrone(logs: ExternalLogEntry[]): ParseResult {
   return { players, bossLabel, killLogs };
 }
 
+// Calculate best kill streak (consecutive kills without dying) from kill logs
+function calculateBestKillStreak(killLogs: KillLog[], bannedPlayers: Set<string> = new Set()): { name: string; streak: number } | null {
+  if (!killLogs || killLogs.length === 0) return null;
+
+  const playerStreaks = new Map<string, number>();
+  const playerMaxStreaks = new Map<string, number>();
+
+  for (const log of killLogs) {
+    const killer = log.killer;
+    const victim = log.victim;
+
+    // Increment killer streak
+    const currentStreak = (playerStreaks.get(killer) || 0) + 1;
+    playerStreaks.set(killer, currentStreak);
+
+    // Update max streak
+    const globalMax = playerMaxStreaks.get(killer) || 0;
+    if (currentStreak > globalMax) {
+      playerMaxStreaks.set(killer, currentStreak);
+    }
+
+    // Reset victim streak
+    playerStreaks.set(victim, 0);
+  }
+
+  // Find best streak among non-banned players
+  let best: { name: string; streak: number } | null = null;
+  for (const [name, streak] of playerMaxStreaks.entries()) {
+    if (bannedPlayers.has(name)) continue;
+    if (streak >= 2 && (!best || streak > best.streak)) {
+      best = { name, streak };
+    }
+  }
+
+  return best;
+}
+
 // Extract minute from the last log entry - filtered by map type
 function getLastKillMinute(logs: ExternalLogEntry[], eventType: 'boss_event' | 'throne_conquest'): number | null {
   if (!logs || logs.length === 0) return null;
@@ -658,6 +695,9 @@ Deno.serve(async (req) => {
       .sort((a, b) => b.kda - a.kda);
     const brabissimo = sortedByKDA[0];
 
+    // Calculate best kill streak from killLogs
+    const bestKillStreak = calculateBestKillStreak(parseResult.killLogs, bannedPlayerNames);
+
     const totals = {
       kills: nonBannedPlayers.reduce((sum, p) => sum + p.kills, 0),
       deaths: nonBannedPlayers.reduce((sum, p) => sum + p.deaths, 0),
@@ -689,9 +729,18 @@ Deno.serve(async (req) => {
       const rankingTitle = isThrone ? '📊 Ranking Throne Conquest' : '📊 Ranking BOSS Diário';
       const reiTitle = isThrone ? '👑 Rei do Trono!' : '👑 Rei do PVP';
       const embedColor = isThrone ? 0xF59E0B : 0x10B981; // Yellow for throne, green for boss
-      const footerMessage = isThrone
-        ? `Esse é o resultado do Throne Conquest! **${reiDoPVP?.name || 'N/A'}** conquistou o trono, já nosso amigo **${coneMonodedo?.name || 'N/A'}** passou fome!`
-        : `Esse é o resultado do BOSSx2 diário! **${reiDoPVP?.name || 'N/A'}** Amassou hoje, já nosso amigo **${coneMonodedo?.name || 'N/A'}** passou fome!`;
+      const eventLabel = isThrone ? 'Throne Conquest' : 'Boss/evento';
+      const footerLines: string[] = [`**Destaques ${eventLabel}:**`];
+      if (bestKillStreak) {
+        footerLines.push(`1 - **${bestKillStreak.name}** matou ${bestKillStreak.streak} vezes sem morrer! é um monstro do PVP.`);
+      }
+      if (brabissimo) {
+        footerLines.push(`2 - **${brabissimo.name}** esse manja de posicionamento, KDA implacável ${brabissimo.kda.toFixed(2)}`);
+      }
+      if (coneMonodedo) {
+        footerLines.push(`3 - **${coneMonodedo.name}** Esse deve estar jogando sem mouse! morreu ${coneMonodedo.deaths} vezes!`);
+      }
+      const footerMessage = footerLines.join('\n');
 
       // Embed 1: Main info
       const embed1 = {

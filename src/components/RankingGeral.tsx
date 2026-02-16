@@ -362,7 +362,7 @@ export const RankingGeral = () => {
         return { name: original, class: data.class || null, guild: data.guild || null };
       });
 
-      return { aggregated, brabissimoRecord, coneMonodedoName, characters: dedupCharacters };
+      return { aggregated, brabissimoRecord, coneMonodedoName, characters: dedupCharacters, killLogs: logs.map((l: any) => ({ killer_name: l.killer_name, victim_name: l.victim_name })) };
     }
   });
 
@@ -541,7 +541,8 @@ export const RankingGeral = () => {
           deaths: p.deaths,
           kda: p.kda,
           eventScore: p.eventScore
-        }))
+        })),
+        killLogs: aggregatedData?.killLogs || []
       };
 
       const { data, error } = await supabase.functions.invoke('discord-webhook', {
@@ -1052,7 +1053,7 @@ export const RankingGeral = () => {
               return acc;
             }, {} as Record<string, number>);
 
-            return Object.entries(guildCounts)
+            return (Object.entries(guildCounts) as [string, number][])
               .sort((a, b) => b[1] - a[1])
               .map(([guild, count]) => (
                 <div
