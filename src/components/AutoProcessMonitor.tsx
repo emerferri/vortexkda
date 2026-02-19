@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Activity, CheckCircle2, Clock, AlertCircle, RefreshCw, Calendar, Users, Play, Loader2 } from 'lucide-react';
+import { Activity, CheckCircle2, Clock, AlertCircle, RefreshCw, Calendar, Users, Play, Loader2, Crown } from 'lucide-react';
 import { format, formatDistanceToNow, parseISO, isToday, isYesterday, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -14,6 +14,7 @@ interface MatchData {
   match_hour: number;
   boss_label: string;
   created_at: string;
+  event_type: string;
   player_count?: number;
 }
 
@@ -22,6 +23,7 @@ interface ExpectedEvent {
   hour: number;
   minute: number;
   label: string;
+  eventType: 'boss_event' | 'throne_conquest';
 }
 
 export const AutoProcessMonitor = () => {
@@ -33,23 +35,20 @@ export const AutoProcessMonitor = () => {
 
   const fetchRecentMatches = async () => {
     try {
-      // Buscar últimas 14 partidas processadas (7 dias x 2 eventos por dia)
       const { data: matches, error } = await supabase
         .from('pvp_matches')
-        .select('id, match_date, match_hour, boss_label, created_at')
+        .select('id, match_date, match_hour, boss_label, created_at, event_type')
         .order('created_at', { ascending: false })
-        .limit(14);
+        .limit(21);
 
       if (error) throw error;
 
-      // Buscar contagem de jogadores para cada partida
       const matchesWithCounts = await Promise.all(
         (matches || []).map(async (match) => {
           const { count } = await supabase
             .from('pvp_match_players')
             .select('*', { count: 'exact', head: true })
             .eq('match_id', match.id);
-          
           return { ...match, player_count: count || 0 };
         })
       );
@@ -62,9 +61,7 @@ export const AutoProcessMonitor = () => {
     }
   };
 
-  useEffect(() => {
-    fetchRecentMatches();
-  }, []);
+  useEffect(() => { fetchRecentMatches(); }, []);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -72,53 +69,36 @@ export const AutoProcessMonitor = () => {
     setRefreshing(false);
   };
 
-  // Disparar processamento manual de um evento
   const handleManualProcess = async (event: ExpectedEvent) => {
-    const eventKey = `${event.date}-${event.hour}`;
+    const eventKey = `${event.date}-${event.hour}-${event.eventType}`;
     setProcessingEvent(eventKey);
-    
+
     try {
-      console.log(`[Manual Trigger] Disparando processamento para ${event.date} ${event.hour}:${event.minute}`);
-      
       const { data, error } = await supabase.functions.invoke('auto-process-ranking', {
         body: {
           attempt: 3,
           forceProcess: true,
           eventHour: event.hour,
-          eventMinute: event.minute
+          eventMinute: event.minute,
+          eventType: event.eventType,
         }
       });
 
       if (error) throw error;
 
-      console.log('[Manual Trigger] Resposta:', data);
-
       if (data?.success) {
         toast({
           title: "Processamento concluído!",
-          description: `Ranking de ${event.date} ${event.hour}:${String(event.minute).padStart(2, '0')} processado com ${data.playersCount || 0} jogadores.`,
+          description: `Ranking de ${event.date} ${event.hour}:${String(event.minute).padStart(2, '0')} processado com ${data.playersCount || data.playerCount || 0} jogadores.`,
         });
-        // Atualizar lista após sucesso
         await fetchRecentMatches();
       } else if (data?.skipped) {
-        toast({
-          title: "Evento já processado",
-          description: data.message || "Este evento já foi processado anteriormente.",
-          variant: "default",
-        });
+        toast({ title: "Evento já processado", description: data.message || "Este evento já foi processado anteriormente." });
         await fetchRecentMatches();
       } else if (data?.noData) {
-        toast({
-          title: "Sem dados",
-          description: data.message || "Nenhum dado encontrado para este período.",
-          variant: "destructive",
-        });
+        toast({ title: "Sem dados", description: data.message || "Nenhum dado encontrado para este período.", variant: "destructive" });
       } else {
-        toast({
-          title: "Resultado inesperado",
-          description: JSON.stringify(data),
-          variant: "default",
-        });
+        toast({ title: "Resultado inesperado", description: JSON.stringify(data) });
       }
     } catch (error) {
       console.error('[Manual Trigger] Erro:', error);
@@ -132,57 +112,59 @@ export const AutoProcessMonitor = () => {
     }
   };
 
-  // Gerar lista de eventos esperados para os últimos 7 dias
   const getExpectedEvents = (): ExpectedEvent[] => {
     const events: ExpectedEvent[] = [];
     const today = new Date();
-    
+
     for (let i = 0; i < 7; i++) {
       const date = subDays(today, i);
       const dateStr = format(date, 'yyyy-MM-dd');
-      const dayOfWeek = date.getDay(); // 0 = domingo, 1 = segunda, 2 = terça, 4 = quinta
-      
-      // Primeiro evento do dia - 21:00 para segunda-feira, 20:00 para outros dias
+      const dayOfWeek = date.getDay();
+
+      // First boss event
       const firstEventHour = dayOfWeek === 1 ? 21 : 20;
       events.push({
-        date: dateStr,
-        hour: firstEventHour,
-        minute: 0,
-        label: `BOSSx2 ${format(date, 'dd/MM/yyyy')} ${firstEventHour}H`
+        date: dateStr, hour: firstEventHour, minute: 0,
+        label: `BOSSx2 ${format(date, 'dd/MM/yyyy')} ${firstEventHour}H`,
+        eventType: 'boss_event',
       });
-      
-      // Segundo evento - 22:00 (ou 22:30 para terça/quinta)
-      const isSecondEventLate = dayOfWeek === 2 || dayOfWeek === 4; // terça ou quinta
+
+      // Tuesday: Throne Conquest at 21:36
+      if (dayOfWeek === 2) {
+        events.push({
+          date: dateStr, hour: 21, minute: 36,
+          label: `Throne ${format(date, 'dd/MM/yyyy')} 21:36`,
+          eventType: 'throne_conquest',
+        });
+      }
+
+      // Second boss event
+      const isSecondEventLate = dayOfWeek === 2 || dayOfWeek === 4;
       events.push({
-        date: dateStr,
-        hour: 22,
-        minute: isSecondEventLate ? 30 : 0,
-        label: `BOSSx2 ${format(date, 'dd/MM/yyyy')} 22${isSecondEventLate ? ':30' : ':00'}`
+        date: dateStr, hour: 22, minute: isSecondEventLate ? 30 : 0,
+        label: `BOSSx2 ${format(date, 'dd/MM/yyyy')} 22${isSecondEventLate ? ':30' : ':00'}`,
+        eventType: 'boss_event',
       });
     }
-    
+
     return events;
   };
 
-  // Verificar se um evento foi processado
   const isEventProcessed = (event: ExpectedEvent): MatchData | null => {
     return recentMatches.find(
-      (m) => m.match_date === event.date && m.match_hour === event.hour
+      (m) => m.match_date === event.date && m.match_hour === event.hour && m.event_type === event.eventType
     ) || null;
   };
 
-  // Verificar se evento deveria ter sido processado (já passou)
   const shouldBeProcessed = (event: ExpectedEvent): boolean => {
     const now = new Date();
     const eventDate = parseISO(event.date);
     const eventTime = new Date(eventDate);
-    // Evento deve estar 30 minutos após o início para considerar processável
     eventTime.setHours(event.hour);
     eventTime.setMinutes(event.minute + 30);
     return now > eventTime;
   };
 
-  // Verificar se pode disparar manualmente (passou pelo menos 25 min desde o início)
   const canManuallyProcess = (event: ExpectedEvent): boolean => {
     const now = new Date();
     const eventDate = parseISO(event.date);
@@ -193,8 +175,6 @@ export const AutoProcessMonitor = () => {
   };
 
   const expectedEvents = getExpectedEvents();
-  
-  // Estatísticas
   const processedCount = expectedEvents.filter(e => isEventProcessed(e) && shouldBeProcessed(e)).length;
   const pendingCount = expectedEvents.filter(e => !isEventProcessed(e) && shouldBeProcessed(e)).length;
   const upcomingCount = expectedEvents.filter(e => !shouldBeProcessed(e)).length;
@@ -204,14 +184,9 @@ export const AutoProcessMonitor = () => {
     const eventTime = new Date(eventDate);
     eventTime.setHours(event.hour);
     eventTime.setMinutes(event.minute);
-    
     const processedTime = parseISO(match.created_at);
-    const delayMs = processedTime.getTime() - eventTime.getTime();
-    const delayMinutes = Math.round(delayMs / (1000 * 60));
-    
-    if (delayMinutes < 60) {
-      return `${delayMinutes}min após`;
-    }
+    const delayMinutes = Math.round((processedTime.getTime() - eventTime.getTime()) / 60000);
+    if (delayMinutes < 60) return `${delayMinutes}min após`;
     const hours = Math.floor(delayMinutes / 60);
     const mins = delayMinutes % 60;
     return `${hours}h${mins > 0 ? ` ${mins}min` : ''} após`;
@@ -254,25 +229,16 @@ export const AutoProcessMonitor = () => {
             <Activity className="w-6 h-6 text-primary" />
             <div>
               <CardTitle>Monitoramento de Processamento Automático</CardTitle>
-              <CardDescription className="mt-1">
-                Status dos últimos rankings processados automaticamente
-              </CardDescription>
+              <CardDescription className="mt-1">Status dos últimos rankings processados automaticamente</CardDescription>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="gap-2"
-          >
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2">
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
         </div>
       </CardHeader>
       <CardContent>
-        {/* Estatísticas resumidas */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 text-center">
             <CheckCircle2 className="w-6 h-6 text-green-500 mx-auto mb-2" />
@@ -291,22 +257,22 @@ export const AutoProcessMonitor = () => {
           </div>
         </div>
 
-        {/* Lista de eventos */}
         <div className="space-y-2">
-          {expectedEvents.map((event, index) => {
+          {expectedEvents.map((event) => {
             const match = isEventProcessed(event);
             const isPast = shouldBeProcessed(event);
             const isProcessed = !!match;
-            const eventKey = `${event.date}-${event.hour}`;
+            const eventKey = `${event.date}-${event.hour}-${event.eventType}`;
             const isProcessing = processingEvent === eventKey;
             const canProcess = canManuallyProcess(event);
-            
+            const isThrone = event.eventType === 'throne_conquest';
+
             return (
               <div
                 key={eventKey}
                 className={`flex items-center justify-between p-3 rounded-lg border ${
                   isProcessed
-                    ? 'bg-green-500/5 border-green-500/20'
+                    ? isThrone ? 'bg-amber-500/5 border-amber-500/20' : 'bg-green-500/5 border-green-500/20'
                     : isPast
                     ? 'bg-yellow-500/5 border-yellow-500/20'
                     : 'bg-muted/30 border-border'
@@ -314,14 +280,17 @@ export const AutoProcessMonitor = () => {
               >
                 <div className="flex items-center gap-3">
                   <div className={`w-2 h-2 rounded-full ${
-                    isProcessed ? 'bg-green-500' : isPast ? 'bg-yellow-500' : 'bg-muted-foreground'
+                    isProcessed ? (isThrone ? 'bg-amber-500' : 'bg-green-500') : isPast ? 'bg-yellow-500' : 'bg-muted-foreground'
                   }`} />
                   <div>
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      {isThrone ? <Crown className="w-4 h-4 text-amber-500" /> : <Calendar className="w-4 h-4 text-muted-foreground" />}
                       <span className="font-medium">
                         {getDateLabel(event.date)} - {formatEventTime(event)}
                       </span>
+                      {isThrone && (
+                        <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/30 text-xs">Throne</Badge>
+                      )}
                       <Badge variant="outline" className="text-xs">
                         {format(parseISO(event.date), 'dd/MM')}
                       </Badge>
@@ -336,24 +305,22 @@ export const AutoProcessMonitor = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   {isProcessed ? (
-                    <Badge className="bg-green-500/20 text-green-500 border-green-500/30">
+                    <Badge className={isThrone
+                      ? "bg-amber-500/20 text-amber-500 border-amber-500/30"
+                      : "bg-green-500/20 text-green-500 border-green-500/30"
+                    }>
                       <CheckCircle2 className="w-3 h-3 mr-1" />
                       Processado
                     </Badge>
                   ) : isPast ? (
                     <>
                       <Button
-                        variant="outline"
-                        size="sm"
+                        variant="outline" size="sm"
                         onClick={() => handleManualProcess(event)}
                         disabled={isProcessing || !canProcess}
                         className="gap-1 h-7 text-xs bg-yellow-500/10 border-yellow-500/30 hover:bg-yellow-500/20"
                       >
-                        {isProcessing ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Play className="w-3 h-3" />
-                        )}
+                        {isProcessing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                         {isProcessing ? 'Processando...' : 'Processar'}
                       </Button>
                       <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/30">
@@ -364,17 +331,12 @@ export const AutoProcessMonitor = () => {
                   ) : canProcess ? (
                     <>
                       <Button
-                        variant="outline"
-                        size="sm"
+                        variant="outline" size="sm"
                         onClick={() => handleManualProcess(event)}
                         disabled={isProcessing}
                         className="gap-1 h-7 text-xs"
                       >
-                        {isProcessing ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Play className="w-3 h-3" />
-                        )}
+                        {isProcessing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                         {isProcessing ? 'Processando...' : 'Processar'}
                       </Button>
                       <Badge variant="outline" className="text-muted-foreground">
@@ -394,15 +356,11 @@ export const AutoProcessMonitor = () => {
           })}
         </div>
 
-        {/* Último processamento */}
         {recentMatches.length > 0 && (
           <div className="mt-4 pt-4 border-t">
             <p className="text-sm text-muted-foreground">
               Último processamento: <span className="font-medium text-foreground">
-                {formatDistanceToNow(parseISO(recentMatches[0].created_at), { 
-                  addSuffix: true, 
-                  locale: ptBR 
-                })}
+                {formatDistanceToNow(parseISO(recentMatches[0].created_at), { addSuffix: true, locale: ptBR })}
               </span>
               {' '}({format(parseISO(recentMatches[0].created_at), "dd/MM 'às' HH:mm", { locale: ptBR })})
             </p>

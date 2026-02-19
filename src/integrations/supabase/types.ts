@@ -41,6 +41,27 @@ export type Database = {
         }
         Relationships: []
       }
+      discord_highlight_phrases: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          phrase_template: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          phrase_template: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          phrase_template?: string
+        }
+        Relationships: []
+      }
       pvp_kill_logs: {
         Row: {
           created_at: string

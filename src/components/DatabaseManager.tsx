@@ -29,6 +29,7 @@ import { ConfrontosDiretos } from './ConfrontosDiretos';
 import { Characters } from './Characters';
 import { UserManagement } from './UserManagement';
 import { AutoProcessMonitor } from './AutoProcessMonitor';
+import { DiscordPhrasesManager } from './DiscordPhrasesManager';
 
 export const DatabaseManager = () => {
   const [loading, setLoading] = useState(false);
@@ -168,9 +169,10 @@ export const DatabaseManager = () => {
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-5 mb-6">
+      <TabsList className="grid w-full grid-cols-6 mb-6">
         <TabsTrigger value="monitoramento">Monitoramento</TabsTrigger>
         <TabsTrigger value="management">Gerenciamento</TabsTrigger>
+        <TabsTrigger value="frases">Frases Discord</TabsTrigger>
         <TabsTrigger value="usuarios">Usuários</TabsTrigger>
         <TabsTrigger value="confrontos">Confrontos Diretos</TabsTrigger>
         <TabsTrigger value="personagens">Personagens</TabsTrigger>
@@ -377,6 +379,10 @@ export const DatabaseManager = () => {
             </DialogContent>
           </Dialog>
         </div>
+      </TabsContent>
+
+      <TabsContent value="frases">
+        <DiscordPhrasesManager />
       </TabsContent>
 
       <TabsContent value="usuarios">
