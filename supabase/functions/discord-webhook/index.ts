@@ -352,16 +352,50 @@ serve(async (req) => {
       const conePlayer = generalBody.specialRankings.coneMonodedo;
       
       const eventLabel = isThrone ? 'Throne Conquest' : 'Boss/evento';
+
+      // Fetch dynamic phrases from database
+      let dynamicPhrases: Record<string, string[]> = {};
+      try {
+        const serviceClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        );
+        const { data: phrasesData } = await serviceClient
+          .from('discord_highlight_phrases')
+          .select('category, phrase_template');
+        if (phrasesData && phrasesData.length > 0) {
+          for (const p of phrasesData) {
+            if (!dynamicPhrases[p.category]) dynamicPhrases[p.category] = [];
+            dynamicPhrases[p.category].push(p.phrase_template);
+          }
+        }
+      } catch (e) {
+        console.log('[Discord Webhook] Failed to fetch dynamic phrases, using defaults');
+      }
+
+      const nowDate = new Date();
+      const startOfYear = new Date(nowDate.getFullYear(), 0, 0);
+      const dayOfYear = Math.floor((nowDate.getTime() - startOfYear.getTime()) / 86400000);
+
+      const selectPhrase = (category: string, name: string, value: string, fallback: string): string => {
+        const phrases = dynamicPhrases[category];
+        if (phrases && phrases.length > 0) {
+          const template = phrases[dayOfYear % phrases.length];
+          return template.replace(/\{name\}/g, name).replace(/\{value\}/g, value);
+        }
+        return fallback;
+      };
+
       const footerLines: string[] = [`**Destaques ${eventLabel}:**`];
       if (bestStreak) {
-        footerLines.push(`1 - **${bestStreak.name}** matou ${bestStreak.streak} vezes sem morrer! é um monstro do PVP.`);
+        footerLines.push(`1 - ${selectPhrase('kill_streak', `**${bestStreak.name}**`, String(bestStreak.streak), `**${bestStreak.name}** matou ${bestStreak.streak} vezes sem morrer! é um monstro do PVP.`)}`);
       }
       if (bestKDAPlayer && bestKDAPlayer.name) {
         const kdaValue = generalBody.playerRanking?.find(p => p.name === bestKDAPlayer.name)?.kda;
-        footerLines.push(`2 - **${bestKDAPlayer.name}** esse manja de posicionamento, KDA implacável ${kdaValue?.toFixed(2) || 'N/A'}`);
+        footerLines.push(`2 - ${selectPhrase('best_kda', `**${bestKDAPlayer.name}**`, kdaValue?.toFixed(2) || 'N/A', `**${bestKDAPlayer.name}** esse manja de posicionamento, KDA implacável ${kdaValue?.toFixed(2) || 'N/A'}`)}`);
       }
       if (conePlayer && conePlayer.name) {
-        footerLines.push(`3 - **${conePlayer.name}** Esse deve estar jogando sem mouse! morreu ${conePlayer.deaths} vezes!`);
+        footerLines.push(`3 - ${selectPhrase('cone', `**${conePlayer.name}**`, String(conePlayer.deaths), `**${conePlayer.name}** Esse deve estar jogando sem mouse! morreu ${conePlayer.deaths} vezes!`)}`);
       }
       const footerMessage = footerLines.join('\n');
       

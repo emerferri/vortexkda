@@ -730,15 +730,45 @@ Deno.serve(async (req) => {
       const reiTitle = isThrone ? '👑 Rei do Trono!' : '👑 Rei do PVP';
       const embedColor = isThrone ? 0xF59E0B : 0x10B981; // Yellow for throne, green for boss
       const eventLabel = isThrone ? 'Throne Conquest' : 'Boss/evento';
+      // Fetch dynamic phrases from database
+      let dynamicPhrases: Record<string, string[]> = {};
+      try {
+        const { data: phrasesData } = await supabaseClient
+          .from('discord_highlight_phrases')
+          .select('category, phrase_template');
+        if (phrasesData && phrasesData.length > 0) {
+          for (const p of phrasesData) {
+            if (!dynamicPhrases[p.category]) dynamicPhrases[p.category] = [];
+            dynamicPhrases[p.category].push(p.phrase_template);
+          }
+        }
+      } catch (e) {
+        console.log('[Auto Process] Failed to fetch dynamic phrases, using defaults');
+      }
+
+      // Select phrase by day of year for daily variety
+      const now = new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 0);
+      const dayOfYear = Math.floor((now.getTime() - startOfYear.getTime()) / 86400000);
+
+      const selectPhrase = (category: string, name: string, value: string, fallback: string): string => {
+        const phrases = dynamicPhrases[category];
+        if (phrases && phrases.length > 0) {
+          const template = phrases[dayOfYear % phrases.length];
+          return template.replace(/\{name\}/g, name).replace(/\{value\}/g, value);
+        }
+        return fallback;
+      };
+
       const footerLines: string[] = [`**Destaques ${eventLabel}:**`];
       if (bestKillStreak) {
-        footerLines.push(`1 - **${bestKillStreak.name}** matou ${bestKillStreak.streak} vezes sem morrer! é um monstro do PVP.`);
+        footerLines.push(`1 - ${selectPhrase('kill_streak', `**${bestKillStreak.name}**`, String(bestKillStreak.streak), `**${bestKillStreak.name}** matou ${bestKillStreak.streak} vezes sem morrer! é um monstro do PVP.`)}`);
       }
       if (brabissimo) {
-        footerLines.push(`2 - **${brabissimo.name}** esse manja de posicionamento, KDA implacável ${brabissimo.kda.toFixed(2)}`);
+        footerLines.push(`2 - ${selectPhrase('best_kda', `**${brabissimo.name}**`, brabissimo.kda.toFixed(2), `**${brabissimo.name}** esse manja de posicionamento, KDA implacável ${brabissimo.kda.toFixed(2)}`)}`);
       }
       if (coneMonodedo) {
-        footerLines.push(`3 - **${coneMonodedo.name}** Esse deve estar jogando sem mouse! morreu ${coneMonodedo.deaths} vezes!`);
+        footerLines.push(`3 - ${selectPhrase('cone', `**${coneMonodedo.name}**`, String(coneMonodedo.deaths), `**${coneMonodedo.name}** Esse deve estar jogando sem mouse! morreu ${coneMonodedo.deaths} vezes!`)}`);
       }
       const footerMessage = footerLines.join('\n');
 
