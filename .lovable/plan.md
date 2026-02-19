@@ -1,11 +1,10 @@
 
-# Plano: Frases Dinamicas + Throne no Monitoramento
 
-## Parte 1: Tabela de Frases Dinamicas
+# Frases Dinamicas no Discord + Throne no Monitoramento
 
-### Nova tabela `discord_highlight_phrases`
+## Parte 1: Criar tabela `discord_highlight_phrases`
 
-Criar a tabela com as colunas:
+Criar a tabela no banco de dados com:
 - `id` (uuid, PK)
 - `category` (text): `kill_streak`, `best_kda`, `cone`
 - `phrase_template` (text): template com placeholders `{name}` e `{value}`
@@ -13,46 +12,50 @@ Criar a tabela com as colunas:
 
 RLS: leitura publica, escrita apenas admin.
 
-Inserir frases iniciais (pelo menos 5 por categoria) com variacoes criativas.
+Inserir aproximadamente 8 frases por categoria com variacoes criativas de zueira.
 
-### Alteracoes nas Edge Functions
+## Parte 2: Alterar Edge Functions
 
-**`supabase/functions/auto-process-ranking/index.ts`** (linhas 730-743):
-- Antes de montar os destaques, buscar frases da tabela `discord_highlight_phrases` agrupadas por categoria
-- Selecionar frase usando `dia_do_ano % total_frases` como indice
-- Aplicar placeholders `{name}` e `{value}` nos templates
-- Fallback para frases padrao caso a tabela esteja vazia
+**`auto-process-ranking`**: Antes de montar destaques, buscar frases da tabela, selecionar por `dia_do_ano % total_frases`, aplicar placeholders `{name}` e `{value}`. Fallback para frase padrao se tabela vazia.
 
-**`supabase/functions/discord-webhook/index.ts`** (linhas 348-366):
-- Mesma logica: buscar frases, selecionar por dia do ano, aplicar placeholders
-- Usar service role client para ler a tabela (ja existe autenticacao no fluxo)
+**`discord-webhook`**: Mesma logica de frases dinamicas.
 
-### Tela de Gerenciamento (Admin)
+## Parte 3: Tela de gerenciamento (Admin)
 
-Novo componente `src/components/DiscordPhrasesManager.tsx`:
-- Listar frases agrupadas por categoria (kill_streak, best_kda, cone)
-- Botao para adicionar nova frase por categoria
-- Editar/remover frases existentes
-- Preview dos placeholders disponiveis (`{name}`, `{value}`)
+Novo componente `DiscordPhrasesManager.tsx`:
+- Listar frases por categoria
+- Adicionar/editar/remover frases
+- Preview dos placeholders
 
-Adicionar como nova aba ou secao dentro da area de Gerenciamento no `DatabaseManager.tsx`.
+Integrar no `DatabaseManager.tsx`.
 
----
+## Parte 4: Throne Conquest no Monitoramento
 
-## Parte 2: Throne Conquest no Monitoramento
+Alterar `AutoProcessMonitor.tsx`:
+- Adicionar `event_type` nas interfaces e queries
+- Nas tercas-feiras, incluir evento Throne 21:36 na lista de esperados
+- Comparar `event_type` na verificacao de duplicatas
+- Badge visual diferenciada (amarelo/dourado) para Throne
 
-### Alteracoes em `src/components/AutoProcessMonitor.tsx`
+## Detalhes tecnicos
 
-1. **Interface `MatchData`**: adicionar campo `event_type` (string)
-2. **Interface `ExpectedEvent`**: adicionar campo `eventType` (`'boss_event' | 'throne_conquest'`)
-3. **`fetchRecentMatches`**: incluir `event_type` no select, aumentar limit para 21
-4. **`getExpectedEvents`**: nas tercas (dayOfWeek === 2), adicionar evento Throne com hora 21, minuto 36, label `THRONE`, eventType `throne_conquest`
-5. **`isEventProcessed`**: comparar tambem `event_type` para nao confundir Boss com Throne no mesmo horario
-6. **`handleManualProcess`**: enviar `eventType` no body da invocacao da edge function
-7. **UI**: Badge visual diferenciada para Throne (cor amarela/dourada) com label "THRONE" ao lado da data
+### Arquivos afetados
+| Arquivo | Acao |
+|---------|------|
+| Nova migracao SQL | Criar tabela + RLS + seed de frases |
+| `supabase/functions/auto-process-ranking/index.ts` | Buscar frases dinamicas |
+| `supabase/functions/discord-webhook/index.ts` | Buscar frases dinamicas |
+| `src/components/DiscordPhrasesManager.tsx` | NOVO - gerenciamento de frases |
+| `src/components/DatabaseManager.tsx` | Adicionar aba/secao de frases |
+| `src/components/AutoProcessMonitor.tsx` | Throne + event_type |
 
-### Logica de eventos esperados por dia
+### Logica de selecao de frases
+```text
+indice = dia_do_ano % total_frases_da_categoria
+```
+Garante variedade diaria e determinismo (mesma frase o dia todo).
 
+### Eventos esperados por dia da semana
 ```text
 Segunda (1): 21:00 BOSS, 22:00 BOSS
 Terca (2):   20:00 BOSS, 21:36 THRONE, 22:30 BOSS
@@ -63,15 +66,3 @@ Sabado (6):  20:00 BOSS, 22:00 BOSS
 Domingo (0): 20:00 BOSS, 22:00 BOSS
 ```
 
----
-
-## Resumo de arquivos
-
-| Arquivo | Acao |
-|---------|------|
-| Nova migracao SQL | Criar tabela `discord_highlight_phrases` + RLS + dados iniciais |
-| `supabase/functions/auto-process-ranking/index.ts` | Buscar frases dinamicas da tabela |
-| `supabase/functions/discord-webhook/index.ts` | Buscar frases dinamicas da tabela |
-| `src/components/DiscordPhrasesManager.tsx` | NOVO - Tela de gerenciamento de frases |
-| `src/components/DatabaseManager.tsx` | Adicionar acesso ao gerenciador de frases |
-| `src/components/AutoProcessMonitor.tsx` | Incluir Throne + event_type na logica |
