@@ -10,6 +10,7 @@ import { MuralDaVergonha } from '@/components/MuralDaVergonha';
 import { KillStreakRanking } from '@/components/KillStreakRanking';
 import { ReisDoPVP } from '@/components/ReisDoPVP';
 import { BestPerClassRanking } from '@/components/BestPerClassRanking';
+import { ClassMatchup } from '@/components/ClassMatchup';
 import { DatabaseManager } from '@/components/DatabaseManager';
 import { DatabaseImport } from '@/components/DatabaseImport';
 import { parseTxtFile, ParseResult } from '@/utils/txtParser';
@@ -111,6 +112,8 @@ const Index = () => {
         return <ClassGuildRanking />;
       case 'melhor-classe':
         return <BestPerClassRanking />;
+      case 'classe-matchup':
+        return <ClassMatchup />;
       case 'putinha':
         return <PutinhaRanking />;
       case 'vergonha':
