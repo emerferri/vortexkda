@@ -1,110 +1,60 @@
 
+# Indicador Classe x Classe (Class Matchup)
 
-# Implementacao: Frases Dinamicas + Throne no Monitoramento
+## Objetivo
+Criar uma nova tela que mostra a vantagem de cada classe sobre as outras, baseada nos logs de kills (`pvp_kill_logs`). Para cada classe, exibir quantas vezes matou/morreu para cada classe adversaria, com percentual e grafico.
 
-## Status atual
+## Fonte de dados
+- `pvp_kill_logs` (~18.430 registros): fornece `killer_name` e `victim_name`
+- `characters`: fornece a `class` de cada jogador (excluindo banidos)
+- Cruzamento: normalizar nomes e fazer lookup da classe do killer e da vitima
 
-- Tabela `discord_highlight_phrases`: NAO EXISTE no banco
-- Edge functions: frases de destaque FIXAS (hardcoded)
-- AutoProcessMonitor: NAO inclui Throne Conquest nas tercas
-- DiscordPhrasesManager: NAO EXISTE
+## Novo componente: `src/components/ClassMatchup.tsx`
 
-## Parte 1: Criar tabela no banco de dados
+### Logica principal
+1. Buscar todos os `pvp_kill_logs` (com paginacao de 1000)
+2. Buscar todos os `characters` (name, class, banned=false)
+3. Para cada kill log, resolver a classe do killer e da vitima
+4. Ignorar logs onde killer ou vitima nao tem classe cadastrada
+5. Agregar em uma matriz: `classA matou classB = N vezes`
+6. Calcular percentuais: do total de kills de classA, qual % foi contra cada classe
 
-Criar tabela `discord_highlight_phrases` com:
-- `id` (uuid, PK)
-- `category` (text): `kill_streak`, `best_kda`, `cone`
-- `phrase_template` (text): template com `{name}` e `{value}`
-- `created_at` (timestamptz)
+### Interface
+- **Seletor de classe**: dropdown para escolher uma classe especifica ou ver todas
+- **Modo de visualizacao**:
+  - Tabela com colunas: Classe Atacante, Classe Alvo, Kills, % do Total
+  - Grafico de barras horizontais (Recharts BarChart) mostrando distribuicao de kills por classe alvo
+- **Filtro de data**: campos de data inicio/fim (reutilizando padrao existente)
+- **Exportar**: botoes para Excel e imagem (seguindo padrao do ClassGuildRanking)
 
-RLS: leitura publica, escrita apenas admin.
+### Layout visual
+Ao selecionar uma classe:
+- Card com titulo "Lord Emperor vs Outras Classes"
+- Grafico de barras horizontal mostrando kills contra cada classe adversaria
+- Tabela abaixo com: Classe Alvo | Kills Realizadas | Mortes Sofridas | Saldo | Win Rate %
 
-Inserir ~8 frases por categoria com variacoes de zueira. Exemplos:
+## Alteracoes nos arquivos
 
-**kill_streak:**
-- `{name} matou {value} vezes sem morrer! Ta possuido!`
-- `{name} fez {value} kills seguidas! Maquina de guerra!`
-- `{name} com {value} kills sem dar respawn! Alguem para esse maluco!`
-- `Sequencia insana de {value} kills! {name} esta on fire!`
-- `{name} eliminou {value} sem piedade! O cemiterio ta lotado!`
-- `{name} com {value} kills seguidas! Nasceu pra isso!`
-- `{name} mandou {value} pro caixao sem morrer! Brabo demais!`
-- `{name} nao morre nunca! {value} kills na sequencia!`
+### Novo arquivo
+- `src/components/ClassMatchup.tsx` - componente completo
 
-**best_kda:**
-- `{name} com KDA de {value}, cirurgico no PVP!`
-- `{name} nao erra um golpe! KDA brutal: {value}`
-- `{name} esse manja de posicionamento, KDA implacavel {value}`
-- `{name} ta jogando xadrez enquanto os outros jogam damas! KDA: {value}`
-- `{name} com KDA {value}! Parece hack mas e talento!`
-- `{name} KDA de {value}! Esse ai leu o manual do jogo!`
-- `{name} com {value} de KDA! Precisao cirurgica!`
-- `{name} ta dando aula! KDA absurdo de {value}!`
+### Arquivos editados
+- `src/pages/Index.tsx` - adicionar case 'classe-matchup' no renderContent
+- `src/components/AppSidebar.tsx` - adicionar item de navegacao "Classe x Classe" com icone Crosshair, posicionado apos "Melhor por Classe"
 
-**cone:**
-- `{name} morreu {value} vezes! Alguem empresta um mouse pra ele!`
-- `{name} caiu {value} vezes! Tava jogando de olhos fechados?`
-- `{name} morreu {value} vezes! Esse deve estar jogando sem mouse!`
-- `{name} com {value} mortes! O chao ta com saudade dele!`
-- `{name} visitou o respawn {value} vezes! Ja tem cartao fidelidade!`
-- `{name} morreu {value} vezes! Ta treinando pra morrer mais rapido?`
-- `{name} com {value} deaths! Recorde de idas ao cemiterio!`
-- `{name} tombou {value} vezes! Pelo menos e persistente!`
+## Detalhes tecnicos
 
-## Parte 2: Alterar Edge Functions
+### Paginacao dos kill logs
+Os ~18.430 registros precisam de paginacao com `.range()` em blocos de 1000, igual ao padrao ja usado em outros componentes.
 
-### `auto-process-ranking` (linhas ~730-743)
-Antes de montar os destaques:
-1. Buscar frases da tabela usando service role client
-2. Calcular `dayOfYear = Math.floor((Date.now() - new Date(year, 0, 0)) / 86400000)`
-3. Para cada categoria, selecionar `phrases[dayOfYear % phrases.length]`
-4. Aplicar `.replace('{name}', nome).replace('{value}', valor)`
-5. Fallback para frases atuais se tabela vazia
-
-### `discord-webhook` (linhas ~354-366)
-Mesma logica de selecao e aplicacao de frases dinamicas.
-
-## Parte 3: Tela de gerenciamento (Admin)
-
-Novo componente `src/components/DiscordPhrasesManager.tsx`:
-- Listar frases agrupadas por categoria (kill_streak, best_kda, cone)
-- Botao para adicionar nova frase por categoria
-- Editar/remover frases existentes
-- Preview dos placeholders disponiveis
-
-Integrar no `DatabaseManager.tsx` como nova aba "Frases Discord" (grid passa de 5 para 6 colunas).
-
-## Parte 4: Throne no AutoProcessMonitor
-
-Alteracoes em `src/components/AutoProcessMonitor.tsx`:
-
-1. Interface `MatchData`: adicionar `event_type` (string)
-2. Interface `ExpectedEvent`: adicionar `eventType` ('boss_event' | 'throne_conquest')
-3. `fetchRecentMatches`: incluir `event_type` no select, limit para 21
-4. `getExpectedEvents`: nas tercas (dayOfWeek === 2), adicionar evento Throne 21:36
-5. `isEventProcessed`: comparar tambem `event_type`
-6. `handleManualProcess`: enviar `eventType` no body
-7. Badge visual dourada/amarela para diferenciar Throne de Boss
-
-Eventos esperados:
+### Estrutura de dados
 ```text
-Segunda (1): 21:00 BOSS, 22:00 BOSS
-Terca (2):   20:00 BOSS, 21:36 THRONE, 22:30 BOSS
-Quarta (3):  20:00 BOSS, 22:00 BOSS
-Quinta (4):  20:00 BOSS, 22:30 BOSS
-Sexta (5):   20:00 BOSS, 22:00 BOSS
-Sabado (6):  20:00 BOSS, 22:00 BOSS
-Domingo (0): 20:00 BOSS, 22:00 BOSS
+Map<string, Map<string, { kills: number, deaths: number }>>
+  killerClass -> victimClass -> { kills, deaths }
 ```
 
-## Arquivos afetados
+### Grafico
+Usar `BarChart` horizontal do Recharts (ja instalado), com barras coloridas por classe alvo. Reutilizar a paleta de cores `COLORS` do ClassGuildRanking.
 
-| Arquivo | Acao |
-|---------|------|
-| Nova migracao SQL | Criar tabela + RLS + seed de ~24 frases |
-| `supabase/functions/auto-process-ranking/index.ts` | Buscar frases dinamicas |
-| `supabase/functions/discord-webhook/index.ts` | Buscar frases dinamicas |
-| `src/components/DiscordPhrasesManager.tsx` | NOVO - gerenciamento de frases |
-| `src/components/DatabaseManager.tsx` | Adicionar aba "Frases Discord" |
-| `src/components/AutoProcessMonitor.tsx` | Throne + event_type |
-
+### Normalizacao de nomes
+Usar NFKC + collapse spaces + trim + lowercase, mesmo padrao dos outros componentes.
