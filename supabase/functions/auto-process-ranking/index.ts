@@ -733,7 +733,7 @@ Deno.serve(async (req) => {
       // Fetch dynamic phrases from database
       let dynamicPhrases: Record<string, string[]> = {};
       try {
-        const { data: phrasesData } = await supabaseClient
+        const { data: phrasesData } = await internalClient
           .from('discord_highlight_phrases')
           .select('category, phrase_template');
         if (phrasesData && phrasesData.length > 0) {
