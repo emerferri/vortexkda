@@ -5,7 +5,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import {
   Swords, LogIn, LogOut, User, Crown, Skull, Users,
   Trophy, Target, Flame, Award, Menu, X, Shield,
-  ChevronsLeft, ChevronsRight
+  ChevronsLeft, ChevronsRight, Crosshair
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
@@ -27,6 +27,7 @@ const navItems: NavItem[] = [
   { id: 'reis', label: 'Rei/Cone PVP', icon: Target },
   { id: 'classe-guild', label: 'Classe/Guild', icon: Users },
   { id: 'melhor-classe', label: 'Melhor por Classe', icon: Award },
+  { id: 'classe-matchup', label: 'Classe x Classe', icon: Crosshair },
   { id: 'putinha', label: 'Minha Putinha', icon: Flame },
   { id: 'vergonha', label: 'Mural da Vergonha', icon: Skull },
   { id: 'killstreak', label: 'Kill Streak', icon: Swords },
