@@ -173,6 +173,8 @@ export const ClassMatchup = () => {
       name: d.className,
       kills: d.kills,
       deaths: d.deaths,
+      saldo: d.saldo,
+      winRate: d.winRate,
       fill: COLORS[i % COLORS.length],
     }));
   }, [displayData]);
@@ -294,7 +296,7 @@ export const ClassMatchup = () => {
               </Button>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={Math.max(300, chartData.length * 40)}>
+          <ResponsiveContainer width="100%" height={Math.max(300, chartData.length * 50)}>
             <BarChart data={chartData} layout="vertical" margin={{ left: 120, right: 30, top: 5, bottom: 5 }}>
               <XAxis type="number" stroke="hsl(var(--muted-foreground))" />
               <YAxis type="category" dataKey="name" stroke="hsl(var(--muted-foreground))" width={110} tick={{ fontSize: 12 }} />
@@ -310,11 +312,18 @@ export const ClassMatchup = () => {
                   return [`${value}`, 'Mortes'];
                 }}
               />
-              <Bar dataKey="kills" name="kills" radius={[0, 4, 4, 0]}>
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.fill} />
-                ))}
-              </Bar>
+              {selectedClass !== 'all' ? (
+                <>
+                  <Bar dataKey="kills" name="kills" fill="#22c55e" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="deaths" name="deaths" fill="#ef4444" radius={[0, 4, 4, 0]} />
+                </>
+              ) : (
+                <Bar dataKey="kills" name="kills" radius={[0, 4, 4, 0]}>
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
+              )}
             </BarChart>
           </ResponsiveContainer>
         </Card>
