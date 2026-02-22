@@ -1,50 +1,46 @@
 
 
-# Frases sem Repetir - Rotacao Completa
+# Ranking: Nunca Tiveram KDA Positivo
 
-## Problema Atual
-A selecao de frases usa `dayOfYear % total_frases`, o que pode repetir frases antes de todas serem usadas (ex: com 3 frases, dia 1 e dia 4 usam a mesma).
+## O que sera feito
+Criar um novo ranking que mostra os personagens que **nunca** tiveram KDA positivo (KDA > 0) em nenhuma partida de Boss Event. Ou seja, em todas as partidas que participaram, o KDA foi sempre 0 ou negativo.
 
-## Solucao
-Adicionar um campo `last_used_at` na tabela `discord_highlight_phrases`. Na hora de selecionar a frase, escolher a que tem o `last_used_at` mais antigo (ou NULL = nunca usada). Apos usar, marcar com a data/hora atual. Assim, todas as frases sao usadas antes de qualquer uma repetir.
+## Como funciona a logica
+1. Buscar todos os registros de `pvp_match_players` filtrados por partidas do tipo `boss_event`
+2. Agrupar por jogador
+3. Filtrar apenas os jogadores onde o **KDA maximo** entre todas as partidas foi <= 0
+4. Ordenar por quantidade de partidas (quem participou mais vezes e nunca teve KDA positivo fica no topo - maior "merito")
 
 ## Alteracoes
 
-### 1. Migracao de banco de dados
-Adicionar coluna `last_used_at` (timestamp, nullable, default NULL) na tabela `discord_highlight_phrases`.
+### 1. Novo componente: `src/components/NeverPositiveKDA.tsx`
+- Seguir o padrao visual do `MuralDaVergonha` (Card, Table, filtros de data/hora, export Excel/Imagem)
+- Colunas: Rank, Jogador, Classe, Guild, Partidas, Melhor KDA, Total Kills, Total Deaths
+- Badge de "nivel" baseado na quantidade de partidas sem KDA positivo
+- Icone tematico (ex: TrendingDown ou ThumbsDown)
 
-### 2. Edge Function `auto-process-ranking/index.ts`
-Alterar a logica de selecao de frases (linhas ~734-761):
+### 2. Adicionar na sidebar (`AppSidebar.tsx`)
+- Novo item no menu: `{ id: 'never-positive', label: 'Nunca Positivo', icon: TrendingDown }`
+- Posicionar proximo ao "Mural da Vergonha"
 
-**Antes:** busca todas as frases e usa `dayOfYear % length`
-
-**Depois:**
-- Para cada categoria (`kill_streak`, `best_kda`, `cone`), buscar a frase com `last_used_at` mais antigo (NULLs primeiro)
-- Usar essa frase
-- Atualizar o `last_used_at` dessa frase para `now()`
-- Quando todas as frases de uma categoria ja foram usadas, a proxima selecao pega a mais antiga, reiniciando o ciclo naturalmente
-
-```text
-Fluxo:
-1. SELECT da frase com last_used_at IS NULL (prioridade) ou ORDER BY last_used_at ASC
-2. Usar a frase selecionada
-3. UPDATE last_used_at = NOW() nessa frase
-4. Repete para cada categoria
-```
-
-### 3. Tipo TypeScript (automatico)
-A coluna `last_used_at` sera refletida automaticamente no types.ts apos a migracao.
+### 3. Adicionar rota no `Index.tsx`
+- Novo case no `renderContent()`: `case 'never-positive': return <NeverPositiveKDA />`
 
 ## Detalhes tecnicos
 
-### Query de selecao por categoria
-```sql
-SELECT * FROM discord_highlight_phrases
-WHERE category = 'kill_streak'
-ORDER BY last_used_at ASC NULLS FIRST
-LIMIT 1
+### Query de dados
+```text
+1. Buscar match IDs do tipo boss_event (com filtros de data/hora opcionais)
+2. Buscar pvp_match_players para esses match IDs
+3. Agrupar por player_name
+4. Para cada jogador, verificar se MAX(kda) <= 0
+5. Se sim, incluir no ranking
+6. Ordenar por partidas jogadas DESC (mais partidas = mais "persistencia")
 ```
 
-### Funcao `selectPhrase` atualizada
-Em vez de calcular pelo dia do ano, a funcao fara uma query individual por categoria, selecionando a frase menos recentemente usada e atualizando-a apos o uso. Isso garante que com N frases, as N primeiras postagens usem frases diferentes.
+### Niveis tematicos
+- 10+ partidas: "Imbativel no Negativo"
+- 5+ partidas: "Persistente"
+- 3+ partidas: "Dedicado"
+- Menos: "Iniciante"
 
