@@ -26,6 +26,7 @@ interface NeverPositivePlayer {
   guild?: string;
   class?: string;
   negativeCount: number;
+  bestScore: number;
 }
 
 export const NeverPositiveKDA = () => {
@@ -102,10 +103,11 @@ export const NeverPositiveKDA = () => {
       );
 
       // Aggregate by player: track max KDA, total kills/deaths, match count, negative count
-      const statsMap = new Map<string, { bestKda: number; totalKills: number; totalDeaths: number; matchesPlayed: number; negativeCount: number }>();
+      const statsMap = new Map<string, { bestKda: number; totalKills: number; totalDeaths: number; matchesPlayed: number; negativeCount: number; bestScore: number }>();
 
       allMatchPlayers.forEach(p => {
         const kda = Number(p.kda);
+        const score = (p.kills * 3) + (kda * 2) - (p.deaths * 1.5);
         const isNegative = kda < 1;
         const existing = statsMap.get(p.player_name);
         if (existing) {
@@ -114,6 +116,7 @@ export const NeverPositiveKDA = () => {
           existing.totalDeaths += p.deaths;
           existing.matchesPlayed += 1;
           if (isNegative) existing.negativeCount += 1;
+          existing.bestScore = Math.max(existing.bestScore, score);
         } else {
           statsMap.set(p.player_name, {
             bestKda: kda,
@@ -121,6 +124,7 @@ export const NeverPositiveKDA = () => {
             totalDeaths: p.deaths,
             matchesPlayed: 1,
             negativeCount: isNegative ? 1 : 0,
+            bestScore: score,
           });
         }
       });
@@ -139,6 +143,7 @@ export const NeverPositiveKDA = () => {
             guild: charInfo?.guild,
             class: charInfo?.class,
             negativeCount: stats.negativeCount,
+            bestScore: parseFloat(stats.bestScore.toFixed(2)),
           });
         }
       });
@@ -170,6 +175,7 @@ export const NeverPositiveKDA = () => {
       'Partidas': p.matchesPlayed,
       'Vezes Negativo': p.negativeCount,
       'Melhor KDA': p.bestKda,
+      'Melhor Pontuação': p.bestScore,
       'Total Kills': p.totalKills,
       'Total Deaths': p.totalDeaths,
     }));
@@ -322,7 +328,9 @@ export const NeverPositiveKDA = () => {
                 <TableHead>Guild</TableHead>
                 <TableHead className="text-right">Partidas</TableHead>
                 <TableHead className="text-right">Vezes Negativo</TableHead>
-                <TableHead className="text-right">Melhor KDA</TableHead>
+                <TableHead className="text-right">
+                  {viewMode === 'never-positive' ? 'Melhor KDA' : 'Melhor Pontuação'}
+                </TableHead>
                 <TableHead className="text-right">Total Kills</TableHead>
                 <TableHead className="text-right">Total Deaths</TableHead>
                 <TableHead className="text-center">Nível</TableHead>
@@ -344,7 +352,9 @@ export const NeverPositiveKDA = () => {
                     <TableCell className="text-muted-foreground">{player.guild || 'Sem Guild'}</TableCell>
                     <TableCell className="text-right font-bold">{player.matchesPlayed}</TableCell>
                     <TableCell className="text-right font-bold text-destructive">{player.negativeCount}</TableCell>
-                    <TableCell className="text-right font-bold">{player.bestKda}</TableCell>
+                    <TableCell className="text-right font-bold">
+                      {viewMode === 'never-positive' ? player.bestKda : player.bestScore}
+                    </TableCell>
                     <TableCell className="text-right">{player.totalKills}</TableCell>
                     <TableCell className="text-right">{player.totalDeaths}</TableCell>
                     <TableCell className="text-center">
