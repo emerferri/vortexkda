@@ -11,6 +11,7 @@ import { KillStreakRanking } from '@/components/KillStreakRanking';
 import { ReisDoPVP } from '@/components/ReisDoPVP';
 import { BestPerClassRanking } from '@/components/BestPerClassRanking';
 import { ClassMatchup } from '@/components/ClassMatchup';
+import { NeverPositiveKDA } from '@/components/NeverPositiveKDA';
 import { DatabaseManager } from '@/components/DatabaseManager';
 import { DatabaseImport } from '@/components/DatabaseImport';
 import { parseTxtFile, ParseResult } from '@/utils/txtParser';
@@ -118,6 +119,8 @@ const Index = () => {
         return <PutinhaRanking />;
       case 'vergonha':
         return <MuralDaVergonha />;
+      case 'never-positive':
+        return <NeverPositiveKDA />;
       case 'killstreak':
         return <KillStreakRanking />;
       case 'admin':
