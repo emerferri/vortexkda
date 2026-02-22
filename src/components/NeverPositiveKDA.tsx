@@ -155,7 +155,7 @@ export const NeverPositiveKDA = () => {
   // Filter for "never positive" tab: players whose best KDA across ALL matches is < 1
   const neverPositivePlayers = useMemo(() => {
     return allPlayers
-      .filter(p => p.bestKda < 1)
+      .filter(p => p.bestKda > 0 && p.bestKda <= 0.99)
       .sort((a, b) => b.matchesPlayed - a.matchesPlayed);
   }, [allPlayers]);
 
