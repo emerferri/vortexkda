@@ -15,6 +15,7 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface NeverPositivePlayer {
   playerName: string;
@@ -24,6 +25,7 @@ interface NeverPositivePlayer {
   totalDeaths: number;
   guild?: string;
   class?: string;
+  negativeCount: number;
 }
 
 export const NeverPositiveKDA = () => {
@@ -35,6 +37,7 @@ export const NeverPositiveKDA = () => {
   const [debouncedDateTo, setDebouncedDateTo] = useState<Date>();
   const [debouncedHourFrom, setDebouncedHourFrom] = useState<number>();
   const [debouncedHourTo, setDebouncedHourTo] = useState<number>();
+  const [viewMode, setViewMode] = useState<'never-positive' | 'negative-count'>('never-positive');
   const tableRef = useRef<HTMLDivElement>(null);
 
   const debouncedSetFilters = useCallback(
@@ -51,11 +54,10 @@ export const NeverPositiveKDA = () => {
     debouncedSetFilters(dateFrom, dateTo, hourFrom, hourTo);
   }, [dateFrom, dateTo, hourFrom, hourTo, debouncedSetFilters]);
 
-  const { data: players = [], isLoading: loading } = useQuery({
+  const { data: allPlayers = [], isLoading: loading } = useQuery({
     queryKey: ['never-positive-kda', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
     staleTime: 30000,
     queryFn: async () => {
-      // Build match query filtered to boss_event only
       let matchQuery = supabase.from('pvp_matches').select('id').eq('event_type', 'boss_event');
 
       if (debouncedDateFrom) {
@@ -77,7 +79,6 @@ export const NeverPositiveKDA = () => {
       const matchIds = matches?.map(m => m.id) || [];
       if (matchIds.length === 0) return [];
 
-      // Fetch all match players with pagination (1000 row limit)
       let allMatchPlayers: { player_name: string; kills: number; deaths: number; kda: number; match_id: string }[] = [];
       const pageSize = 1000;
       let page = 0;
@@ -95,37 +96,40 @@ export const NeverPositiveKDA = () => {
         page++;
       }
 
-      // Fetch character info
       const { data: characters } = await supabase.from('characters').select('name, guild, class');
       const characterMap = new Map(
         characters?.map(char => [char.name.toLowerCase(), { guild: char.guild, class: char.class }]) || []
       );
 
-      // Aggregate by player: track max KDA, total kills/deaths, match count
-      const statsMap = new Map<string, { bestKda: number; totalKills: number; totalDeaths: number; matchesPlayed: number }>();
+      // Aggregate by player: track max KDA, total kills/deaths, match count, negative count
+      const statsMap = new Map<string, { bestKda: number; totalKills: number; totalDeaths: number; matchesPlayed: number; negativeCount: number }>();
 
       allMatchPlayers.forEach(p => {
+        const kda = Number(p.kda);
+        const isNegative = kda < 1;
         const existing = statsMap.get(p.player_name);
         if (existing) {
-          existing.bestKda = Math.max(existing.bestKda, Number(p.kda));
+          existing.bestKda = Math.max(existing.bestKda, kda);
           existing.totalKills += p.kills;
           existing.totalDeaths += p.deaths;
           existing.matchesPlayed += 1;
+          if (isNegative) existing.negativeCount += 1;
         } else {
           statsMap.set(p.player_name, {
-            bestKda: Number(p.kda),
+            bestKda: kda,
             totalKills: p.kills,
             totalDeaths: p.deaths,
             matchesPlayed: 1,
+            negativeCount: isNegative ? 1 : 0,
           });
         }
       });
 
-      // Filter: only players whose best KDA across all matches is <= 0
       const result: NeverPositivePlayer[] = [];
       statsMap.forEach((stats, playerName) => {
-        if (stats.bestKda <= 0) {
-          const charInfo = characterMap.get(playerName.toLowerCase());
+        const charInfo = characterMap.get(playerName.toLowerCase());
+        // Include all players that have at least 1 negative match
+        if (stats.negativeCount > 0) {
           result.push({
             playerName,
             matchesPlayed: stats.matchesPlayed,
@@ -134,23 +138,37 @@ export const NeverPositiveKDA = () => {
             totalDeaths: stats.totalDeaths,
             guild: charInfo?.guild,
             class: charInfo?.class,
+            negativeCount: stats.negativeCount,
           });
         }
       });
 
-      // Sort by matches played DESC (more matches = more "persistence")
-      result.sort((a, b) => b.matchesPlayed - a.matchesPlayed);
       return result;
     }
   });
 
+  // Filter for "never positive" tab: players whose best KDA across ALL matches is < 1
+  const neverPositivePlayers = useMemo(() => {
+    return allPlayers
+      .filter(p => p.bestKda < 1)
+      .sort((a, b) => b.matchesPlayed - a.matchesPlayed);
+  }, [allPlayers]);
+
+  // Sort by negative count for the "negative count" tab
+  const negativeCountPlayers = useMemo(() => {
+    return [...allPlayers].sort((a, b) => b.negativeCount - a.negativeCount);
+  }, [allPlayers]);
+
+  const currentPlayers = viewMode === 'never-positive' ? neverPositivePlayers : negativeCountPlayers;
+
   const exportToExcel = () => {
-    const data = players.map((p, index) => ({
+    const data = currentPlayers.map((p, index) => ({
       'Posição': index + 1,
       'Jogador': p.playerName,
       'Classe': p.class || 'Sem Classe',
       'Guild': p.guild || 'Sem Guild',
       'Partidas': p.matchesPlayed,
+      'Vezes Negativo': p.negativeCount,
       'Melhor KDA': p.bestKda,
       'Total Kills': p.totalKills,
       'Total Deaths': p.totalDeaths,
@@ -178,10 +196,10 @@ export const NeverPositiveKDA = () => {
     }
   };
 
-  const getPersistenceLevel = (matches: number): { label: string; variant: 'default' | 'secondary' | 'destructive' } => {
-    if (matches >= 10) return { label: 'Imbatível no Negativo', variant: 'destructive' };
-    if (matches >= 5) return { label: 'Persistente', variant: 'destructive' };
-    if (matches >= 3) return { label: 'Dedicado', variant: 'secondary' };
+  const getPersistenceLevel = (count: number): { label: string; variant: 'default' | 'secondary' | 'destructive' } => {
+    if (count >= 10) return { label: 'Imbatível no Negativo', variant: 'destructive' };
+    if (count >= 5) return { label: 'Persistente', variant: 'destructive' };
+    if (count >= 3) return { label: 'Dedicado', variant: 'secondary' };
     return { label: 'Iniciante', variant: 'default' };
   };
 
@@ -195,18 +213,6 @@ export const NeverPositiveKDA = () => {
     );
   }
 
-  if (players.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-muted-foreground">
-            Nenhum jogador encontrado que nunca teve KDA positivo. Parabéns a todos! 🎉
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card ref={tableRef}>
       <CardHeader>
@@ -214,9 +220,9 @@ export const NeverPositiveKDA = () => {
           <div className="flex items-center gap-3">
             <TrendingDown className="w-8 h-8 text-destructive" />
             <div>
-              <CardTitle className="text-3xl">Nunca Tiveram KDA Positivo</CardTitle>
+              <CardTitle className="text-3xl">KDA Negativo</CardTitle>
               <CardDescription className="text-base mt-1">
-                Jogadores que NUNCA tiveram KDA positivo em nenhuma partida de Boss Event
+                Jogadores com KDA negativo (abaixo de 1.0) em Boss Events
               </CardDescription>
             </div>
           </div>
@@ -290,48 +296,66 @@ export const NeverPositiveKDA = () => {
             </Button>
           )}
         </div>
+
+        {/* View Mode Tabs */}
+        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'never-positive' | 'negative-count')} className="mt-4">
+          <TabsList>
+            <TabsTrigger value="never-positive">Nunca Positivo</TabsTrigger>
+            <TabsTrigger value="negative-count">Vezes Negativo</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-20">Rank</TableHead>
-              <TableHead>Jogador</TableHead>
-              <TableHead>Classe</TableHead>
-              <TableHead>Guild</TableHead>
-              <TableHead className="text-right">Partidas</TableHead>
-              <TableHead className="text-right">Melhor KDA</TableHead>
-              <TableHead className="text-right">Total Kills</TableHead>
-              <TableHead className="text-right">Total Deaths</TableHead>
-              <TableHead className="text-center">Nível</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {players.map((player, index) => {
-              const level = getPersistenceLevel(player.matchesPlayed);
-              return (
-                <TableRow key={player.playerName}>
-                  <TableCell className="font-bold text-lg">
-                    {index === 0 && '📉'}
-                    {index === 1 && '👎'}
-                    {index === 2 && '🥀'}
-                    {index > 2 && `#${index + 1}`}
-                  </TableCell>
-                  <TableCell className="font-semibold">{player.playerName}</TableCell>
-                  <TableCell className="text-muted-foreground">{player.class || 'Sem Classe'}</TableCell>
-                  <TableCell className="text-muted-foreground">{player.guild || 'Sem Guild'}</TableCell>
-                  <TableCell className="text-right font-bold">{player.matchesPlayed}</TableCell>
-                  <TableCell className="text-right font-bold text-destructive">{player.bestKda}</TableCell>
-                  <TableCell className="text-right">{player.totalKills}</TableCell>
-                  <TableCell className="text-right">{player.totalDeaths}</TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant={level.variant}>{level.label}</Badge>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+        {currentPlayers.length === 0 ? (
+          <div className="text-center text-muted-foreground py-8">
+            {viewMode === 'never-positive' 
+              ? 'Nenhum jogador encontrado que nunca teve KDA positivo. Parabéns a todos! 🎉'
+              : 'Nenhum jogador com KDA negativo encontrado.'}
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-20">Rank</TableHead>
+                <TableHead>Jogador</TableHead>
+                <TableHead>Classe</TableHead>
+                <TableHead>Guild</TableHead>
+                <TableHead className="text-right">Partidas</TableHead>
+                <TableHead className="text-right">Vezes Negativo</TableHead>
+                <TableHead className="text-right">Melhor KDA</TableHead>
+                <TableHead className="text-right">Total Kills</TableHead>
+                <TableHead className="text-right">Total Deaths</TableHead>
+                <TableHead className="text-center">Nível</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {currentPlayers.map((player, index) => {
+                const level = getPersistenceLevel(viewMode === 'never-positive' ? player.matchesPlayed : player.negativeCount);
+                return (
+                  <TableRow key={player.playerName}>
+                    <TableCell className="font-bold text-lg">
+                      {index === 0 && '📉'}
+                      {index === 1 && '👎'}
+                      {index === 2 && '🥀'}
+                      {index > 2 && `#${index + 1}`}
+                    </TableCell>
+                    <TableCell className="font-semibold">{player.playerName}</TableCell>
+                    <TableCell className="text-muted-foreground">{player.class || 'Sem Classe'}</TableCell>
+                    <TableCell className="text-muted-foreground">{player.guild || 'Sem Guild'}</TableCell>
+                    <TableCell className="text-right font-bold">{player.matchesPlayed}</TableCell>
+                    <TableCell className="text-right font-bold text-destructive">{player.negativeCount}</TableCell>
+                    <TableCell className="text-right font-bold">{player.bestKda}</TableCell>
+                    <TableCell className="text-right">{player.totalKills}</TableCell>
+                    <TableCell className="text-right">{player.totalDeaths}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant={level.variant}>{level.label}</Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
       </CardContent>
     </Card>
   );
