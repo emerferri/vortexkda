@@ -112,7 +112,7 @@ export const DiscordPhrasesManager = () => {
         <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 border">
           <Info className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
           <p className="text-sm text-muted-foreground">
-            A frase do dia é selecionada automaticamente com base no dia do ano. Quanto mais frases, maior a variedade!
+            As frases são usadas em rotação: cada frase é usada uma vez antes de qualquer repetir. Quanto mais frases, maior o ciclo sem repetição!
           </p>
         </div>
 
