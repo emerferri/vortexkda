@@ -46,18 +46,21 @@ export type Database = {
           category: string
           created_at: string
           id: string
+          last_used_at: string | null
           phrase_template: string
         }
         Insert: {
           category: string
           created_at?: string
           id?: string
+          last_used_at?: string | null
           phrase_template: string
         }
         Update: {
           category?: string
           created_at?: string
           id?: string
+          last_used_at?: string | null
           phrase_template?: string
         }
         Relationships: []
