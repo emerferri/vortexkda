@@ -141,203 +141,38 @@ export const RankingGeral = () => {
 
   const { data: aggregatedData, isLoading } = useQuery({
     queryKey: ['ranking-geral', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
-    staleTime: 30000, // Cache for 30 seconds
+    staleTime: 30000,
     queryFn: async () => {
-      // Vamos unificar a fonte com Confrontos Diretos: agregaremos a partir de pvp_kill_logs
-      // e aplicaremos filtros de data/hora através dos match_ids de pvp_matches
-
-      // Normalizador forte (igual ao usado antes, removendo tudo que não é alfanumérico)
-      const normalize = (s?: string) =>
-        (s ?? '')
-          .normalize('NFKD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/[^a-zA-Z0-9]/g, '')
-          .toLowerCase();
-
-      // Buscar classes/personagens para mapear nome -> classe e guild (excluindo banidos)
-      const { data: characters } = await supabase
-        .from('characters')
-        .select('name, class, guild, banned')
-        .eq('banned', false);
-
-      // Buscar lista de todos os personagens banidos para filtrar nos logs
-      const { data: bannedChars } = await supabase
-        .from('characters')
-        .select('name')
-        .eq('banned', true);
-      
-      const bannedNames = new Set((bannedChars || []).map(c => normalize((c.name || '').trim())));
-
-      const entries = (characters || []).map((c) => {
-        const displayName = (c.name ?? '').trim();
-        const norm = normalize(displayName);
-        const clsStr = ((c.class ?? '') as string).replace(/\s+/g, ' ').trim();
-        const guildStr = ((c.guild ?? '') as string).replace(/\s+/g, ' ').trim();
-        return { displayName, norm, cls: clsStr || null, guild: guildStr || null };
+      // Chamar a função RPC que faz toda a agregação no banco
+      const { data: rpcData, error } = await supabase.rpc('get_ranking_geral', {
+        p_date_from: debouncedDateFrom ? format(debouncedDateFrom, 'yyyy-MM-dd') : null,
+        p_date_to: debouncedDateTo ? format(debouncedDateTo, 'yyyy-MM-dd') : null,
+        p_hour_from: debouncedHourFrom ?? null,
+        p_hour_to: debouncedHourTo ?? null,
       });
 
-      // Preferir classe não vazia quando houver duplicatas para o mesmo nome normalizado
-      const characterMap = new Map<string, { class: string | null; guild: string | null }>();
-      for (const e of entries) {
-        const current = characterMap.get(e.norm);
-        if (!current || e.cls) characterMap.set(e.norm, { class: e.cls, guild: e.guild });
-      }
+      if (error) throw error;
 
-      // Preparar lista para fuzzy match (fallback)
-      const characterEntries = Array.from(characterMap.entries()).map(([norm, data]) => ({
-        norm,
-        class: (data.class || '').toString(),
-        guild: (data.guild || '').toString(),
-      }));
-
-      // Levenshtein limitado (até distância 1)
-      const levenshtein2 = (a: string, b: string) => {
-        if (a === b) return 0;
-        if (Math.abs(a.length - b.length) > 2) return 3;
-        const dp = Array.from({ length: a.length + 1 }, (_, i) => Array(b.length + 1).fill(0));
-        for (let i = 0; i <= a.length; i++) dp[i][0] = i;
-        for (let j = 0; j <= b.length; j++) dp[0][j] = j;
-        let minInRow = 0;
-        for (let i = 1; i <= a.length; i++) {
-          minInRow = Number.MAX_SAFE_INTEGER;
-          for (let j = 1; j <= b.length; j++) {
-            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-            dp[i][j] = Math.min(
-              dp[i - 1][j] + 1,
-              dp[i][j - 1] + 1,
-              dp[i - 1][j - 1] + cost
-            );
-            if (dp[i][j] < minInRow) minInRow = dp[i][j];
-          }
-          if (minInRow > 2) return 3;
-        }
-        return dp[a.length][b.length];
-      };
-
-      const findClosestCharacterData = (normName: string): { class: string | null; guild: string | null } => {
-        let best: { dist: number; class: string | null; guild: string | null } = { dist: 3, class: null, guild: null };
-        for (const entry of characterEntries) {
-          const d = levenshtein2(normName, entry.norm);
-          if (d < best.dist) best = { dist: d, class: entry.class, guild: entry.guild };
-          if (best.dist === 0) break;
-        }
-        return best.dist <= 1 ? { class: best.class, guild: best.guild } : { class: null, guild: null };
-      };
-
-      // SEMPRE filtramos por event_type = 'boss_event' para não misturar com Throne Conquest
-      // Adicionalmente, aplicamos filtros de data/hora se estiverem ativos
-      const matchFilterActive = !!(debouncedDateFrom || debouncedDateTo || debouncedHourFrom !== undefined || debouncedHourTo !== undefined);
-      
-      // Buscar TODOS os match_ids de boss_event (com filtros opcionais de data/hora)
-      const pageSize = 1000;
-      let from = 0;
-      let matchesAccum: any[] = [];
-      while (true) {
-        let mq = supabase
-          .from('pvp_matches')
-          .select('id, match_date, match_hour')
-          .eq('event_type', 'boss_event'); // IMPORTANTE: filtra apenas boss_event
-        if (debouncedDateFrom) mq = mq.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
-        if (debouncedDateTo) mq = mq.lte('match_date', format(debouncedDateTo, 'yyyy-MM-dd'));
-        if (debouncedHourFrom !== undefined) mq = mq.gte('match_hour', debouncedHourFrom);
-        if (debouncedHourTo !== undefined) mq = mq.lte('match_hour', debouncedHourTo);
-        const { data: page, error } = await mq.range(from, from + pageSize - 1);
-        if (error) throw error;
-        if (page && page.length > 0) matchesAccum = matchesAccum.concat(page);
-        if (!page || page.length < pageSize) break;
-        from += pageSize;
-      }
-      const matchIds = (matchesAccum || []).map((m: any) => m.id);
-      if (!matchIds.length) {
+      if (!rpcData || rpcData.length === 0) {
         return { aggregated: [], brabissimoRecord: undefined, coneMonodedoName: '', characters: [] };
       }
 
-      // Buscar todos os logs (paginado) filtrados por match_ids de boss_event
-      const pageSizeLogs = 1000;
-      let fromLogs = 0;
-      let logs: any[] = [];
-      while (true) {
-        let ql = supabase
-          .from('pvp_kill_logs')
-          .select('killer_name, victim_name, match_id, created_at')
-          .in('match_id', matchIds) // Sempre filtra por boss_event matches
-          .order('created_at', { ascending: false });
-        const { data: page, error } = await ql.range(fromLogs, fromLogs + pageSizeLogs - 1);
-        if (error) throw error;
-        if (page && page.length > 0) logs = logs.concat(page as any[]);
-        if (!page || page.length < pageSizeLogs) break;
-        fromLogs += pageSizeLogs;
-      }
+      // Mapear resultado da RPC para o formato AggregatedPlayer
+      const aggregated: AggregatedPlayer[] = (rpcData as any[]).map((row: any) => ({
+        name: row.player_name,
+        class: row.player_class || null,
+        guild: row.player_guild || null,
+        kills: Number(row.total_kills),
+        deaths: Number(row.total_deaths),
+        kda: Number(row.kda),
+        weightedKda: Number(row.weighted_kda),
+        matches: Number(row.matches_played),
+        mvpScore: Number(row.event_score),
+        eventScore: Number(row.event_score),
+      }));
 
-      // Agregar kills/deaths a partir dos logs (mesma lógica do Confrontos Diretos)
-      type Stat = { kills: number; deaths: number; displayName: string; matches: Set<string> };
-      const playerMap = new Map<string, Stat>();
-      const perMatchKills = new Map<string, number>(); // key: `${match_id}|${normKey}`
-      const uniqueMatches = new Set<string>();
-
-      for (const log of logs) {
-        const matchId = log.match_id as string;
-        if (matchId) uniqueMatches.add(matchId);
-
-        const killerDisplay = (log.killer_name || '').trim();
-        const victimDisplay = (log.victim_name || '').trim();
-        const killerKey = normalize(killerDisplay);
-        const victimKey = normalize(victimDisplay);
-
-        // Ignorar jogadores banidos
-        if (bannedNames.has(killerKey) || bannedNames.has(victimKey)) continue;
-
-        if (killerKey) {
-          const kstats = playerMap.get(killerKey) || { kills: 0, deaths: 0, displayName: killerDisplay, matches: new Set<string>() };
-          kstats.kills += 1;
-          if (matchId) kstats.matches.add(matchId);
-          playerMap.set(killerKey, kstats);
-
-          if (matchId) {
-            const pmkKey = `${matchId}|${killerKey}`;
-            perMatchKills.set(pmkKey, (perMatchKills.get(pmkKey) || 0) + 1);
-          }
-        }
-        if (victimKey) {
-          const vstats = playerMap.get(victimKey) || { kills: 0, deaths: 0, displayName: victimDisplay, matches: new Set<string>() };
-          vstats.deaths += 1;
-          if (matchId) vstats.matches.add(matchId);
-          playerMap.set(victimKey, vstats);
-        }
-      }
-
-      // Cone monodedo = jogador com pior pontuação (calculado após agregar)
+      // Cone Monodedo = jogador com menor pontuação
       let coneMonodedoName = '';
-
-      const totalBossEvents = uniqueMatches.size;
-
-      // Filtrar personagens sem atividade se houver filtros de data/hora
-      let aggregated: AggregatedPlayer[] = Array.from(playerMap.entries()).map(([normKey, stats]) => {
-        const kda = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
-        const weightedKda = totalBossEvents > 0 ? kda * (stats.matches.size / totalBossEvents) : 0;
-        const mvpScore = (stats.kills * 3) + (kda * 2) - (stats.deaths * 1.5);
-        const eventScore = (stats.kills * 3) + (kda * 2) - (stats.deaths * 1.5);
-        const charData = characterMap.get(normKey) || findClosestCharacterData(normKey);
-        return {
-          name: stats.displayName,
-          class: charData.class,
-          guild: charData.guild,
-          kills: stats.kills,
-          deaths: stats.deaths,
-          kda,
-          weightedKda,
-          matches: stats.matches.size,
-          mvpScore,
-          eventScore,
-        };
-      });
-
-      // Se houver filtros de data/hora ativos, remove jogadores sem atividade
-      if (matchFilterActive) {
-        aggregated = aggregated.filter(p => p.kills > 0 || p.deaths > 0);
-      }
-
-      // Encontrar o Cone Monodedo = jogador com menor pontuação (eventScore)
       if (aggregated.length > 0) {
         const worstPlayer = [...aggregated].sort((a, b) => a.eventScore - b.eventScore)[0];
         coneMonodedoName = worstPlayer.name;
@@ -345,24 +180,16 @@ export const RankingGeral = () => {
 
       // Brabíssimo = maior nº de kills em uma única partida (exclui cone monodedo)
       let brabissimoRecord: { name: string; kills: number } | undefined = undefined;
-      for (const [key, count] of perMatchKills.entries()) {
-        const [matchId, normKey] = key.split('|');
-        const stats = playerMap.get(normKey);
-        if (!stats) continue;
-        if (stats.displayName === coneMonodedoName) continue;
-        if (!brabissimoRecord || count > brabissimoRecord.kills) {
-          brabissimoRecord = { name: stats.displayName, kills: count };
+      for (const row of rpcData as any[]) {
+        const maxKills = Number(row.single_match_max_kills);
+        if (maxKills > 0 && row.player_name !== coneMonodedoName) {
+          if (!brabissimoRecord || maxKills > brabissimoRecord.kills) {
+            brabissimoRecord = { name: row.player_name, kills: maxKills };
+          }
         }
       }
 
-      // Remove debug logs in production
-
-      const dedupCharacters = Array.from(characterMap.entries()).map(([norm, data]) => {
-        const original = (entries.find(e => e.norm === norm)?.displayName) || '';
-        return { name: original, class: data.class || null, guild: data.guild || null };
-      });
-
-      return { aggregated, brabissimoRecord, coneMonodedoName, characters: dedupCharacters, killLogs: logs.map((l: any) => ({ killer_name: l.killer_name, victim_name: l.victim_name })) };
+      return { aggregated, brabissimoRecord, coneMonodedoName, characters: [] };
     }
   });
 
@@ -542,7 +369,7 @@ export const RankingGeral = () => {
           kda: p.kda,
           eventScore: p.eventScore
         })),
-        killLogs: aggregatedData?.killLogs || []
+        killLogs: []
       };
 
       const { data, error } = await supabase.functions.invoke('discord-webhook', {

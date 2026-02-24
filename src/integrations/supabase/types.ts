@@ -188,6 +188,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_ranking_geral: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_hour_from?: number
+          p_hour_to?: number
+        }
+        Returns: {
+          event_score: number
+          kda: number
+          matches_played: number
+          player_class: string
+          player_guild: string
+          player_name: string
+          single_match_max_kills: number
+          total_deaths: number
+          total_kills: number
+          weighted_kda: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
