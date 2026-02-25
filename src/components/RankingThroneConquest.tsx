@@ -43,6 +43,7 @@ export const RankingThroneConquest = () => {
   const [debouncedDateFrom, setDebouncedDateFrom] = useState<Date>();
   const [debouncedDateTo, setDebouncedDateTo] = useState<Date>();
   const [classFilter, setClassFilter] = useState<string>('all');
+  const [guildFilter, setGuildFilter] = useState<string>('all');
   const [showDiscordModal, setShowDiscordModal] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [environment, setEnvironment] = useState<'homolog' | 'prod'>('homolog');
@@ -319,6 +320,15 @@ export const RankingThroneConquest = () => {
     }
   });
 
+  const guildOptions = useMemo(() => {
+    if (!aggregatedData?.aggregated) return [];
+    const guilds = new Set<string>();
+    for (const p of aggregatedData.aggregated) {
+      if (p.guild && p.guild.trim()) guilds.add(p.guild.trim());
+    }
+    return Array.from(guilds).sort((a, b) => a.localeCompare(b));
+  }, [aggregatedData]);
+
   const sortedPlayers = useMemo(() => {
     if (!aggregatedData?.aggregated) return [];
     
@@ -326,14 +336,21 @@ export const RankingThroneConquest = () => {
     let filtered = base;
 
     if (classFilter !== 'all') {
-      filtered = base.filter(p => 
+      filtered = filtered.filter(p => 
         normalizeClassKey(p.class || '') === classFilter && 
+        (p.kills > 0 || p.deaths > 0)
+      );
+    }
+
+    if (guildFilter !== 'all') {
+      filtered = filtered.filter(p => 
+        (p.guild || '').trim() === guildFilter &&
         (p.kills > 0 || p.deaths > 0)
       );
     }
     
     return [...filtered].sort((a, b) => b[sortBy] - a[sortBy]);
-  }, [aggregatedData, sortBy, classFilter]);
+  }, [aggregatedData, sortBy, classFilter, guildFilter]);
 
   const topPlayer = sortedPlayers[0];
 
@@ -566,6 +583,23 @@ export const RankingThroneConquest = () => {
                 {classOptions?.map((opt) => (
                   <SelectItem key={opt.key} value={opt.key}>
                     {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">Guild:</span>
+            <Select value={guildFilter} onValueChange={setGuildFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Todas as guilds" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {guildOptions.map((guild) => (
+                  <SelectItem key={guild} value={guild}>
+                    {guild}
                   </SelectItem>
                 ))}
               </SelectContent>
