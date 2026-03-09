@@ -28,7 +28,7 @@ const Index = () => {
   const [killLogs, setKillLogs] = useState<any[]>([]);
   const [eventType, setEventType] = useState<'boss_event' | 'throne_conquest'>('boss_event');
   const { user } = useAuth();
-  const { canEditData } = useUserRole();
+  const { canEditData, isAdmin, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
