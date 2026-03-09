@@ -713,6 +713,7 @@ Deno.serve(async (req) => {
     const rankingTableText = formatRankingTable(sortedPlayers);
 
     // Post to Discord - select webhook based on event type
+    const isPostingPaused = Deno.env.get('AUTO_POST_PAUSED') === 'true';
     let webhookUrl: string | undefined;
     if (eventType === 'throne_conquest') {
       webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_THRONE');
@@ -720,7 +721,9 @@ Deno.serve(async (req) => {
       webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_PROD') || Deno.env.get('DISCORD_WEBHOOK_URL');
     }
 
-    if (webhookUrl) {
+    if (isPostingPaused) {
+      console.log(`[Auto Process] ⏸️ Discord posting is PAUSED. Skipping webhook for ${eventType} (${matchDate} ${matchHour}H). Data was saved successfully.`);
+    } else if (webhookUrl) {
       const [year, month, day] = matchDate.split('-');
       const formattedDate = `${day}/${month}/${year}`;
 
