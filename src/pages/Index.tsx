@@ -15,7 +15,7 @@ import { NeverPositiveKDA } from '@/components/NeverPositiveKDA';
 import { DatabaseManager } from '@/components/DatabaseManager';
 import { DatabaseImport } from '@/components/DatabaseImport';
 import { parseTxtFile, ParseResult } from '@/utils/txtParser';
-import { Swords, FileText, Database, Crown, Wrench } from 'lucide-react';
+import { Swords, FileText, Database, Crown } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
