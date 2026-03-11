@@ -1,0 +1,497 @@
+import { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Brain, Loader2, Shield, TrendingUp, TrendingDown, Minus, Star, Users, Target, AlertTriangle, ArrowUpRight } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  AnalyticsFilters, fetchMatchesWithType, fetchKillLogsForMatches,
+  fetchAllCharacters, buildCharacterMap, filterBanned, MatchWithType, CharacterInfo
+} from '@/hooks/useAnalyticsData';
+import { toast } from 'sonner';
+
+interface Props {
+  filters: AnalyticsFilters;
+}
+
+interface MemberStats {
+  name: string;
+  className: string;
+  kills: number;
+  deaths: number;
+  kda: number;
+  participation: number;
+  consistency: number; // std dev of per-match KDA
+  bestEvent: string;
+  worstEvent: string;
+  trend: 'up' | 'down' | 'stable';
+  classification: string;
+  perMatchKDAs: number[];
+  recentKDA: number;
+}
+
+function stdDev(values: number[]): number {
+  if (values.length < 2) return 0;
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const sq = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length;
+  return Math.sqrt(sq);
+}
+
+function classify(member: MemberStats, guildAvgKDA: number): string {
+  // MVP: top KDA + high participation
+  if (member.kda >= guildAvgKDA * 1.3 && member.participation >= 60) return 'MVP';
+  // Em Evolução: trending up
+  if (member.trend === 'up' && member.kda < guildAvgKDA) return 'Em Evolução';
+  // Constante: low std dev + decent participation
+  if (member.consistency < 0.5 && member.participation >= 40) return 'Constante';
+  // Oscilante: high std dev
+  if (member.consistency > 1.5) return 'Oscilante';
+  // Destaque: above average KDA
+  if (member.kda > guildAvgKDA) return 'Destaque';
+  // Reserva: low participation
+  if (member.participation < 30) return 'Reserva';
+  return 'Regular';
+}
+
+function classificationBadge(c: string) {
+  const map: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: React.ReactNode }> = {
+    'MVP': { variant: 'default', icon: <Star className="w-3 h-3" /> },
+    'Constante': { variant: 'secondary', icon: <Shield className="w-3 h-3" /> },
+    'Oscilante': { variant: 'destructive', icon: <AlertTriangle className="w-3 h-3" /> },
+    'Destaque': { variant: 'default', icon: <Target className="w-3 h-3" /> },
+    'Em Evolução': { variant: 'secondary', icon: <ArrowUpRight className="w-3 h-3" /> },
+    'Reserva': { variant: 'outline', icon: <Users className="w-3 h-3" /> },
+    'Regular': { variant: 'outline', icon: null },
+  };
+  const cfg = map[c] || map['Regular'];
+  return (
+    <Badge variant={cfg.variant} className="gap-1 text-xs">
+      {cfg.icon} {c}
+    </Badge>
+  );
+}
+
+function trendIcon(t: 'up' | 'down' | 'stable') {
+  if (t === 'up') return <TrendingUp className="w-4 h-4 text-green-500" />;
+  if (t === 'down') return <TrendingDown className="w-4 h-4 text-red-500" />;
+  return <Minus className="w-4 h-4 text-muted-foreground" />;
+}
+
+const eventLabel = (e: string) => e === 'boss_event' ? 'Boss' : e === 'throne_conquest' ? 'Throne' : e;
+
+export const TeamBuilder = ({ filters }: Props) => {
+  const [guild, setGuild] = useState<string>('');
+  const [guilds, setGuilds] = useState<string[]>([]);
+  const [members, setMembers] = useState<MemberStats[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiInsights, setAiInsights] = useState('');
+
+  // Load guild list
+  useEffect(() => {
+    fetchAllCharacters().then(chars => {
+      const gs = [...new Set(chars.filter(c => !c.banned && c.guild).map(c => c.guild))].sort();
+      setGuilds(gs);
+    });
+  }, []);
+
+  // Analyze guild when selected
+  useEffect(() => {
+    if (!guild) { setMembers([]); return; }
+    analyzeGuild();
+  }, [guild, filters]);
+
+  const analyzeGuild = async () => {
+    setLoading(true);
+    try {
+      const [matches, characters] = await Promise.all([
+        fetchMatchesWithType(filters),
+        fetchAllCharacters(),
+      ]);
+      const charMap = buildCharacterMap(characters);
+      const matchIds = matches.map(m => m.id);
+      let logs = await fetchKillLogsForMatches(matchIds);
+      logs = filterBanned(logs, charMap);
+
+      // Build match->event_type map and ordered match list
+      const matchTypeMap = new Map<string, string>();
+      const matchDateMap = new Map<string, string>();
+      for (const m of matches) {
+        matchTypeMap.set(m.id, m.event_type);
+        matchDateMap.set(m.id, m.match_date);
+      }
+
+      // Get guild members (unique names from characters table)
+      const guildMembers = new Set(
+        characters.filter(c => c.guild === guild && !c.banned).map(c => c.name)
+      );
+
+      // Per-member, per-match stats
+      const memberMatchKills = new Map<string, Map<string, number>>();
+      const memberMatchDeaths = new Map<string, Map<string, number>>();
+      const totalMatches = matches.length;
+
+      // Also per-event-type stats
+      const memberEventKills = new Map<string, Map<string, number>>();
+      const memberEventDeaths = new Map<string, Map<string, number>>();
+
+      for (const l of logs) {
+        const eventType = matchTypeMap.get(l.match_id) || 'unknown';
+
+        for (const [name, isKiller] of [[l.killer_name, true], [l.victim_name, false]] as [string, boolean][]) {
+          if (!guildMembers.has(name)) continue;
+
+          // Per match
+          const matchMap = isKiller ? memberMatchKills : memberMatchDeaths;
+          if (!matchMap.has(name)) matchMap.set(name, new Map());
+          const mm = matchMap.get(name)!;
+          mm.set(l.match_id, (mm.get(l.match_id) || 0) + 1);
+
+          // Per event type
+          const eventMap = isKiller ? memberEventKills : memberEventDeaths;
+          if (!eventMap.has(name)) eventMap.set(name, new Map());
+          const em = eventMap.get(name)!;
+          em.set(eventType, (em.get(eventType) || 0) + 1);
+        }
+      }
+
+      // Build stats for each member
+      const stats: MemberStats[] = [];
+
+      for (const name of guildMembers) {
+        const killsByMatch = memberMatchKills.get(name) || new Map<string, number>();
+        const deathsByMatch = memberMatchDeaths.get(name) || new Map<string, number>();
+        const allMatchIds = new Set([...killsByMatch.keys(), ...deathsByMatch.keys()]);
+
+        const totalKills = [...killsByMatch.values()].reduce((a, b) => a + b, 0);
+        const totalDeaths = [...deathsByMatch.values()].reduce((a, b) => a + b, 0);
+        const kda = totalDeaths === 0 ? totalKills : +(totalKills / totalDeaths).toFixed(2);
+        const participation = totalMatches > 0 ? +((allMatchIds.size / totalMatches) * 100).toFixed(1) : 0;
+
+        // Per-match KDAs for consistency
+        const perMatchKDAs: number[] = [];
+        for (const mid of allMatchIds) {
+          const k = killsByMatch.get(mid) || 0;
+          const d = deathsByMatch.get(mid) || 0;
+          perMatchKDAs.push(d === 0 ? k : k / d);
+        }
+        const consistency = +stdDev(perMatchKDAs).toFixed(2);
+
+        // Trend: last 5 matches vs overall
+        // Order matches by date
+        const orderedMatchIds = [...allMatchIds].sort((a, b) => {
+          const da = matchDateMap.get(a) || '';
+          const db = matchDateMap.get(b) || '';
+          return da.localeCompare(db);
+        });
+        const last5 = orderedMatchIds.slice(-5);
+        const recentKDAs = last5.map(mid => {
+          const k = killsByMatch.get(mid) || 0;
+          const d = deathsByMatch.get(mid) || 0;
+          return d === 0 ? k : k / d;
+        });
+        const recentKDA = recentKDAs.length > 0 ? +(recentKDAs.reduce((a, b) => a + b, 0) / recentKDAs.length).toFixed(2) : kda;
+        let trend: 'up' | 'down' | 'stable' = 'stable';
+        if (recentKDA > kda * 1.1) trend = 'up';
+        else if (recentKDA < kda * 0.9) trend = 'down';
+
+        // Best/worst event
+        const eventKills = memberEventKills.get(name) || new Map<string, number>();
+        const eventDeaths = memberEventDeaths.get(name) || new Map<string, number>();
+        const eventTypes = new Set([...eventKills.keys(), ...eventDeaths.keys()]);
+        let bestEvent = '-';
+        let worstEvent = '-';
+        let bestKDA = -1;
+        let worstKDA = Infinity;
+
+        for (const et of eventTypes) {
+          const ek = eventKills.get(et) || 0;
+          const ed = eventDeaths.get(et) || 0;
+          const ekda = ed === 0 ? ek : ek / ed;
+          if (ekda > bestKDA) { bestKDA = ekda; bestEvent = et; }
+          if (ekda < worstKDA) { worstKDA = ekda; worstEvent = et; }
+        }
+
+        const charInfo = charMap.get(name);
+
+        if (allMatchIds.size > 0) {
+          stats.push({
+            name,
+            className: charInfo?.class || 'Unknown',
+            kills: totalKills,
+            deaths: totalDeaths,
+            kda,
+            participation,
+            consistency,
+            bestEvent,
+            worstEvent,
+            trend,
+            classification: '', // filled after avg calc
+            perMatchKDAs,
+            recentKDA,
+          });
+        }
+      }
+
+      // Classify
+      const guildAvgKDA = stats.length > 0 ? stats.reduce((s, m) => s + m.kda, 0) / stats.length : 1;
+      for (const m of stats) {
+        m.classification = classify(m, guildAvgKDA);
+      }
+
+      // Sort by KDA desc
+      stats.sort((a, b) => b.kda - a.kda);
+      setMembers(stats);
+    } catch (err: any) {
+      toast.error('Erro ao analisar guild: ' + (err.message || 'Erro desconhecido'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Suggested composition: best players per class
+  const suggestedTeam = useMemo(() => {
+    if (members.length === 0) return [];
+    // Score: KDA * 0.4 + consistency_inverted * 0.3 + participation * 0.3
+    const scored = members
+      .filter(m => m.classification !== 'Reserva')
+      .map(m => ({
+        ...m,
+        score: m.kda * 0.4 + (1 / (1 + m.consistency)) * 3 * 0.3 + (m.participation / 100) * 3 * 0.3,
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    // Pick best per class, then fill remaining
+    const byClass = new Map<string, typeof scored>();
+    for (const s of scored) {
+      if (!byClass.has(s.className)) byClass.set(s.className, []);
+      byClass.get(s.className)!.push(s);
+    }
+
+    const team: typeof scored = [];
+    // First, one per class
+    for (const [, players] of byClass) {
+      if (players.length > 0) team.push(players[0]);
+    }
+    // Then fill to top 10 if more available
+    for (const s of scored) {
+      if (team.length >= 10) break;
+      if (!team.find(t => t.name === s.name)) team.push(s);
+    }
+
+    return team.slice(0, 10);
+  }, [members]);
+
+  const generateAIInsights = async () => {
+    if (members.length === 0) return;
+    setAiLoading(true);
+    setAiInsights('');
+
+    try {
+      const summary = {
+        guild,
+        totalMembers: members.length,
+        guildAvgKDA: +(members.reduce((s, m) => s + m.kda, 0) / members.length).toFixed(2),
+        members: members.map(m => ({
+          name: m.name,
+          class: m.className,
+          kills: m.kills,
+          deaths: m.deaths,
+          kda: m.kda,
+          participation: m.participation + '%',
+          consistency: m.consistency,
+          classification: m.classification,
+          trend: m.trend,
+          bestEvent: eventLabel(m.bestEvent),
+          worstEvent: eventLabel(m.worstEvent),
+          recentKDA: m.recentKDA,
+        })),
+        suggestedTeam: suggestedTeam.map(s => ({ name: s.name, class: s.className, score: +s.score.toFixed(2) })),
+        classDistribution: Object.fromEntries(
+          [...new Set(members.map(m => m.className))].map(c => [c, members.filter(m => m.className === c).length])
+        ),
+        analysisType: 'team_building',
+      };
+
+      const resp = await supabase.functions.invoke('pvp-ai-insights', { body: { summary } });
+      if (resp.error) throw resp.error;
+      if (resp.data?.error) {
+        if (resp.data.status === 429) toast.error('Rate limit atingido. Tente novamente em alguns segundos.');
+        else if (resp.data.status === 402) toast.error('Créditos insuficientes para IA.');
+        else toast.error(resp.data.error);
+        return;
+      }
+      setAiInsights(resp.data?.insights || 'Nenhum insight gerado.');
+    } catch (err: any) {
+      toast.error('Erro ao gerar insights: ' + (err.message || 'Erro desconhecido'));
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Guild Selector */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Shield className="w-5 h-5 text-primary" />
+            Escalação & Team Builder
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Selecione uma guild para analisar o desempenho individual dos membros e montar a melhor formação.
+          </p>
+          <Select value={guild} onValueChange={setGuild}>
+            <SelectTrigger className="w-full max-w-xs">
+              <SelectValue placeholder="Selecione a guild" />
+            </SelectTrigger>
+            <SelectContent>
+              {guilds.map(g => (
+                <SelectItem key={g} value={g}>{g}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <span className="ml-2 text-sm text-muted-foreground">Analisando membros...</span>
+        </div>
+      )}
+
+      {!loading && guild && members.length > 0 && (
+        <>
+          {/* Members Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Users className="w-5 h-5 text-primary" />
+                Membros de {guild} ({members.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>#</TableHead>
+                      <TableHead>Jogador</TableHead>
+                      <TableHead>Classe</TableHead>
+                      <TableHead>Kills</TableHead>
+                      <TableHead>Deaths</TableHead>
+                      <TableHead>KDA</TableHead>
+                      <TableHead>Participação</TableHead>
+                      <TableHead>Consistência</TableHead>
+                      <TableHead>Melhor Evento</TableHead>
+                      <TableHead>Pior Evento</TableHead>
+                      <TableHead>Tendência</TableHead>
+                      <TableHead>Classificação</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {members.map((m, i) => (
+                      <TableRow key={m.name}>
+                        <TableCell className="font-medium">{i + 1}</TableCell>
+                        <TableCell className="font-semibold">{m.name}</TableCell>
+                        <TableCell>{m.className}</TableCell>
+                        <TableCell className="text-green-500">{m.kills}</TableCell>
+                        <TableCell className="text-red-500">{m.deaths}</TableCell>
+                        <TableCell className="font-bold">{m.kda}</TableCell>
+                        <TableCell>{m.participation}%</TableCell>
+                        <TableCell>
+                          <span className={m.consistency < 0.5 ? 'text-green-500' : m.consistency > 1.5 ? 'text-red-500' : 'text-yellow-500'}>
+                            {m.consistency}
+                          </span>
+                        </TableCell>
+                        <TableCell>{eventLabel(m.bestEvent)}</TableCell>
+                        <TableCell>{eventLabel(m.worstEvent)}</TableCell>
+                        <TableCell>{trendIcon(m.trend)}</TableCell>
+                        <TableCell>{classificationBadge(m.classification)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Suggested Composition */}
+          {suggestedTeam.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Target className="w-5 h-5 text-primary" />
+                  Composição Sugerida
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Melhor formação baseada em KDA, consistência e participação.
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                  {suggestedTeam.map(s => (
+                    <div key={s.name} className="border border-border rounded-lg p-3 text-center space-y-1 bg-card">
+                      <p className="font-semibold text-sm truncate">{s.name}</p>
+                      <Badge variant="secondary" className="text-xs">{s.className}</Badge>
+                      <p className="text-xs text-muted-foreground">KDA: {s.kda} | Score: {s.score.toFixed(1)}</p>
+                      {classificationBadge(s.classification)}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <span className="text-sm text-muted-foreground">Composição por classe:</span>
+                  {Object.entries(
+                    suggestedTeam.reduce<Record<string, number>>((acc, s) => {
+                      acc[s.className] = (acc[s.className] || 0) + 1;
+                      return acc;
+                    }, {})
+                  ).map(([cls, count]) => (
+                    <Badge key={cls} variant="outline" className="text-xs">{count}x {cls}</Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* AI Insights */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Brain className="w-5 h-5 text-primary" />
+                Análise Tática IA — {guild}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                A IA analisa os dados dos membros e sugere escalação, pontos a melhorar e composição ideal.
+              </p>
+              <Button onClick={generateAIInsights} disabled={aiLoading} className="gap-2">
+                {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
+                {aiLoading ? 'Analisando...' : 'Gerar Análise de Escalação'}
+              </Button>
+              {aiInsights && (
+                <div className="bg-card border border-border rounded-lg p-4 whitespace-pre-wrap text-sm text-foreground leading-relaxed">
+                  {aiInsights}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {!loading && guild && members.length === 0 && (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            Nenhum membro encontrado com dados PvP para esta guild no período selecionado.
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+};
