@@ -117,14 +117,22 @@ export const UserManagement = () => {
     }
   };
 
-  const handleDeleteRole = async (id: string) => {
+  const handleDeleteRole = async (roleId: string | null) => {
+    if (!roleId) {
+      toast({
+        title: 'Aviso',
+        description: 'Este usuário já está sem permissões especiais.',
+      });
+      return;
+    }
+
     if (!confirm('Tem certeza que deseja remover este usuário do sistema?')) return;
 
     try {
       const { error } = await supabase
         .from('user_roles')
         .delete()
-        .eq('id', id);
+        .eq('id', roleId);
 
       if (error) throw error;
 
