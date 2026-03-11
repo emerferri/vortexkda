@@ -55,9 +55,8 @@ Deno.serve(async (req) => {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const mapFilter = searchParams.get('map'); // 'devias' or 'pvp_square'
-    const limit = parseInt(searchParams.get('limit') || '5000');
 
-    console.log(`Fetching external logs with filters: startDate=${startDate}, endDate=${endDate}, map=${mapFilter}, limit=${limit}`);
+    console.log(`Fetching external logs with filters: startDate=${startDate}, endDate=${endDate}, map=${mapFilter}`);
 
     // Connect to external Supabase
     const externalUrl = Deno.env.get('EXTERNAL_SUPABASE_URL');
@@ -72,42 +71,65 @@ Deno.serve(async (req) => {
 
     const externalClient = createClient(externalUrl, externalKey);
 
-    // Build query
-    let query = externalClient
-      .from('logs_pvp')
-      .select('id, content, timestamp, created_at')
-      .order('timestamp', { ascending: false })
-      .limit(limit);
+    // Paginate to fetch ALL logs (Supabase default limit is 1000 per request)
+    const PAGE_SIZE = 1000;
+    const MAX_PAGES = 10; // Safety limit: max 10000 records
+    let allLogs: any[] = [];
+    let page = 0;
 
-    // Apply date filters if provided
-    if (startDate) {
-      query = query.gte('timestamp', startDate);
+    while (page < MAX_PAGES) {
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      let query = externalClient
+        .from('logs_pvp')
+        .select('id, content, timestamp, created_at')
+        .order('timestamp', { ascending: false })
+        .range(from, to);
+
+      // Apply date filters if provided
+      if (startDate) {
+        query = query.gte('timestamp', startDate);
+      }
+      if (endDate) {
+        query = query.lte('timestamp', endDate);
+      }
+
+      // Apply map filter if provided
+      if (mapFilter === 'devias') {
+        query = query.ilike('content', '%Devias%[Server: Boss Event PvP]%');
+      } else if (mapFilter === 'pvp_square') {
+        query = query.ilike('content', '%PvP Square%[Server: Boss Event PvP]%');
+      }
+
+      const { data: logs, error: logsError } = await query;
+
+      if (logsError) {
+        console.error('Error fetching logs:', logsError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch logs from external database', details: logsError.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!logs || logs.length === 0) {
+        break; // No more data
+      }
+
+      allLogs = allLogs.concat(logs);
+      console.log(`Page ${page + 1}: fetched ${logs.length} logs (total: ${allLogs.length})`);
+
+      if (logs.length < PAGE_SIZE) {
+        break; // Last page
+      }
+
+      page++;
     }
-    if (endDate) {
-      query = query.lte('timestamp', endDate);
-    }
 
-    // Apply map filter if provided
-    if (mapFilter === 'devias') {
-      query = query.ilike('content', '%Devias%[Server: Boss Event PvP]%');
-    } else if (mapFilter === 'pvp_square') {
-      query = query.ilike('content', '%PvP Square%[Server: Boss Event PvP]%');
-    }
-
-    const { data: logs, error: logsError } = await query;
-
-    if (logsError) {
-      console.error('Error fetching logs:', logsError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch logs from external database', details: logsError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`Successfully fetched ${logs?.length || 0} logs from external database`);
+    console.log(`Successfully fetched ${allLogs.length} total logs from external database`);
 
     return new Response(
-      JSON.stringify({ logs: logs || [], count: logs?.length || 0 }),
+      JSON.stringify({ logs: allLogs, count: allLogs.length }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
