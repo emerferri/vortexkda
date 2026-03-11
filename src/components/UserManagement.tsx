@@ -67,6 +67,10 @@ export const UserManagement = () => {
     setSubmitting(true);
 
     try {
+      // Save admin session before creating user
+      const { data: adminSession } = await supabase.auth.getSession();
+      const adminRefreshToken = adminSession?.session?.refresh_token;
+
       // Create user via Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
@@ -79,13 +83,18 @@ export const UserManagement = () => {
       if (authError) throw authError;
       if (!authData.user) throw new Error('Falha ao criar usuário');
 
-      // Assign role to the new user
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert([{
-          user_id: authData.user.id,
-          role: formData.role,
-        }]);
+      const newUserId = authData.user.id;
+
+      // Restore admin session before assigning role
+      if (adminRefreshToken) {
+        await supabase.auth.refreshSession({ refresh_token: adminRefreshToken });
+      }
+
+      // Assign role using security definer function
+      const { error: roleError } = await supabase.rpc('assign_user_role', {
+        _user_id: newUserId,
+        _role: formData.role,
+      });
 
       if (roleError) throw roleError;
 
