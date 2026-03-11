@@ -25,6 +25,7 @@ export const BestPerClassRanking = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('best');
+  const [eventType, setEventType] = useState<string>('boss_event');
   const { data: bestPerClass, isLoading } = useQuery({
     queryKey: ['best-per-class', startDate, endDate],
     queryFn: async () => {
