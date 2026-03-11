@@ -49,6 +49,7 @@ const getStreakLevel = (streak: number) => {
 
 export const KillStreakRanking = () => {
   const { user } = useAuth();
+  const [eventType, setEventType] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
