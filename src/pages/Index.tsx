@@ -13,6 +13,7 @@ import { BestPerClassRanking } from '@/components/BestPerClassRanking';
 import { ClassMatchup } from '@/components/ClassMatchup';
 import { NeverPositiveKDA } from '@/components/NeverPositiveKDA';
 import { DatabaseManager } from '@/components/DatabaseManager';
+import { PvPAnalyticsDashboard } from '@/components/analytics/PvPAnalyticsDashboard';
 import { DatabaseImport } from '@/components/DatabaseImport';
 import { parseTxtFile, ParseResult } from '@/utils/txtParser';
 import { Swords, FileText, Database, Crown } from 'lucide-react';
