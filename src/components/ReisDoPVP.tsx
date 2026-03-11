@@ -32,13 +32,17 @@ export const ReisDoPVP = () => {
   const [endDate, setEndDate] = useState('');
 
   const { data: rankingData, isLoading } = useQuery({
-    queryKey: ['reis-cone-pvp', startDate, endDate],
+    queryKey: ['reis-cone-pvp', startDate, endDate, eventType],
     staleTime: 0,
     queryFn: async () => {
       console.log('[ReisDoPVP] Starting query...');
       let query = supabase
         .from('pvp_matches')
         .select('id, match_date, match_hour');
+
+      if (eventType !== 'all') {
+        query = query.eq('event_type', eventType);
+      }
 
       if (startDate) query = query.gte('match_date', startDate);
       if (endDate) query = query.lte('match_date', endDate);
