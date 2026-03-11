@@ -89,6 +89,9 @@ const Index = () => {
                 <Button variant={importSource === 'database' ? 'default' : 'ghost'} size="sm" onClick={() => setImportSource('database')} className="gap-2">
                   <Database className="w-4 h-4" /> Banco de Dados
                 </Button>
+                <Button variant={importSource === 'arka' ? 'default' : 'ghost'} size="sm" onClick={() => setImportSource('arka')} className="gap-2">
+                  <Crosshair className="w-4 h-4" /> Arka War
+                </Button>
               </div>
               {importSource === 'database' && (
                 <div className="flex gap-2 p-1 bg-muted/30 rounded-lg">
@@ -102,8 +105,9 @@ const Index = () => {
               )}
               {importSource === 'txt' && <FileUpload onFileUpload={handleFileUpload} />}
               {importSource === 'database' && <DatabaseImport onDataLoaded={handleDatabaseImport} eventType={importEventType} />}
+              {importSource === 'arka' && <ArkaWarImport />}
             </div>
-            <Scoreboard players={players} bossLabel={bossLabel} killLogs={killLogs} eventType={eventType} />
+            {importSource !== 'arka' && <Scoreboard players={players} bossLabel={bossLabel} killLogs={killLogs} eventType={eventType} />}
           </div>
         );
       case 'ranking':
