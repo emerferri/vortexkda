@@ -41,19 +41,13 @@ export const GuildAnalytics = ({ filters }: Props) => {
       logs = filterBanned(logs, charMap);
       logs = filterByGuild(logs, filters.guild, charMap);
 
-      // Get unique guilds from characters
-      const guildMembers = new Map<string, Set<string>>();
+      // Track unique active players per guild (only those who appear in logs)
+      const guildActiveMembers = new Map<string, Set<string>>();
       const guildKills = new Map<string, number>();
       const guildDeaths = new Map<string, number>();
       const guildMatches = new Map<string, Set<string>>();
       const guildPlayerKills = new Map<string, Map<string, number>>();
       const guildVsGuild = new Map<string, Map<string, number>>();
-
-      for (const c of characters) {
-        if (c.banned || !c.guild) continue;
-        if (!guildMembers.has(c.guild)) guildMembers.set(c.guild, new Set());
-        guildMembers.get(c.guild)!.add(c.name);
-      }
 
       for (const l of logs) {
         const killerChar = charMap.get(l.killer_name);
@@ -61,7 +55,11 @@ export const GuildAnalytics = ({ filters }: Props) => {
         const killerGuild = killerChar?.guild;
         const victimGuild = victimChar?.guild;
 
+        // Track active members per guild (distinct player names)
         if (killerGuild) {
+          if (!guildActiveMembers.has(killerGuild)) guildActiveMembers.set(killerGuild, new Set());
+          guildActiveMembers.get(killerGuild)!.add(l.killer_name);
+
           guildKills.set(killerGuild, (guildKills.get(killerGuild) || 0) + 1);
           if (!guildMatches.has(killerGuild)) guildMatches.set(killerGuild, new Set());
           guildMatches.get(killerGuild)!.add(l.match_id);
@@ -78,17 +76,23 @@ export const GuildAnalytics = ({ filters }: Props) => {
         }
 
         if (victimGuild) {
+          if (!guildActiveMembers.has(victimGuild)) guildActiveMembers.set(victimGuild, new Set());
+          guildActiveMembers.get(victimGuild)!.add(l.victim_name);
+
           guildDeaths.set(victimGuild, (guildDeaths.get(victimGuild) || 0) + 1);
           if (!guildMatches.has(victimGuild)) guildMatches.set(victimGuild, new Set());
           guildMatches.get(victimGuild)!.add(l.match_id);
         }
       }
 
+      // Build stats using only guilds that have active players in the filtered logs
       const stats: GuildStat[] = [];
-      for (const [guild, members] of guildMembers) {
+      const allGuilds = new Set([...guildActiveMembers.keys()]);
+      for (const guild of allGuilds) {
         const kills = guildKills.get(guild) || 0;
         const deaths = guildDeaths.get(guild) || 0;
         if (kills === 0 && deaths === 0) continue;
+        const activeMembers = guildActiveMembers.get(guild)?.size || 0;
 
         let topKiller: GuildStat['topKiller'] = null;
         const pk = guildPlayerKills.get(guild);
