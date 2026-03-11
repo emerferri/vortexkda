@@ -69,6 +69,7 @@ const COLORS = [
 
 export const ClassGuildRanking = () => {
   const [filterType, setFilterType] = useState<FilterType>('class');
+  const [eventType, setEventType] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
