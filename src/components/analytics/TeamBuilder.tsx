@@ -275,13 +275,13 @@ export const TeamBuilder = ({ filters }: Props) => {
     for (const [, players] of byClass) {
       if (players.length > 0) team.push(players[0]);
     }
-    // Then fill to top 10 if more available
+    // Then fill to top 25 (Throne Conquest composition)
     for (const s of scored) {
-      if (team.length >= 10) break;
+      if (team.length >= 25) break;
       if (!team.find(t => t.name === s.name)) team.push(s);
     }
 
-    return team.slice(0, 10);
+    return team.slice(0, 25);
   }, [members]);
 
   const generateAIInsights = async () => {
