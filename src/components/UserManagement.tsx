@@ -13,9 +13,10 @@ import { Badge } from '@/components/ui/badge';
 
 interface UserRole {
   id: string;
+  role_id: string | null;
   user_id: string;
-  role: 'admin' | 'moderator';
-  email?: string;
+  role: 'admin' | 'moderator' | 'user';
+  email: string;
 }
 
 export const UserManagement = () => {
