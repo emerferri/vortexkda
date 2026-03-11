@@ -54,11 +54,6 @@ export const RankingArkaWar = () => {
   const specialCardsRef = useRef<HTMLDivElement>(null);
 
   // Import state
-  const [importDate, setImportDate] = useState<Date>();
-  const [importHour, setImportHour] = useState<number>(21);
-  const [parsedKills, setParsedKills] = useState<ParsedKill[]>([]);
-  const [importing, setImporting] = useState(false);
-  const [fileName, setFileName] = useState('');
 
   const debouncedSetFilters = useCallback(
     debounce((from: Date | undefined, to: Date | undefined) => {
