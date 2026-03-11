@@ -82,7 +82,7 @@ export const ClassGuildRanking = () => {
   const BOSS_HOURS = [20, 21, 22];
 
   const { data: playersData, isLoading } = useQuery({
-    queryKey: ['players-with-characters', dateFrom, dateTo, hourFrom, hourTo],
+    queryKey: ['players-with-characters', dateFrom, dateTo, hourFrom, hourTo, eventType],
     queryFn: async () => {
       // Fetch all match players with their aggregate stats
       let query = supabase
@@ -91,8 +91,12 @@ export const ClassGuildRanking = () => {
           player_name,
           kills,
           deaths,
-          pvp_matches!inner(match_date, match_hour)
+          pvp_matches!inner(match_date, match_hour, event_type)
         `);
+
+      if (eventType !== 'all') {
+        query = query.eq('pvp_matches.event_type', eventType);
+      }
 
       if (dateFrom) {
         query = query.gte('pvp_matches.match_date', format(dateFrom, 'yyyy-MM-dd'));
