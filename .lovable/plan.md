@@ -15,10 +15,18 @@ Dashboard (sub-abas internas via Tabs)
 ├── PvP Direto   → Player vs Player / Guild vs Guild
 ├── Classes      → Eficiência, dominância, matriz, meta
 ├── Gráficos     → Evolução temporal (kills/dia, KDA)
+├── Escalação    → Team Builder com métricas avançadas por membro
 └── Insights IA  → Análise automática via Lovable AI
 ```
 
-## Arquivos Criados
+## Módulo Escalação & Team Builder
+
+- Seleção de guild → tabela de membros com: Kills, Deaths, KDA, Participação%, Consistência (desvio padrão), Melhor/Pior evento, Tendência
+- Classificação automática: MVP, Constante, Oscilante, Destaque, Em Evolução, Reserva
+- Composição sugerida (melhor time por score combinado)
+- Insights IA táticos (prompt especializado em escalação)
+
+## Arquivos
 
 | Arquivo |
 |---------|
@@ -31,12 +39,5 @@ Dashboard (sub-abas internas via Tabs)
 | `src/components/analytics/ClassAnalytics.tsx` |
 | `src/components/analytics/AnalyticsCharts.tsx` |
 | `src/components/analytics/AIInsights.tsx` |
+| `src/components/analytics/TeamBuilder.tsx` |
 | `supabase/functions/pvp-ai-insights/index.ts` |
-
-## Arquivos Modificados
-
-| Arquivo |
-|---------|
-| `src/components/AppSidebar.tsx` |
-| `src/pages/Index.tsx` |
-| `supabase/config.toml` |
