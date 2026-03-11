@@ -5,6 +5,7 @@ import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableRow, TableHeader } from './ui/table';
 import { Crosshair, Download, Image, Calendar as CalendarIcon } from 'lucide-react';
+import { EventTypeFilter } from './EventTypeFilter';
 import { Button } from './ui/button';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
