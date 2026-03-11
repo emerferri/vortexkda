@@ -304,14 +304,15 @@ export const TeamBuilder = ({ filters }: Props) => {
     for (const [, players] of byClass) {
       if (players.length > 0) team.push(players[0]);
     }
-    // Then fill to top 25 (Throne Conquest composition)
+    const maxSize = TEAM_SIZE[eventType] || 25;
+    // Then fill to max size
     for (const s of scored) {
-      if (team.length >= 25) break;
+      if (team.length >= maxSize) break;
       if (!team.find(t => t.name === s.name)) team.push(s);
     }
 
-    return team.slice(0, 25);
-  }, [members]);
+    return team.slice(0, maxSize);
+  }, [members, eventType]);
 
   const generateAIInsights = async () => {
     if (members.length === 0) return;
