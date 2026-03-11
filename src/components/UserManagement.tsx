@@ -160,12 +160,17 @@ export const UserManagement = () => {
         </Badge>
       );
     }
-    return (
-      <Badge className="bg-blue-500/20 text-blue-500 border-blue-500/30">
-        <Shield className="w-3 h-3 mr-1" />
-        Moderador
-      </Badge>
-    );
+
+    if (role === 'moderator') {
+      return (
+        <Badge className="bg-blue-500/20 text-blue-500 border-blue-500/30">
+          <Shield className="w-3 h-3 mr-1" />
+          Moderador
+        </Badge>
+      );
+    }
+
+    return <Badge variant="secondary">Usuário</Badge>;
   };
 
   if (loading) {
