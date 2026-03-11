@@ -27,10 +27,11 @@ export const BestPerClassRanking = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('best');
   const [eventType, setEventType] = useState<string>('boss_event');
   const { data: bestPerClass, isLoading } = useQuery({
-    queryKey: ['best-per-class', startDate, endDate],
+    queryKey: ['best-per-class', startDate, endDate, eventType],
     queryFn: async () => {
       // 1. Fetch matches (with optional date filter)
-      let matchQuery = supabase.from('pvp_matches').select('id, match_date').eq('event_type', 'boss_event');
+      let matchQuery = supabase.from('pvp_matches').select('id, match_date');
+      if (eventType !== 'all') matchQuery = matchQuery.eq('event_type', eventType);
       if (startDate) matchQuery = matchQuery.gte('match_date', startDate);
       if (endDate) matchQuery = matchQuery.lte('match_date', endDate);
       const { data: matches, error: mErr } = await matchQuery;
