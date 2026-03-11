@@ -154,3 +154,49 @@ export function filterByGuild(logs: KillLog[], guild: string | null, charMap: Ma
     return killer?.guild === guild || victim?.guild === guild;
   });
 }
+
+export interface MatchWithType {
+  id: string;
+  event_type: string;
+  match_date: string;
+}
+
+export async function fetchMatchesWithType(filters: AnalyticsFilters): Promise<MatchWithType[]> {
+  let query = supabase.from('pvp_matches').select('id, event_type, match_date');
+
+  if (filters.eventType !== 'all') {
+    query = query.eq('event_type', filters.eventType);
+  }
+  if (filters.dateFrom) {
+    query = query.gte('match_date', filters.dateFrom);
+  }
+  if (filters.dateTo) {
+    query = query.lte('match_date', filters.dateTo);
+  }
+  if (filters.hourFrom !== null) {
+    query = query.gte('match_hour', filters.hourFrom);
+  }
+  if (filters.hourTo !== null) {
+    query = query.lte('match_hour', filters.hourTo);
+  }
+
+  query = query.order('match_date', { ascending: true });
+
+  const all: MatchWithType[] = [];
+  let page = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      hasMore = false;
+    } else {
+      all.push(...data);
+      hasMore = data.length === PAGE_SIZE;
+      page++;
+    }
+  }
+
+  return all;
+}

@@ -13,7 +13,23 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `Você é um analista especializado em PvP de jogos MMORPG. Analise os dados de PvP fornecidos e gere insights detalhados em português brasileiro. 
+    const isTeamBuilding = summary.analysisType === 'team_building';
+
+    const systemPrompt = isTeamBuilding
+      ? `Você é um treinador/estrategista especializado em PvP de jogos MMORPG. Analise os dados de desempenho dos membros da guild e gere uma análise tática detalhada em português brasileiro.
+
+Seu relatório deve cobrir:
+1. **Escalação Ideal**: Quem deve ser escalado como titular e por quê (baseado em KDA, consistência e participação)
+2. **Jogadores em Destaque**: Quem está performando acima da média
+3. **Jogadores para Desenvolver**: Quem tem potencial mas precisa melhorar (tendência em alta, mas KDA ainda baixo)
+4. **Pontos Fracos da Guild**: Onde a guild pode melhorar (falta de consistência, baixa participação, classes em falta)
+5. **Composição Tática**: Sugestão de formação ideal por classe, considerando os dados
+6. **Oscilantes**: Jogadores imprevisíveis que podem surpreender ou decepcionar — como lidar com eles
+7. **Recomendações**: Ações práticas para melhorar o desempenho coletivo
+
+Use emojis para destacar pontos importantes. Seja específico com números e percentuais.
+Mantenha o tom de um treinador motivador mas realista. Máximo 1000 palavras.`
+      : `Você é um analista especializado em PvP de jogos MMORPG. Analise os dados de PvP fornecidos e gere insights detalhados em português brasileiro. 
 
 Seu relatório deve cobrir:
 1. **Jogadores Dominantes**: Quem são os melhores jogadores e por quê
