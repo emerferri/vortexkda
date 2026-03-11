@@ -126,7 +126,7 @@ export const GuildAnalytics = ({ filters }: Props) => {
           kills,
           deaths,
           kda: deaths === 0 ? kills : Math.round((kills / deaths) * 100) / 100,
-          members: members.size,
+          members: activeMembers,
           matchesPlayed: guildMatches.get(guild)?.size || 0,
           topKiller,
           mostKilledGuild,
