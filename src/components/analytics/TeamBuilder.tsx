@@ -134,10 +134,11 @@ export const TeamBuilder = ({ filters }: Props) => {
   const analyzeGuild = async () => {
     setLoading(true);
     try {
-      const [matches, characters] = await Promise.all([
+      const [allMatches, characters] = await Promise.all([
         fetchMatchesWithType(filters),
         fetchAllCharacters(),
       ]);
+      const matches = eventType === 'all' ? allMatches : allMatches.filter(m => m.event_type === eventType);
       const charMap = buildCharacterMap(characters);
       const matchIds = matches.map(m => m.id);
       let logs = await fetchKillLogsForMatches(matchIds);
