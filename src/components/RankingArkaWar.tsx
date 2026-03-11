@@ -301,7 +301,7 @@ export const RankingArkaWar = () => {
         <div className="text-center py-12 text-muted-foreground">
           <Crosshair className="w-16 h-16 mx-auto mb-4 opacity-50" />
           <p>Nenhum dado encontrado para o Arka War.</p>
-          <p className="text-sm mt-2">Importe dados através da planilha Excel acima.</p>
+          <p className="text-sm mt-2">Importe dados pelo menu "Incluir Dados".</p>
         </div>
       ) : (
         <>
