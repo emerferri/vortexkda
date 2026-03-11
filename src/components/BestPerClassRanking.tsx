@@ -7,6 +7,7 @@ import { Award, Calendar, X, Crosshair, Skull } from 'lucide-react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
+import { EventTypeFilter } from './EventTypeFilter';
 
 interface PlayerClassStats {
   player_name: string;
@@ -24,11 +25,13 @@ export const BestPerClassRanking = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('best');
+  const [eventType, setEventType] = useState<string>('boss_event');
   const { data: bestPerClass, isLoading } = useQuery({
-    queryKey: ['best-per-class', startDate, endDate],
+    queryKey: ['best-per-class', startDate, endDate, eventType],
     queryFn: async () => {
       // 1. Fetch matches (with optional date filter)
-      let matchQuery = supabase.from('pvp_matches').select('id, match_date').eq('event_type', 'boss_event');
+      let matchQuery = supabase.from('pvp_matches').select('id, match_date');
+      if (eventType !== 'all') matchQuery = matchQuery.eq('event_type', eventType);
       if (startDate) matchQuery = matchQuery.gte('match_date', startDate);
       if (endDate) matchQuery = matchQuery.lte('match_date', endDate);
       const { data: matches, error: mErr } = await matchQuery;
@@ -164,6 +167,7 @@ export const BestPerClassRanking = () => {
 
       {/* Date filter */}
       <div className="flex flex-wrap items-center justify-center gap-3">
+        <EventTypeFilter value={eventType} onChange={setEventType} />
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-muted-foreground" />
           <Input

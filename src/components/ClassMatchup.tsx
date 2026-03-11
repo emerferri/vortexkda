@@ -5,6 +5,7 @@ import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableRow, TableHeader } from './ui/table';
 import { Crosshair, Download, Image, Calendar as CalendarIcon } from 'lucide-react';
+import { EventTypeFilter } from './EventTypeFilter';
 import { Button } from './ui/button';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
@@ -32,6 +33,7 @@ interface MatchupEntry {
 
 export const ClassMatchup = () => {
   const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [eventType, setEventType] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const chartRef = useRef<HTMLDivElement>(null);
@@ -51,10 +53,11 @@ export const ClassMatchup = () => {
 
   // Fetch all kill logs with pagination
   const { data: killLogs, isLoading } = useQuery({
-    queryKey: ['kill-logs-matchup', dateFrom, dateTo],
+    queryKey: ['kill-logs-matchup', dateFrom, dateTo, eventType],
     queryFn: async () => {
       // First get match IDs filtered by date if needed
       let matchQuery = supabase.from('pvp_matches').select('id');
+      if (eventType !== 'all') matchQuery = matchQuery.eq('event_type', eventType);
       if (dateFrom) matchQuery = matchQuery.gte('match_date', format(dateFrom, 'yyyy-MM-dd'));
       if (dateTo) matchQuery = matchQuery.lte('match_date', format(dateTo, 'yyyy-MM-dd'));
 
@@ -228,6 +231,7 @@ export const ClassMatchup = () => {
       {/* Filters */}
       <div className="bg-card/50 p-6 rounded-xl border border-border space-y-4">
         <div className="flex flex-wrap gap-4 justify-center items-center">
+          <EventTypeFilter value={eventType} onChange={setEventType} />
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-muted-foreground">Classe:</span>
             <Select value={selectedClass} onValueChange={setSelectedClass}>

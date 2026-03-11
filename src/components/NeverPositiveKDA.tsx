@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { TrendingDown, Download, Image as ImageIcon, Calendar, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { EventTypeFilter } from './EventTypeFilter';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -31,6 +32,7 @@ interface NeverPositivePlayer {
 
 export const NeverPositiveKDA = () => {
   const [dateFrom, setDateFrom] = useState<Date>();
+  const [eventType, setEventType] = useState<string>('boss_event');
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
   const [hourTo, setHourTo] = useState<number>();
@@ -56,10 +58,11 @@ export const NeverPositiveKDA = () => {
   }, [dateFrom, dateTo, hourFrom, hourTo, debouncedSetFilters]);
 
   const { data: allPlayers = [], isLoading: loading } = useQuery({
-    queryKey: ['never-positive-kda', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    queryKey: ['never-positive-kda', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo, eventType],
     staleTime: 30000,
     queryFn: async () => {
-      let matchQuery = supabase.from('pvp_matches').select('id').eq('event_type', 'boss_event');
+      let matchQuery = supabase.from('pvp_matches').select('id');
+      if (eventType !== 'all') matchQuery = matchQuery.eq('event_type', eventType);
 
       if (debouncedDateFrom) {
         matchQuery = matchQuery.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
@@ -246,6 +249,7 @@ export const NeverPositiveKDA = () => {
 
         {/* Date and Hour Filters */}
         <div className="flex flex-wrap gap-2 mt-4">
+          <EventTypeFilter value={eventType} onChange={setEventType} />
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">

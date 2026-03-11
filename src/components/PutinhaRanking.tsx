@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2, Skull, Target, Download, Calendar, Clock } from 'lucide-react';
+import { EventTypeFilter } from './EventTypeFilter';
 import { toast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -25,6 +26,7 @@ interface PutinhaRelation {
 
 export const PutinhaRanking = () => {
   const [exporting, setExporting] = useState(false);
+  const [eventType, setEventType] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
@@ -52,12 +54,16 @@ export const PutinhaRanking = () => {
   }, [dateFrom, dateTo, hourFrom, hourTo, debouncedSetFilters]);
 
   const { data: relations = [], isLoading: loading } = useQuery({
-    queryKey: ['putinha-ranking', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    queryKey: ['putinha-ranking', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo, eventType],
     staleTime: 30000,
     queryFn: async () => {
 
       // 1) Fetch match IDs based on date/hour filters
       let matchQuery = supabase.from('pvp_matches').select('id');
+
+      if (eventType !== 'all') {
+        matchQuery = matchQuery.eq('event_type', eventType);
+      }
 
       if (debouncedDateFrom) {
         matchQuery = matchQuery.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
@@ -234,6 +240,7 @@ export const PutinhaRanking = () => {
         
         {/* Date and Hour Filters */}
         <div className="flex flex-wrap gap-2 mt-4">
+          <EventTypeFilter value={eventType} onChange={setEventType} />
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">

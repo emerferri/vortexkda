@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EventTypeFilter } from './EventTypeFilter';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -48,6 +49,7 @@ const getStreakLevel = (streak: number) => {
 
 export const KillStreakRanking = () => {
   const { user } = useAuth();
+  const [eventType, setEventType] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
@@ -58,7 +60,7 @@ export const KillStreakRanking = () => {
   const rankingRef = useRef<HTMLDivElement>(null);
 
   const { data: killLogs = [], isLoading } = useQuery({
-    queryKey: ['kill-streak-logs', dateFrom, dateTo, hourFrom, hourTo],
+    queryKey: ['kill-streak-logs', dateFrom, dateTo, hourFrom, hourTo, eventType],
     queryFn: async () => {
       let query = supabase
         .from('pvp_kill_logs')
@@ -67,9 +69,13 @@ export const KillStreakRanking = () => {
           victim_name,
           created_at,
           match_id,
-          pvp_matches!inner(match_date, match_hour)
+          pvp_matches!inner(match_date, match_hour, event_type)
         `)
         .order('created_at', { ascending: true });
+
+      if (eventType !== 'all') {
+        query = query.eq('pvp_matches.event_type', eventType);
+      }
 
       if (dateFrom) {
         query = query.gte('pvp_matches.match_date', format(dateFrom, 'yyyy-MM-dd'));
@@ -297,6 +303,7 @@ export const KillStreakRanking = () => {
           <div className="space-y-4 mb-6">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium">Filtros</h3>
+              <EventTypeFilter value={eventType} onChange={setEventType} />
               {hasFilters && (
                 <Button
                   variant="ghost"

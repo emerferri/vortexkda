@@ -7,6 +7,7 @@ import { Crown, Trophy, Target, TrendingUp, TrendingDown, Skull, Calendar, X } f
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { EventTypeFilter } from './EventTypeFilter';
 
 interface PlayerStats {
   player_name: string;
@@ -26,17 +27,22 @@ type ViewMode = 'rei' | 'cone';
 
 export const ReisDoPVP = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('rei');
+  const [eventType, setEventType] = useState<string>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
   const { data: rankingData, isLoading } = useQuery({
-    queryKey: ['reis-cone-pvp', startDate, endDate],
+    queryKey: ['reis-cone-pvp', startDate, endDate, eventType],
     staleTime: 0,
     queryFn: async () => {
       console.log('[ReisDoPVP] Starting query...');
       let query = supabase
         .from('pvp_matches')
         .select('id, match_date, match_hour');
+
+      if (eventType !== 'all') {
+        query = query.eq('event_type', eventType);
+      }
 
       if (startDate) query = query.gte('match_date', startDate);
       if (endDate) query = query.lte('match_date', endDate);
@@ -258,6 +264,7 @@ export const ReisDoPVP = () => {
 
       {/* Date Filters */}
       <div className="flex flex-wrap items-center justify-center gap-3">
+        <EventTypeFilter value={eventType} onChange={setEventType} />
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-muted-foreground" />
           <Input

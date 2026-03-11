@@ -14,6 +14,7 @@ import { ClassMatchup } from '@/components/ClassMatchup';
 import { NeverPositiveKDA } from '@/components/NeverPositiveKDA';
 import { DatabaseManager } from '@/components/DatabaseManager';
 import { PvPAnalyticsDashboard } from '@/components/analytics/PvPAnalyticsDashboard';
+import { RankingArkaWar } from '@/components/RankingArkaWar';
 import { DatabaseImport } from '@/components/DatabaseImport';
 import { parseTxtFile, ParseResult } from '@/utils/txtParser';
 import { Swords, FileText, Database, Crown } from 'lucide-react';
@@ -108,6 +109,8 @@ const Index = () => {
         return <RankingGeral />;
       case 'throne':
         return <RankingThroneConquest />;
+      case 'arka':
+        return <RankingArkaWar />;
       case 'reis':
         return <ReisDoPVP />;
       case 'classe-guild':

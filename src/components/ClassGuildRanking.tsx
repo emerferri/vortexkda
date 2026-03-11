@@ -5,6 +5,7 @@ import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableRow, TableHeader } from './ui/table';
 import { Crosshair, Users, Sword, AlertCircle, Calendar as CalendarIcon, Download, Image } from 'lucide-react';
+import { EventTypeFilter } from './EventTypeFilter';
 import { Alert, AlertDescription } from './ui/alert';
 import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -68,6 +69,7 @@ const COLORS = [
 
 export const ClassGuildRanking = () => {
   const [filterType, setFilterType] = useState<FilterType>('class');
+  const [eventType, setEventType] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
@@ -80,7 +82,7 @@ export const ClassGuildRanking = () => {
   const BOSS_HOURS = [20, 21, 22];
 
   const { data: playersData, isLoading } = useQuery({
-    queryKey: ['players-with-characters', dateFrom, dateTo, hourFrom, hourTo],
+    queryKey: ['players-with-characters', dateFrom, dateTo, hourFrom, hourTo, eventType],
     queryFn: async () => {
       // Fetch all match players with their aggregate stats
       let query = supabase
@@ -89,8 +91,12 @@ export const ClassGuildRanking = () => {
           player_name,
           kills,
           deaths,
-          pvp_matches!inner(match_date, match_hour)
+          pvp_matches!inner(match_date, match_hour, event_type)
         `);
+
+      if (eventType !== 'all') {
+        query = query.eq('pvp_matches.event_type', eventType);
+      }
 
       if (dateFrom) {
         query = query.gte('pvp_matches.match_date', format(dateFrom, 'yyyy-MM-dd'));
@@ -302,6 +308,7 @@ export const ClassGuildRanking = () => {
       {/* Filtros de Data e Hora */}
       <div className="bg-card/50 p-6 rounded-xl border border-border space-y-4">
         <div className="flex flex-wrap gap-4 justify-center items-center">
+          <EventTypeFilter value={eventType} onChange={setEventType} />
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-muted-foreground">De:</span>
             <Popover>
