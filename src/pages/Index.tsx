@@ -109,6 +109,8 @@ const Index = () => {
         return <RankingGeral />;
       case 'throne':
         return <RankingThroneConquest />;
+      case 'arka':
+        return <RankingArkaWar />;
       case 'reis':
         return <ReisDoPVP />;
       case 'classe-guild':

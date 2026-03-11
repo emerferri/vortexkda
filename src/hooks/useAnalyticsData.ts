@@ -8,7 +8,7 @@ export interface AnalyticsFilters {
   dateTo: string | null;
   hourFrom: number | null;
   hourTo: number | null;
-  eventType: 'boss_event' | 'throne_conquest' | 'all';
+  eventType: 'boss_event' | 'throne_conquest' | 'arka_war' | 'all';
   guild: string | null;
 }
 

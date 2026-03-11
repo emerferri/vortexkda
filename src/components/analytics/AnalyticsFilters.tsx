@@ -127,6 +127,7 @@ export const AnalyticsFiltersBar = ({ filters, onChange }: AnalyticsFiltersProps
           <SelectItem value="all">Todos Eventos</SelectItem>
           <SelectItem value="boss_event">Boss Event</SelectItem>
           <SelectItem value="throne_conquest">Throne</SelectItem>
+          <SelectItem value="arka_war">Arka War</SelectItem>
         </SelectContent>
       </Select>
 
