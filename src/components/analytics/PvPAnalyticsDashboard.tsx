@@ -7,8 +7,9 @@ import { DirectCombat } from './DirectCombat';
 import { ClassAnalytics } from './ClassAnalytics';
 import { AnalyticsCharts } from './AnalyticsCharts';
 import { AIInsights } from './AIInsights';
+import { TeamBuilder } from './TeamBuilder';
 import { AnalyticsFilters, defaultFilters } from '@/hooks/useAnalyticsData';
-import { BarChart3, Users, Swords, Shield, LineChart, Brain } from 'lucide-react';
+import { BarChart3, Users, Swords, Shield, LineChart, Brain, Target } from 'lucide-react';
 
 export const PvPAnalyticsDashboard = () => {
   const [filters, setFilters] = useState<AnalyticsFilters>(defaultFilters);
@@ -28,7 +29,7 @@ export const PvPAnalyticsDashboard = () => {
       <AnalyticsFiltersBar filters={filters} onChange={setFilters} />
 
       <Tabs defaultValue="players" className="w-full">
-        <TabsList className="grid grid-cols-3 md:grid-cols-6 w-full">
+        <TabsList className="grid grid-cols-4 md:grid-cols-7 w-full">
           <TabsTrigger value="players" className="gap-1 text-xs">
             <Users className="w-3 h-3" /> Players
           </TabsTrigger>
@@ -43,6 +44,9 @@ export const PvPAnalyticsDashboard = () => {
           </TabsTrigger>
           <TabsTrigger value="charts" className="gap-1 text-xs">
             <LineChart className="w-3 h-3" /> Gráficos
+          </TabsTrigger>
+          <TabsTrigger value="team" className="gap-1 text-xs">
+            <Target className="w-3 h-3" /> Escalação
           </TabsTrigger>
           <TabsTrigger value="insights" className="gap-1 text-xs">
             <Brain className="w-3 h-3" /> Insights IA
@@ -63,6 +67,9 @@ export const PvPAnalyticsDashboard = () => {
         </TabsContent>
         <TabsContent value="charts">
           <AnalyticsCharts filters={filters} />
+        </TabsContent>
+        <TabsContent value="team">
+          <TeamBuilder filters={filters} />
         </TabsContent>
         <TabsContent value="insights">
           <AIInsights filters={filters} />
