@@ -528,16 +528,35 @@ Deno.serve(async (req) => {
     const externalClient = createClient(externalUrl, externalKey);
 
     // Query using local Brazil time (external DB stores timestamps in local time)
-    const { data: logs, error: logsError } = await externalClient
-      .from('logs_pvp')
-      .select('id, content, timestamp, created_at')
-      .gte('timestamp', localStartDate)
-      .lte('timestamp', localEndDate)
-      .order('timestamp', { ascending: false })
-      .limit(2000);
+    // Paginate to fetch ALL logs (Supabase default limit is 1000 per request)
+    const PAGE_SIZE = 1000;
+    const MAX_PAGES = 10;
+    let logs: ExternalLogEntry[] = [];
+    let page = 0;
 
-    if (logsError) {
-      throw new Error(`Failed to fetch logs: ${logsError.message}`);
+    while (page < MAX_PAGES) {
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      const { data: pageLogs, error: logsError } = await externalClient
+        .from('logs_pvp')
+        .select('id, content, timestamp, created_at')
+        .gte('timestamp', localStartDate)
+        .lte('timestamp', localEndDate)
+        .order('timestamp', { ascending: false })
+        .range(from, to);
+
+      if (logsError) {
+        throw new Error(`Failed to fetch logs: ${logsError.message}`);
+      }
+
+      if (!pageLogs || pageLogs.length === 0) break;
+
+      logs = logs.concat(pageLogs as ExternalLogEntry[]);
+      console.log(`[Auto Process] Page ${page + 1}: fetched ${pageLogs.length} logs (total: ${logs.length})`);
+
+      if (pageLogs.length < PAGE_SIZE) break;
+      page++;
     }
 
     console.log(`[Auto Process] Fetched ${logs?.length || 0} logs from external database`);
