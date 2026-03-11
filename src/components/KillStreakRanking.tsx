@@ -303,6 +303,7 @@ export const KillStreakRanking = () => {
           <div className="space-y-4 mb-6">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium">Filtros</h3>
+              <EventTypeFilter value={eventType} onChange={setEventType} />
               {hasFilters && (
                 <Button
                   variant="ghost"

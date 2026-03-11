@@ -167,6 +167,7 @@ export const BestPerClassRanking = () => {
 
       {/* Date filter */}
       <div className="flex flex-wrap items-center justify-center gap-3">
+        <EventTypeFilter value={eventType} onChange={setEventType} />
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-muted-foreground" />
           <Input

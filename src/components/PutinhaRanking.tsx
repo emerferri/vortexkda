@@ -240,6 +240,7 @@ export const PutinhaRanking = () => {
         
         {/* Date and Hour Filters */}
         <div className="flex flex-wrap gap-2 mt-4">
+          <EventTypeFilter value={eventType} onChange={setEventType} />
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
