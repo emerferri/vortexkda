@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const mapFilter = searchParams.get('map'); // 'devias' or 'pvp_square'
-    const limit = parseInt(searchParams.get('limit') || '1000');
+    const limit = parseInt(searchParams.get('limit') || '5000');
 
     console.log(`Fetching external logs with filters: startDate=${startDate}, endDate=${endDate}, map=${mapFilter}, limit=${limit}`);
 

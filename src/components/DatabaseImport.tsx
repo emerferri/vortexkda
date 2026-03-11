@@ -75,12 +75,12 @@ export const DatabaseImport = ({ onDataLoaded, eventType = 'boss_event' }: Datab
   const processData = () => {
     if (!previewData?.logs) return;
 
-    const result = parseExternalDbContent(previewData.logs);
+    const result = parseExternalDbContent(previewData.logs, eventType);
     
     if (result.players.length === 0) {
       toast({
         title: 'Nenhum dado válido',
-        description: 'Nenhum registro de kill válido encontrado nos logs (verificando mapa PvP Square).',
+        description: `Nenhum registro de kill válido encontrado nos logs (verificando mapa ${eventType === 'throne_conquest' ? 'Devias' : 'PvP Square'}).`,
         variant: 'destructive',
       });
       return;
