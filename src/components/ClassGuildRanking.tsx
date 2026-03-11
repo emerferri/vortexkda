@@ -308,6 +308,7 @@ export const ClassGuildRanking = () => {
       {/* Filtros de Data e Hora */}
       <div className="bg-card/50 p-6 rounded-xl border border-border space-y-4">
         <div className="flex flex-wrap gap-4 justify-center items-center">
+          <EventTypeFilter value={eventType} onChange={setEventType} />
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-muted-foreground">De:</span>
             <Popover>
