@@ -33,6 +33,7 @@ interface MatchupEntry {
 
 export const ClassMatchup = () => {
   const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [eventType, setEventType] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const chartRef = useRef<HTMLDivElement>(null);
