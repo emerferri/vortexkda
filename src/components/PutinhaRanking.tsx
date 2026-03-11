@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2, Skull, Target, Download, Calendar, Clock } from 'lucide-react';
+import { EventTypeFilter } from './EventTypeFilter';
 import { toast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
