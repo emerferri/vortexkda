@@ -5,6 +5,7 @@ import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableRow, TableHeader } from './ui/table';
 import { Crosshair, Users, Sword, AlertCircle, Calendar as CalendarIcon, Download, Image } from 'lucide-react';
+import { EventTypeFilter } from './EventTypeFilter';
 import { Alert, AlertDescription } from './ui/alert';
 import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
