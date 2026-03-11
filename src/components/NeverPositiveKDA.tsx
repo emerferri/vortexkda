@@ -58,10 +58,11 @@ export const NeverPositiveKDA = () => {
   }, [dateFrom, dateTo, hourFrom, hourTo, debouncedSetFilters]);
 
   const { data: allPlayers = [], isLoading: loading } = useQuery({
-    queryKey: ['never-positive-kda', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    queryKey: ['never-positive-kda', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo, eventType],
     staleTime: 30000,
     queryFn: async () => {
-      let matchQuery = supabase.from('pvp_matches').select('id').eq('event_type', 'boss_event');
+      let matchQuery = supabase.from('pvp_matches').select('id');
+      if (eventType !== 'all') matchQuery = matchQuery.eq('event_type', eventType);
 
       if (debouncedDateFrom) {
         matchQuery = matchQuery.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
