@@ -309,7 +309,8 @@ export const UserManagement = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDeleteRole(userRole.id)}
+                        disabled={!userRole.role_id}
+                        onClick={() => handleDeleteRole(userRole.role_id)}
                       >
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
