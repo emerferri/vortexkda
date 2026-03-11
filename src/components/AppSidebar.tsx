@@ -23,7 +23,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { id: 'ranking', label: 'Ranking Geral', icon: Trophy },
+  { id: 'ranking', label: 'Boss Diário', icon: Trophy },
   { id: 'throne', label: 'Throne', icon: Crown },
   { id: 'arka', label: 'Arka War', icon: Crosshair },
   { id: 'reis', label: 'Rei/Cone PVP', icon: Target },

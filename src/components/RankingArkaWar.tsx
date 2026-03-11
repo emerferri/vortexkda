@@ -444,62 +444,6 @@ export const RankingArkaWar = () => {
         </div>
       </div>
 
-      {/* Import Section (admin/moderator only) */}
-      {canEditData && (
-        <Card className="border-orange-500/30">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Upload className="w-5 h-5 text-orange-500" />
-              Importar Dados de Arka War
-            </CardTitle>
-            <CardDescription>
-              Formato da planilha: Assassino | Vitimas | Hora/Abate
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap items-end gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Planilha Excel</label>
-                <Input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileSelect} className="w-[250px]" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Data do Evento</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("w-[180px] justify-start text-left font-normal", !importDate && "text-muted-foreground")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {importDate ? format(importDate, "PPP", { locale: ptBR }) : "Selecione"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={importDate} onSelect={setImportDate} initialFocus className="p-3 pointer-events-auto" />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Hora</label>
-                <Select value={String(importHour)} onValueChange={v => setImportHour(Number(v))}>
-                  <SelectTrigger className="w-[100px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 24 }, (_, i) => (
-                      <SelectItem key={i} value={String(i)}>{String(i).padStart(2, '0')}:00</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={handleImport} disabled={importing || parsedKills.length === 0 || !importDate} className="gap-2">
-                {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                {importing ? 'Importando...' : `Importar${parsedKills.length > 0 ? ` (${parsedKills.length} kills)` : ''}`}
-              </Button>
-            </div>
-            {fileName && parsedKills.length > 0 && (
-              <p className="text-sm text-muted-foreground mt-2">📄 {fileName} — {parsedKills.length} kills prontos para importar</p>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground"><p>Carregando dados do Arka War...</p></div>
