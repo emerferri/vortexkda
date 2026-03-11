@@ -15,7 +15,7 @@ import { NeverPositiveKDA } from '@/components/NeverPositiveKDA';
 import { DatabaseManager } from '@/components/DatabaseManager';
 import { DatabaseImport } from '@/components/DatabaseImport';
 import { parseTxtFile, ParseResult } from '@/utils/txtParser';
-import { Swords, FileText, Database, Crown, Wrench } from 'lucide-react';
+import { Swords, FileText, Database, Crown } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -130,21 +130,6 @@ const Index = () => {
     }
   };
 
-  if (!isAdmin && !roleLoading) {
-    return (
-      <div className="min-h-screen bg-background gradient-gaming flex items-center justify-center">
-        <div className="text-center space-y-6 px-4">
-          <Wrench className="w-20 h-20 text-primary mx-auto animate-pulse" />
-          <h1 className="text-3xl md:text-4xl font-bold text-foreground">
-            Site em manutenção
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-md mx-auto">
-            Realizando melhorias sugeridas pelo Bica!
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background gradient-gaming flex">
