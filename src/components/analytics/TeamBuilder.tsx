@@ -373,18 +373,30 @@ export const TeamBuilder = ({ filters }: Props) => {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Selecione uma guild para analisar o desempenho individual dos membros e montar a melhor formação.
+            Selecione uma guild e o tipo de evento para analisar o desempenho individual dos membros e montar a melhor formação.
           </p>
-          <Select value={guild} onValueChange={setGuild}>
-            <SelectTrigger className="w-full max-w-xs">
-              <SelectValue placeholder="Selecione a guild" />
-            </SelectTrigger>
-            <SelectContent>
-              {guilds.map(g => (
-                <SelectItem key={g} value={g}>{g}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex flex-wrap gap-3">
+            <Select value={guild} onValueChange={setGuild}>
+              <SelectTrigger className="w-full max-w-xs">
+                <SelectValue placeholder="Selecione a guild" />
+              </SelectTrigger>
+              <SelectContent>
+                {guilds.map(g => (
+                  <SelectItem key={g} value={g}>{g}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={eventType} onValueChange={setEventType}>
+              <SelectTrigger className="w-full max-w-xs">
+                <SelectValue placeholder="Tipo de evento" />
+              </SelectTrigger>
+              <SelectContent>
+                {eventOptions.map(e => (
+                  <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </CardContent>
       </Card>
 
