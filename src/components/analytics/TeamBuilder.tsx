@@ -81,9 +81,22 @@ function trendIcon(t: 'up' | 'down' | 'stable') {
 
 const eventLabel = (e: string) => e === 'boss_event' ? 'Boss' : e === 'throne_conquest' ? 'Throne' : e;
 
+const EVENT_OPTIONS = [
+  { value: 'all', label: 'Todos os Eventos' },
+  { value: 'boss_event', label: 'Boss Event' },
+  { value: 'throne_conquest', label: 'Throne Conquest' },
+];
+
+const TEAM_SIZE: Record<string, number> = {
+  all: 25,
+  boss_event: 25,
+  throne_conquest: 25,
+};
+
 export const TeamBuilder = ({ filters }: Props) => {
   const [guild, setGuild] = useState<string>('');
   const [guilds, setGuilds] = useState<string[]>([]);
+  const [eventType, setEventType] = useState<string>('all');
   const [members, setMembers] = useState<MemberStats[]>([]);
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -97,11 +110,26 @@ export const TeamBuilder = ({ filters }: Props) => {
     });
   }, []);
 
+  // Load available event types dynamically
+  const [eventOptions, setEventOptions] = useState(EVENT_OPTIONS);
+  useEffect(() => {
+    supabase.from('pvp_matches').select('event_type').then(({ data }) => {
+      if (!data) return;
+      const types = [...new Set(data.map(d => d.event_type))].sort();
+      const opts = [{ value: 'all', label: 'Todos os Eventos' }];
+      for (const t of types) {
+        const existing = EVENT_OPTIONS.find(e => e.value === t);
+        opts.push(existing || { value: t, label: t });
+      }
+      setEventOptions(opts);
+    });
+  }, []);
+
   // Analyze guild when selected
   useEffect(() => {
     if (!guild) { setMembers([]); return; }
     analyzeGuild();
-  }, [guild, filters]);
+  }, [guild, filters, eventType]);
 
   const analyzeGuild = async () => {
     setLoading(true);
