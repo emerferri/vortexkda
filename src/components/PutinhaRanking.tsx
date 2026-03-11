@@ -54,12 +54,16 @@ export const PutinhaRanking = () => {
   }, [dateFrom, dateTo, hourFrom, hourTo, debouncedSetFilters]);
 
   const { data: relations = [], isLoading: loading } = useQuery({
-    queryKey: ['putinha-ranking', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    queryKey: ['putinha-ranking', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo, eventType],
     staleTime: 30000,
     queryFn: async () => {
 
       // 1) Fetch match IDs based on date/hour filters
       let matchQuery = supabase.from('pvp_matches').select('id');
+
+      if (eventType !== 'all') {
+        matchQuery = matchQuery.eq('event_type', eventType);
+      }
 
       if (debouncedDateFrom) {
         matchQuery = matchQuery.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
