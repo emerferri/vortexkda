@@ -7,6 +7,7 @@ import { Award, Calendar, X, Crosshair, Skull } from 'lucide-react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
+import { EventTypeFilter } from './EventTypeFilter';
 
 interface PlayerClassStats {
   player_name: string;
