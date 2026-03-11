@@ -36,9 +36,6 @@ interface ParsedKill {
 }
 
 export const RankingArkaWar = () => {
-  const { user } = useAuth();
-  const { canEditData } = useUserRole();
-  const queryClient = useQueryClient();
   const [sortBy, setSortBy] = useState<SortKey>('eventScore');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
