@@ -24,6 +24,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { id: 'ranking', label: 'Ranking Geral', icon: Trophy },
   { id: 'throne', label: 'Throne', icon: Crown },
+  { id: 'arka', label: 'Arka War', icon: Crosshair },
   { id: 'reis', label: 'Rei/Cone PVP', icon: Target },
   { id: 'classe-guild', label: 'Classe/Guild', icon: Users },
   { id: 'melhor-classe', label: 'Melhor por Classe', icon: Award },
