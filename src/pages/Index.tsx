@@ -57,7 +57,7 @@ const Index = () => {
     }
   };
 
-  const [importSource, setImportSource] = useState<'txt' | 'database'>('txt');
+  const [importSource, setImportSource] = useState<'txt' | 'database' | 'arka'>('txt');
   const [importEventType, setImportEventType] = useState<'boss_event' | 'throne_conquest'>('boss_event');
 
   const handleFileUpload = (content: string) => {
