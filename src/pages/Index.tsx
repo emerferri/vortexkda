@@ -124,6 +124,8 @@ const Index = () => {
         return <NeverPositiveKDA />;
       case 'killstreak':
         return <KillStreakRanking />;
+      case 'analytics':
+        return <PvPAnalyticsDashboard />;
       case 'admin':
         return <DatabaseManager />;
       default:
