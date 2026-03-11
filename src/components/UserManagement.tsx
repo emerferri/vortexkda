@@ -36,18 +36,16 @@ export const UserManagement = () => {
 
   const loadUserRoles = async () => {
     try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('id, user_id, role')
-        .order('role');
+      const { data, error } = await supabase.rpc('list_users_with_roles');
 
       if (error) throw error;
 
-      // For each user role, we'll show the user_id since we can't access auth.users
-      const rolesWithInfo = (data || []).map(ur => ({
-        ...ur,
-        role: ur.role as 'admin' | 'moderator',
-        email: `User ID: ${ur.user_id.slice(0, 8)}...`,
+      const rolesWithInfo: UserRole[] = (data || []).map((u: any) => ({
+        id: u.role_id ?? `user-${u.user_id}`,
+        role_id: u.role_id,
+        user_id: u.user_id,
+        role: (u.role as 'admin' | 'moderator' | 'user') ?? 'user',
+        email: u.email ?? `User ID: ${u.user_id.slice(0, 8)}...`,
       }));
 
       setUserRoles(rolesWithInfo);
