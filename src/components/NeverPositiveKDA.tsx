@@ -32,6 +32,7 @@ interface NeverPositivePlayer {
 
 export const NeverPositiveKDA = () => {
   const [dateFrom, setDateFrom] = useState<Date>();
+  const [eventType, setEventType] = useState<string>('boss_event');
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
   const [hourTo, setHourTo] = useState<number>();
