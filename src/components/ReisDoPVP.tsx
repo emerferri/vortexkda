@@ -7,6 +7,7 @@ import { Crown, Trophy, Target, TrendingUp, TrendingDown, Skull, Calendar, X } f
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { EventTypeFilter } from './EventTypeFilter';
 
 interface PlayerStats {
   player_name: string;
