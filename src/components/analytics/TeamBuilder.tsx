@@ -280,19 +280,22 @@ export const TeamBuilder = ({ filters }: Props) => {
     }
   };
 
+  // Score helper
+  const scorePlayer = (m: MemberStats) => ({
+    ...m,
+    score: m.kda * 0.4 + (1 / (1 + m.consistency)) * 3 * 0.3 + (m.participation / 100) * 3 * 0.3,
+  });
+
+  type ScoredMember = MemberStats & { score: number };
+
   // Suggested composition: best players per class
   const suggestedTeam = useMemo(() => {
     if (members.length === 0) return [];
-    // Score: KDA * 0.4 + consistency_inverted * 0.3 + participation * 0.3
     const scored = members
       .filter(m => m.classification !== 'Reserva')
-      .map(m => ({
-        ...m,
-        score: m.kda * 0.4 + (1 / (1 + m.consistency)) * 3 * 0.3 + (m.participation / 100) * 3 * 0.3,
-      }))
+      .map(scorePlayer)
       .sort((a, b) => b.score - a.score);
 
-    // Pick best per class, then fill remaining
     const byClass = new Map<string, typeof scored>();
     for (const s of scored) {
       if (!byClass.has(s.className)) byClass.set(s.className, []);
@@ -300,18 +303,78 @@ export const TeamBuilder = ({ filters }: Props) => {
     }
 
     const team: typeof scored = [];
-    // First, one per class
     for (const [, players] of byClass) {
       if (players.length > 0) team.push(players[0]);
     }
     const maxSize = TEAM_SIZE[eventType] || 25;
-    // Then fill to max size
     for (const s of scored) {
       if (team.length >= maxSize) break;
       if (!team.find(t => t.name === s.name)) team.push(s);
     }
 
     return team.slice(0, maxSize);
+  }, [members, eventType]);
+
+  // Arka War composition: 4 parties of 5, each must have 1 Darkness Wizard
+  // 2 EE total: 1 in a party, 1 reserve (outside)
+  const arkaWarParties = useMemo(() => {
+    if (members.length === 0 || eventType !== 'arka_war') return null;
+
+    const scored = members
+      .filter(m => m.classification !== 'Reserva')
+      .map(scorePlayer)
+      .sort((a, b) => b.score - a.score);
+
+    const DW_CLASS = 'Darkness Wizard';
+    const EE_CLASS = 'Elf Elder';
+
+    // Separate pools
+    const dwPlayers = scored.filter(s => s.className === DW_CLASS);
+    const eePlayers = scored.filter(s => s.className === EE_CLASS);
+    const otherPlayers = scored.filter(s => s.className !== DW_CLASS && s.className !== EE_CLASS);
+
+    // Need at least 4 DW
+    if (dwPlayers.length < 4) {
+      return { error: `Necessário pelo menos 4 ${DW_CLASS}, encontrados: ${dwPlayers.length}`, parties: [], reserve: [], eeReserve: null as ScoredMember | null };
+    }
+
+    const parties: ScoredMember[][] = [[], [], [], []];
+    const used = new Set<string>();
+
+    // Step 1: Assign 1 DW to each party
+    for (let i = 0; i < 4; i++) {
+      parties[i].push(dwPlayers[i]);
+      used.add(dwPlayers[i].name);
+    }
+
+    // Step 2: Assign 1 EE to a party (best EE), second EE goes to reserve
+    let eeReserve: ScoredMember | null = null;
+    if (eePlayers.length >= 2) {
+      parties[0].push(eePlayers[0]); // Best EE in PT1
+      used.add(eePlayers[0].name);
+      eeReserve = eePlayers[1]; // Second EE is reserve
+      used.add(eePlayers[1].name);
+    } else if (eePlayers.length === 1) {
+      parties[0].push(eePlayers[0]);
+      used.add(eePlayers[0].name);
+    }
+
+    // Step 3: Fill remaining slots (each party needs 5 total)
+    // Available pool: other players + remaining DW + remaining EE
+    const fillPool = scored.filter(s => !used.has(s.name));
+
+    for (let i = 0; i < 4; i++) {
+      while (parties[i].length < 5 && fillPool.length > 0) {
+        const next = fillPool.shift()!;
+        parties[i].push(next);
+        used.add(next.name);
+      }
+    }
+
+    // Reserve: everyone not picked (excluding the EE reserve already tracked)
+    const reserve = scored.filter(s => !used.has(s.name) && s.name !== eeReserve?.name);
+
+    return { error: null, parties, reserve, eeReserve };
   }, [members, eventType]);
 
   const generateAIInsights = async () => {
@@ -463,8 +526,97 @@ export const TeamBuilder = ({ filters }: Props) => {
             </CardContent>
           </Card>
 
-          {/* Suggested Composition */}
-          {suggestedTeam.length > 0 && (
+          {/* Arka War Party Composition */}
+          {eventType === 'arka_war' && arkaWarParties && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Target className="w-5 h-5 text-primary" />
+                  Composição Arka War — 4 PTs de 5
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <p className="text-sm text-muted-foreground">
+                  Cada PT possui obrigatoriamente 1 Darkness Wizard. 2 Elf Elder no total: 1 escalado, 1 reserva.
+                </p>
+
+                {arkaWarParties.error && (
+                  <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 text-sm text-destructive">
+                    <AlertTriangle className="w-4 h-4 inline mr-2" />
+                    {arkaWarParties.error}
+                  </div>
+                )}
+
+                {!arkaWarParties.error && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {arkaWarParties.parties.map((party, pi) => (
+                      <div key={pi} className="border border-border rounded-lg p-4 bg-card space-y-3">
+                        <h4 className="font-bold text-sm flex items-center gap-2">
+                          <Shield className="w-4 h-4 text-primary" />
+                          PT {pi + 1}
+                        </h4>
+                        <div className="space-y-2">
+                          {party.map(p => (
+                            <div key={p.name} className="flex items-center justify-between gap-2 text-sm">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-semibold truncate">{p.name}</span>
+                                <Badge variant={p.className === 'Darkness Wizard' ? 'default' : p.className === 'Elf Elder' ? 'secondary' : 'outline'} className="text-xs shrink-0">
+                                  {p.className}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+                                <span>KDA: {p.kda}</span>
+                                <span>Score: {p.score.toFixed(1)}</span>
+                                {trendIcon(p.trend)}
+                              </div>
+                            </div>
+                          ))}
+                          {party.length < 5 && (
+                            <p className="text-xs text-destructive italic">⚠ Vaga não preenchida ({5 - party.length} restante)</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* EE Reserve */}
+                {arkaWarParties.eeReserve && (
+                  <div className="border border-dashed border-border rounded-lg p-4 bg-muted/30">
+                    <h4 className="font-bold text-sm mb-2 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      Elf Elder Reserva (fora da composição)
+                    </h4>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-semibold">{arkaWarParties.eeReserve.name}</span>
+                      <Badge variant="secondary" className="text-xs">Elf Elder</Badge>
+                      <span className="text-xs text-muted-foreground">KDA: {arkaWarParties.eeReserve.kda} | Score: {arkaWarParties.eeReserve.score.toFixed(1)}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Other reserves */}
+                {arkaWarParties.reserve && arkaWarParties.reserve.length > 0 && (
+                  <div className="border border-dashed border-border rounded-lg p-4 bg-muted/30">
+                    <h4 className="font-bold text-sm mb-2 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      Reservas ({arkaWarParties.reserve.length})
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {arkaWarParties.reserve.map(r => (
+                        <Badge key={r.name} variant="outline" className="text-xs gap-1">
+                          {r.name} ({r.className})
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Generic Suggested Composition (non-arka_war) */}
+          {eventType !== 'arka_war' && suggestedTeam.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
