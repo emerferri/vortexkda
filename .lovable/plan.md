@@ -1,75 +1,101 @@
 
-# Melhoria de Performance do Ranking Geral
 
-## Problema Identificado
+# Sistema de Análise de Desempenho PvP - Plano de Implementação
 
-O Ranking Geral esta lento porque:
+## Visão Geral
 
-1. Busca **20.000+ registros** da tabela `pvp_kill_logs` no navegador do usuario
-2. Toda a agregacao (kills, deaths, KDA, pontuacao) e feita no **client-side** com JavaScript
-3. Faltam indices importantes no banco de dados (ex: `event_type` na tabela `pvp_matches`)
-4. Sao feitas **15+ requisicoes HTTP** paginadas de 1000 em 1000 registros
+Dashboard analítico completo, acessível apenas para administradores, com 6 módulos organizados em sub-abas. Reutiliza padrões existentes (filtros com date-picker, queries paginadas, Recharts para gráficos).
 
-## Solucao Proposta
-
-### 1. Criar indices que estao faltando no banco
-
-Indices novos necessarios:
-- `pvp_matches(event_type)` - toda query filtra por event_type, mas nao existe indice
-- `pvp_matches(event_type, match_date)` - indice composto para filtros combinados
-- `pvp_matches(match_hour)` - usado nos filtros de hora
-
-### 2. Criar funcao no banco para agregacao server-side
-
-Em vez de trazer 20.000+ linhas para o navegador e processar com JavaScript, criar uma funcao SQL (`get_ranking_geral`) que faz toda a agregacao direto no banco de dados e retorna apenas o resultado final (aprox. 100-200 linhas de jogadores agregados).
-
-A funcao recebera os parametros de filtro (data inicio, data fim, hora inicio, hora fim) e retornara os dados ja agregados: nome do jogador, total kills, total deaths, KDA, pontuacao, numero de partidas.
-
-### 3. Refatorar o componente RankingGeral
-
-Substituir as multiplas queries paginadas por uma unica chamada RPC (`supabase.rpc('get_ranking_geral', {...})`), que retornara os dados ja prontos.
-
-## Impacto Esperado
-
-- **Antes**: 15+ requisicoes HTTP, 20.000+ linhas transferidas, processamento pesado no navegador
-- **Depois**: 1 requisicao HTTP, ~200 linhas transferidas, processamento feito no banco
-
-## Detalhes Tecnicos
-
-### Indices SQL
+## Estrutura de Navegação
 
 ```text
-CREATE INDEX idx_pvp_matches_event_type ON pvp_matches(event_type);
-CREATE INDEX idx_pvp_matches_event_type_date ON pvp_matches(event_type, match_date);
-CREATE INDEX idx_pvp_matches_hour ON pvp_matches(match_hour);
+Sidebar
+└── 📊 Análise PvP  [requiresAdmin: true]
+
+Dashboard (sub-abas internas via Tabs)
+├── Players      → Stats individuais + busca por nome
+├── Guilds       → Stats por guild + ranking interno
+├── PvP Direto   → Player vs Player / Guild vs Guild
+├── Classes      → Eficiência, dominância, matriz, meta
+├── Gráficos     → Evolução temporal (kills/dia, KDA)
+└── Insights IA  → Análise automática via Lovable AI
 ```
 
-### Funcao SQL `get_ranking_geral`
+## Filtros Globais (compartilhados entre sub-abas)
 
-Parametros de entrada:
-- `p_date_from` (date, opcional)
-- `p_date_to` (date, opcional)
-- `p_hour_from` (int, opcional)
-- `p_hour_to` (int, opcional)
+- Data inicial / final (Calendar picker)
+- Hora inicial / final (Select)
+- Tipo de evento: Boss / Throne / Todos
+- Guild específica (opcional)
 
-Logica:
-1. Buscar match_ids de boss_event com filtros aplicados
-2. Agregar kills e deaths a partir de `pvp_kill_logs` usando esses match_ids
-3. Calcular KDA, pontuacao e numero de partidas
-4. Fazer JOIN com tabela `characters` para obter classe e guild
-5. Excluir jogadores banidos
-6. Retornar resultado agregado
+## Módulos
 
-Retorno: tabela com colunas (player_name, player_class, player_guild, total_kills, total_deaths, kda, weighted_kda, matches_played, event_score, single_match_max_kills)
+### 1. Player Analytics
+- Autocomplete de jogador (tabela `characters`)
+- Métricas: Kills, Deaths, KDA, Kill Streak máximo, First Bloods, vítimas únicas
+- Rival que mais matou / que mais morreu para
+- Tabela detalhada de confrontos por oponente
+- Rankings: Top Killers, Mais Mortes, Melhor KDA
 
-### Refatoracao do componente
+### 2. Guild Analytics
+- Select de guild (populado de `characters`)
+- Métricas: Total kills/deaths, KDA guild, guild mais abatida, guild rival dominante
+- Participação em eventos (contagem de partidas)
+- Ranking interno de membros
+- Ranking: Guild Dominante
 
-- Remover toda a logica de paginacao e agregacao client-side
-- Substituir por `supabase.rpc('get_ranking_geral', { p_date_from, p_date_to, p_hour_from, p_hour_to })`
-- Manter a logica de fuzzy match de classes apenas para casos nao cobertos pelo JOIN
-- Manter toda a UI, filtros, exports e publicacao Discord inalterados
+### 3. Confronto Direto (PvP Direto)
+- **Player vs Player**: Selecionar 2 jogadores, comparar kills mútuas, taxa de dominância
+- **Guild vs Guild**: Selecionar 2 guilds, comparar kills/mortes, top performers de cada lado
+- Tabela: Rivalidade PvP (Player | Rival | Confrontos)
 
-### Arquivos alterados
+### 4. Análise de Classes
+- Jogadores por classe + Pick Rate (%)
+- Kills/Deaths/KDA por classe
+- **Kill Efficiency Index**: kills / jogadores da classe
+- **Classe vs Classe**: Tabela cruzada (killer_class x victim_class)
+- **Matriz de Dominância**: Heatmap com % de vitória entre classes
+- **Score de Dominância**: (Kills - Deaths) / Players
+- **META do Servidor**: Ranking automático de classes por score
+- Rankings: Mais letal, Mais mortes, Mais eficiente, Dominante
 
-1. **Nova migration SQL** - Indices + funcao `get_ranking_geral`
-2. **src/components/RankingGeral.tsx** - Refatorar queryFn para usar RPC
+### 5. Gráficos (Recharts)
+- Player: Kills/dia (LineChart), Mortes/dia, Evolução KDA
+- Guild: Kills por guild rival (BarChart), Participação PvP
+- Classes: Distribuição (PieChart), Performance cruzada (Heatmap via BarChart), Eficiência (BarChart)
+
+### 6. Insights IA (Lovable AI)
+- Edge function `pvp-ai-insights` usando `google/gemini-3-flash-preview`
+- Envia dados agregados (top players, guilds, rivalidades, classes)
+- Retorna insights em português (dominâncias, tendências, meta)
+- Tratamento de 429/402
+
+## Consultas ao Banco
+
+Todas as queries usam tabelas existentes (`pvp_kill_logs`, `pvp_matches`, `pvp_match_players`, `characters`) com paginação `.range()` (PAGE_SIZE 1000). Filtro de jogadores banidos aplicado. Sem necessidade de novas tabelas ou migrações.
+
+## Cálculos Chave no Frontend
+
+- **Kill Streak**: Sequência de kills sem morrer por match (ordem dos logs)
+- **First Blood**: Primeiro kill de cada match
+- **Kill Efficiency**: kills da classe / jogadores da classe
+- **Dominância**: `kills_contra / (kills_contra + mortes_para) * 100`
+- **Pick Rate**: `jogadores_classe / total_jogadores * 100`
+- **META Score**: Combinação de eficiência + dominância média
+
+## Arquivos
+
+| Ação | Arquivo |
+|------|---------|
+| Criar | `src/components/analytics/PvPAnalyticsDashboard.tsx` |
+| Criar | `src/components/analytics/AnalyticsFilters.tsx` |
+| Criar | `src/components/analytics/PlayerAnalytics.tsx` |
+| Criar | `src/components/analytics/GuildAnalytics.tsx` |
+| Criar | `src/components/analytics/DirectCombat.tsx` |
+| Criar | `src/components/analytics/ClassAnalytics.tsx` |
+| Criar | `src/components/analytics/AnalyticsCharts.tsx` |
+| Criar | `src/components/analytics/AIInsights.tsx` |
+| Criar | `supabase/functions/pvp-ai-insights/index.ts` |
+| Modificar | `src/components/AppSidebar.tsx` — novo item |
+| Modificar | `src/pages/Index.tsx` — novo case |
+
