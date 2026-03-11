@@ -16,8 +16,9 @@ import { DatabaseManager } from '@/components/DatabaseManager';
 import { PvPAnalyticsDashboard } from '@/components/analytics/PvPAnalyticsDashboard';
 import { RankingArkaWar } from '@/components/RankingArkaWar';
 import { DatabaseImport } from '@/components/DatabaseImport';
+import { ArkaWarImport } from '@/components/ArkaWarImport';
 import { parseTxtFile, ParseResult } from '@/utils/txtParser';
-import { Swords, FileText, Database, Crown } from 'lucide-react';
+import { Swords, FileText, Database, Crown, Crosshair } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -56,7 +57,7 @@ const Index = () => {
     }
   };
 
-  const [importSource, setImportSource] = useState<'txt' | 'database'>('txt');
+  const [importSource, setImportSource] = useState<'txt' | 'database' | 'arka'>('txt');
   const [importEventType, setImportEventType] = useState<'boss_event' | 'throne_conquest'>('boss_event');
 
   const handleFileUpload = (content: string) => {
@@ -88,6 +89,9 @@ const Index = () => {
                 <Button variant={importSource === 'database' ? 'default' : 'ghost'} size="sm" onClick={() => setImportSource('database')} className="gap-2">
                   <Database className="w-4 h-4" /> Banco de Dados
                 </Button>
+                <Button variant={importSource === 'arka' ? 'default' : 'ghost'} size="sm" onClick={() => setImportSource('arka')} className="gap-2">
+                  <Crosshair className="w-4 h-4" /> Arka War
+                </Button>
               </div>
               {importSource === 'database' && (
                 <div className="flex gap-2 p-1 bg-muted/30 rounded-lg">
@@ -101,8 +105,9 @@ const Index = () => {
               )}
               {importSource === 'txt' && <FileUpload onFileUpload={handleFileUpload} />}
               {importSource === 'database' && <DatabaseImport onDataLoaded={handleDatabaseImport} eventType={importEventType} />}
+              {importSource === 'arka' && <ArkaWarImport />}
             </div>
-            <Scoreboard players={players} bossLabel={bossLabel} killLogs={killLogs} eventType={eventType} />
+            {importSource !== 'arka' && <Scoreboard players={players} bossLabel={bossLabel} killLogs={killLogs} eventType={eventType} />}
           </div>
         );
       case 'ranking':
