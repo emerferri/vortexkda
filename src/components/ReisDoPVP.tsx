@@ -27,6 +27,7 @@ type ViewMode = 'rei' | 'cone';
 
 export const ReisDoPVP = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('rei');
+  const [eventType, setEventType] = useState<string>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
