@@ -13,9 +13,10 @@ import { Badge } from '@/components/ui/badge';
 
 interface UserRole {
   id: string;
+  role_id: string | null;
   user_id: string;
-  role: 'admin' | 'moderator';
-  email?: string;
+  role: 'admin' | 'moderator' | 'user';
+  email: string;
 }
 
 export const UserManagement = () => {
@@ -35,18 +36,16 @@ export const UserManagement = () => {
 
   const loadUserRoles = async () => {
     try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('id, user_id, role')
-        .order('role');
+      const { data, error } = await supabase.rpc('list_users_with_roles');
 
       if (error) throw error;
 
-      // For each user role, we'll show the user_id since we can't access auth.users
-      const rolesWithInfo = (data || []).map(ur => ({
-        ...ur,
-        role: ur.role as 'admin' | 'moderator',
-        email: `User ID: ${ur.user_id.slice(0, 8)}...`,
+      const rolesWithInfo: UserRole[] = (data || []).map((u: any) => ({
+        id: u.role_id ?? `user-${u.user_id}`,
+        role_id: u.role_id,
+        user_id: u.user_id,
+        role: (u.role as 'admin' | 'moderator' | 'user') ?? 'user',
+        email: u.email ?? `User ID: ${u.user_id.slice(0, 8)}...`,
       }));
 
       setUserRoles(rolesWithInfo);
@@ -118,14 +117,22 @@ export const UserManagement = () => {
     }
   };
 
-  const handleDeleteRole = async (id: string) => {
+  const handleDeleteRole = async (roleId: string | null) => {
+    if (!roleId) {
+      toast({
+        title: 'Aviso',
+        description: 'Este usuário já está sem permissões especiais.',
+      });
+      return;
+    }
+
     if (!confirm('Tem certeza que deseja remover este usuário do sistema?')) return;
 
     try {
       const { error } = await supabase
         .from('user_roles')
         .delete()
-        .eq('id', id);
+        .eq('id', roleId);
 
       if (error) throw error;
 
@@ -153,12 +160,17 @@ export const UserManagement = () => {
         </Badge>
       );
     }
-    return (
-      <Badge className="bg-blue-500/20 text-blue-500 border-blue-500/30">
-        <Shield className="w-3 h-3 mr-1" />
-        Moderador
-      </Badge>
-    );
+
+    if (role === 'moderator') {
+      return (
+        <Badge className="bg-blue-500/20 text-blue-500 border-blue-500/30">
+          <Shield className="w-3 h-3 mr-1" />
+          Moderador
+        </Badge>
+      );
+    }
+
+    return <Badge variant="secondary">Usuário</Badge>;
   };
 
   if (loading) {
@@ -297,7 +309,8 @@ export const UserManagement = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDeleteRole(userRole.id)}
+                        disabled={!userRole.role_id}
+                        onClick={() => handleDeleteRole(userRole.role_id)}
                       >
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
