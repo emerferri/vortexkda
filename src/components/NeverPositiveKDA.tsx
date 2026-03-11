@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { TrendingDown, Download, Image as ImageIcon, Calendar, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { EventTypeFilter } from './EventTypeFilter';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
