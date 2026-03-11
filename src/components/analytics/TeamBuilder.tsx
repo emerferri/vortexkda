@@ -526,8 +526,97 @@ export const TeamBuilder = ({ filters }: Props) => {
             </CardContent>
           </Card>
 
-          {/* Suggested Composition */}
-          {suggestedTeam.length > 0 && (
+          {/* Arka War Party Composition */}
+          {eventType === 'arka_war' && arkaWarParties && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Target className="w-5 h-5 text-primary" />
+                  Composição Arka War — 4 PTs de 5
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <p className="text-sm text-muted-foreground">
+                  Cada PT possui obrigatoriamente 1 Darkness Wizard. 2 Elf Elder no total: 1 escalado, 1 reserva.
+                </p>
+
+                {arkaWarParties.error && (
+                  <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 text-sm text-destructive">
+                    <AlertTriangle className="w-4 h-4 inline mr-2" />
+                    {arkaWarParties.error}
+                  </div>
+                )}
+
+                {!arkaWarParties.error && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {arkaWarParties.parties.map((party, pi) => (
+                      <div key={pi} className="border border-border rounded-lg p-4 bg-card space-y-3">
+                        <h4 className="font-bold text-sm flex items-center gap-2">
+                          <Shield className="w-4 h-4 text-primary" />
+                          PT {pi + 1}
+                        </h4>
+                        <div className="space-y-2">
+                          {party.map(p => (
+                            <div key={p.name} className="flex items-center justify-between gap-2 text-sm">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-semibold truncate">{p.name}</span>
+                                <Badge variant={p.className === 'Darkness Wizard' ? 'default' : p.className === 'Elf Elder' ? 'secondary' : 'outline'} className="text-xs shrink-0">
+                                  {p.className}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+                                <span>KDA: {p.kda}</span>
+                                <span>Score: {p.score.toFixed(1)}</span>
+                                {trendIcon(p.trend)}
+                              </div>
+                            </div>
+                          ))}
+                          {party.length < 5 && (
+                            <p className="text-xs text-destructive italic">⚠ Vaga não preenchida ({5 - party.length} restante)</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* EE Reserve */}
+                {arkaWarParties.eeReserve && (
+                  <div className="border border-dashed border-border rounded-lg p-4 bg-muted/30">
+                    <h4 className="font-bold text-sm mb-2 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      Elf Elder Reserva (fora da composição)
+                    </h4>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-semibold">{arkaWarParties.eeReserve.name}</span>
+                      <Badge variant="secondary" className="text-xs">Elf Elder</Badge>
+                      <span className="text-xs text-muted-foreground">KDA: {arkaWarParties.eeReserve.kda} | Score: {arkaWarParties.eeReserve.score.toFixed(1)}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Other reserves */}
+                {arkaWarParties.reserve && arkaWarParties.reserve.length > 0 && (
+                  <div className="border border-dashed border-border rounded-lg p-4 bg-muted/30">
+                    <h4 className="font-bold text-sm mb-2 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      Reservas ({arkaWarParties.reserve.length})
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {arkaWarParties.reserve.map(r => (
+                        <Badge key={r.name} variant="outline" className="text-xs gap-1">
+                          {r.name} ({r.className})
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Generic Suggested Composition (non-arka_war) */}
+          {eventType !== 'arka_war' && suggestedTeam.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
