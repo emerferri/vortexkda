@@ -126,6 +126,7 @@ export const TeamBuilder = ({ filters }: Props) => {
       ]);
       const matches = eventType === 'all' ? allMatches : allMatches.filter(m => m.event_type === eventType);
       const charMap = buildCharacterMap(characters);
+      setAllCharacters(characters);
       const matchIds = matches.map(m => m.id);
       let logs = await fetchKillLogsForMatches(matchIds);
       logs = filterBanned(logs, charMap);
