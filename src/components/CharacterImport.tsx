@@ -141,6 +141,7 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
                 name: parts[0],
                 guild: parts[1] || '',
                 class: parts[2] || '',
+                pilot_name: parts[3] || '',
               });
             }
           }
