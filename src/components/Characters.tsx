@@ -24,6 +24,7 @@ interface Character {
   guild: string;
   class: string;
   banned: boolean;
+  pilot_name?: string;
 }
 
 export const Characters = () => {
