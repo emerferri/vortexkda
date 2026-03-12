@@ -24,6 +24,7 @@ interface Character {
   guild: string;
   class: string;
   banned: boolean;
+  pilot_name?: string;
 }
 
 export const Characters = () => {
@@ -34,7 +35,7 @@ export const Characters = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCharacter, setEditingCharacter] = useState<Character | null>(null);
-  const [formData, setFormData] = useState({ name: '', guild: '', class: '' });
+  const [formData, setFormData] = useState({ name: '', guild: '', class: '', pilot_name: '' });
   const [submitting, setSubmitting] = useState(false);
   const [showUnregisteredOnly, setShowUnregisteredOnly] = useState(false);
   const [searchParams] = useSearchParams();
@@ -58,7 +59,7 @@ export const Characters = () => {
       // Get all registered characters (explicit columns to avoid reserved-word issues)
       const { data: registeredChars, error: charsError } = await supabase
         .from('characters')
-        .select('id, name, guild, class, banned')
+        .select('id, name, guild, class, banned, pilot_name')
         .order('name');
 
       if (charsError) throw charsError;
@@ -166,7 +167,7 @@ export const Characters = () => {
       }
 
       setDialogOpen(false);
-      setFormData({ name: '', guild: '', class: '' });
+      setFormData({ name: '', guild: '', class: '', pilot_name: '' });
       setEditingCharacter(null);
       loadCharacters();
     } catch (error: any) {
@@ -274,13 +275,13 @@ export const Characters = () => {
 
   const openEditDialog = (character: Character) => {
     setEditingCharacter(character);
-    setFormData({ name: character.name, guild: character.guild, class: character.class });
+    setFormData({ name: character.name, guild: character.guild, class: character.class, pilot_name: (character as any).pilot_name || '' });
     setDialogOpen(true);
   };
 
   const openAddDialog = () => {
     setEditingCharacter(null);
-    setFormData({ name: '', guild: '', class: '' });
+    setFormData({ name: '', guild: '', class: '', pilot_name: '' });
     setDialogOpen(true);
   };
 
@@ -665,6 +666,16 @@ export const Characters = () => {
                         value={formData.class}
                         onChange={(e) => setFormData({ ...formData, class: e.target.value })}
                         required
+                        disabled={submitting}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="pilot_name">Piloto</Label>
+                      <Input
+                        id="pilot_name"
+                        value={formData.pilot_name}
+                        onChange={(e) => setFormData({ ...formData, pilot_name: e.target.value })}
+                        placeholder="Nome do piloto (pessoa real)"
                         disabled={submitting}
                       />
                     </div>
