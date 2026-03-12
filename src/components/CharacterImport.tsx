@@ -355,6 +355,7 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
                   <TableHead>Nome</TableHead>
                   <TableHead>Guild</TableHead>
                   <TableHead>Classe</TableHead>
+                  <TableHead>Piloto</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
