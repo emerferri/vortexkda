@@ -286,6 +286,7 @@ export const Scoreboard = ({ players, bossLabel, killLogs = [], eventType = 'bos
       </div>
 
       <div className="flex flex-wrap gap-3 justify-center items-center">
+        <SortButton label="Pontuação" sortKey="score" icon={Star} />
         <SortButton label="Kills" sortKey="kills" icon={Crosshair} />
         <SortButton label="Deaths" sortKey="deaths" icon={Skull} />
         <SortButton label="KDA" sortKey="kda" icon={TrendingUp} />
