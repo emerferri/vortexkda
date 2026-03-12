@@ -551,7 +551,7 @@ export const TeamBuilder = ({ filters }: Props) => {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Importe a lista de pilotos disponíveis para o evento. O sistema cruzará com os personagens cadastrados e sugerirá a formação apenas com pilotos presentes.
+                Importe a lista de pilotos disponíveis. O sistema priorizará personagens com piloto na lista, complementará com personagens sem piloto definido, e rebaixará para reserva quem tiver desempenho inferior — mesmo com piloto disponível.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
