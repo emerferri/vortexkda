@@ -404,32 +404,13 @@ export const TeamBuilder = ({ filters }: Props) => {
 
   return (
     <div className="space-y-6">
-      {/* Guild Selector */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Shield className="w-5 h-5 text-primary" />
-            Escalação & Team Builder
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Selecione uma guild para analisar o desempenho individual dos membros e montar a melhor formação. Use os filtros superiores para definir período e tipo de evento.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <Select value={guild} onValueChange={setGuild}>
-              <SelectTrigger className="w-full max-w-xs">
-                <SelectValue placeholder="Selecione a guild" />
-              </SelectTrigger>
-              <SelectContent>
-                {guilds.map(g => (
-                  <SelectItem key={g} value={g}>{g}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      {!guild && (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            Selecione uma guild no filtro superior para analisar o desempenho dos membros e montar a melhor formação.
+          </CardContent>
+        </Card>
+      )}
 
       {loading && (
         <div className="flex items-center justify-center py-12">
