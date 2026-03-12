@@ -347,60 +347,92 @@ export const TeamBuilder = ({ filters }: Props) => {
 
   type ScoredMember = MemberStats & { score: number };
 
-  // Filter members by available pilots
-  const effectiveMembers = useMemo(() => {
-    if (!pilotFilterActive || !pilotAvailability) return members;
-    return members.filter(m => pilotAvailability.availableCharNames.has(m.name));
+  // Enrich members with pilot status
+  const enrichedMembers = useMemo(() => {
+    if (!pilotFilterActive || !pilotAvailability) {
+      return members.map(m => ({ ...m, pilotStatus: 'none' as PilotStatus }));
+    }
+    return members.map(m => {
+      let status: PilotStatus;
+      if (pilotAvailability.availableCharNames.has(m.name)) {
+        status = 'available';
+      } else if (!m.pilotName) {
+        status = 'no_pilot';
+      } else {
+        status = 'unavailable';
+      }
+      return { ...m, pilotStatus: status };
+    });
   }, [members, pilotFilterActive, pilotAvailability]);
 
-  // Suggested composition: best players per class
-  const suggestedTeam = useMemo(() => {
-    const pool = pilotFilterActive ? effectiveMembers : members;
-    if (pool.length === 0) return [];
-    const scored = pool
-      .filter(m => m.classification !== 'Reserva')
-      .map(scorePlayer)
-      .sort((a, b) => b.score - a.score);
+  // Pool-based team selection
+  const selectTeamByPools = useCallback((pool: MemberStats[], maxSize: number): { team: ScoredMember[]; reserves: ScoredMember[] } => {
+    const scored = pool.map(scorePlayer).sort((a, b) => b.score - a.score);
 
-    const byClass = new Map<string, typeof scored>();
-    for (const s of scored) {
-      if (!byClass.has(s.className)) byClass.set(s.className, []);
-      byClass.get(s.className)!.push(s);
+    if (!pilotFilterActive) {
+      const team = scored.filter(m => m.classification !== 'Reserva').slice(0, maxSize);
+      const reserves = scored.filter(s => !team.find(t => t.name === s.name));
+      return { team, reserves };
     }
 
-    const team: typeof scored = [];
-    for (const [, players] of byClass) {
-      if (players.length > 0) team.push(players[0]);
-    }
-    const maxSize = TEAM_SIZE[eventType] || 25;
-    for (const s of scored) {
+    // Pool A: pilot available, Pool B: no pilot defined, Pool C: pilot unavailable
+    const poolA = scored.filter(s => s.pilotStatus === 'available');
+    const poolB = scored.filter(s => s.pilotStatus === 'no_pilot');
+    const poolC = scored.filter(s => s.pilotStatus === 'unavailable');
+
+    const team: ScoredMember[] = [];
+    const used = new Set<string>();
+
+    for (const s of poolA) {
       if (team.length >= maxSize) break;
-      if (!team.find(t => t.name === s.name)) team.push(s);
+      team.push(s);
+      used.add(s.name);
+    }
+    for (const s of poolB) {
+      if (team.length >= maxSize) break;
+      team.push(s);
+      used.add(s.name);
+    }
+    for (const s of poolC) {
+      if (team.length >= maxSize) break;
+      team.push(s);
+      used.add(s.name);
     }
 
-    return team.slice(0, maxSize);
-  }, [effectiveMembers, members, eventType, pilotFilterActive]);
+    const reserves = scored.filter(s => !used.has(s.name));
+    return { team, reserves };
+  }, [pilotFilterActive]);
+
+  // Suggested composition
+  const { suggestedTeam, suggestedReserves } = useMemo(() => {
+    if (enrichedMembers.length === 0) return { suggestedTeam: [] as ScoredMember[], suggestedReserves: [] as ScoredMember[] };
+    const maxSize = TEAM_SIZE[eventType] || 25;
+    const { team, reserves } = selectTeamByPools(enrichedMembers, maxSize);
+    return { suggestedTeam: team, suggestedReserves: reserves };
+  }, [enrichedMembers, eventType, selectTeamByPools]);
 
   // Arka War composition: 4 parties of 5, each must have 1 Darkness Wizard
-  // 2 EE total: 1 in a party, 1 reserve (outside)
   const arkaWarParties = useMemo(() => {
-    const pool = pilotFilterActive ? effectiveMembers : members;
-    if (pool.length === 0 || eventType !== 'arka_war') return null;
+    if (enrichedMembers.length === 0 || eventType !== 'arka_war') return null;
 
-    const scored = pool
-      .filter(m => m.classification !== 'Reserva')
-      .map(scorePlayer)
-      .sort((a, b) => b.score - a.score);
+    const scored = enrichedMembers.map(scorePlayer).sort((a, b) => b.score - a.score);
+
+    let prioritized: ScoredMember[];
+    if (pilotFilterActive) {
+      const pA = scored.filter(s => s.pilotStatus === 'available');
+      const pB = scored.filter(s => s.pilotStatus === 'no_pilot');
+      const pC = scored.filter(s => s.pilotStatus === 'unavailable');
+      prioritized = [...pA, ...pB, ...pC];
+    } else {
+      prioritized = scored.filter(m => m.classification !== 'Reserva');
+    }
 
     const DW_CLASS = 'Darkness Wizard';
     const EE_CLASS = 'Elf Elder';
 
-    // Separate pools
-    const dwPlayers = scored.filter(s => s.className === DW_CLASS);
-    const eePlayers = scored.filter(s => s.className === EE_CLASS);
-    const otherPlayers = scored.filter(s => s.className !== DW_CLASS && s.className !== EE_CLASS);
+    const dwPlayers = prioritized.filter(s => s.className === DW_CLASS);
+    const eePlayers = prioritized.filter(s => s.className === EE_CLASS);
 
-    // Need at least 4 DW
     if (dwPlayers.length < 4) {
       return { error: `Necessário pelo menos 4 ${DW_CLASS}, encontrados: ${dwPlayers.length}`, parties: [], reserve: [], eeReserve: null as ScoredMember | null };
     }
@@ -408,28 +440,23 @@ export const TeamBuilder = ({ filters }: Props) => {
     const parties: ScoredMember[][] = [[], [], [], []];
     const used = new Set<string>();
 
-    // Step 1: Assign 1 DW to each party
     for (let i = 0; i < 4; i++) {
       parties[i].push(dwPlayers[i]);
       used.add(dwPlayers[i].name);
     }
 
-    // Step 2: Assign 1 EE to a party (best EE), second EE goes to reserve
     let eeReserve: ScoredMember | null = null;
     if (eePlayers.length >= 2) {
-      parties[0].push(eePlayers[0]); // Best EE in PT1
+      parties[0].push(eePlayers[0]);
       used.add(eePlayers[0].name);
-      eeReserve = eePlayers[1]; // Second EE is reserve
+      eeReserve = eePlayers[1];
       used.add(eePlayers[1].name);
     } else if (eePlayers.length === 1) {
       parties[0].push(eePlayers[0]);
       used.add(eePlayers[0].name);
     }
 
-    // Step 3: Fill remaining slots (each party needs 5 total)
-    // Available pool: other players + remaining DW + remaining EE
-    const fillPool = scored.filter(s => !used.has(s.name));
-
+    const fillPool = prioritized.filter(s => !used.has(s.name));
     for (let i = 0; i < 4; i++) {
       while (parties[i].length < 5 && fillPool.length > 0) {
         const next = fillPool.shift()!;
@@ -438,11 +465,9 @@ export const TeamBuilder = ({ filters }: Props) => {
       }
     }
 
-    // Reserve: everyone not picked (excluding the EE reserve already tracked)
     const reserve = scored.filter(s => !used.has(s.name) && s.name !== eeReserve?.name);
-
     return { error: null, parties, reserve, eeReserve };
-  }, [members, eventType]);
+  }, [enrichedMembers, eventType, pilotFilterActive]);
 
   const generateAIInsights = async () => {
     if (members.length === 0) return;
