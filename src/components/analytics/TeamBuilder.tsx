@@ -630,7 +630,7 @@ export const TeamBuilder = ({ filters }: Props) => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {members.map((m, i) => (
+                    {(pilotFilterActive ? effectiveMembers : members).map((m, i) => (
                       <TableRow key={m.name}>
                         <TableCell className="font-medium">{i + 1}</TableCell>
                         <TableCell className="font-semibold">{m.name}</TableCell>
