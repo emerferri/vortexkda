@@ -1,37 +1,45 @@
 
+# Sistema de Análise de Desempenho PvP - Plano de Implementação
 
-## Plano: Escalação Inteligente com Pilotos e Métricas
+## Status: ✅ Implementado
 
-### Problema Atual
-A lógica atual simplesmente filtra: se o piloto está na lista, o personagem entra; se não, fica fora. Não há avaliação de desempenho para decidir se o piloto deveria ser titular ou reserva.
-
-### Nova Lógica de Escalação
+## Estrutura de Navegação
 
 ```text
-1. Importa lista de pilotos disponíveis
-2. Cruza pilotos ↔ personagens (pilot_name)
-3. Calcula score de TODOS os personagens da guild
-4. Monta o time usando 3 pools, nesta prioridade:
-   Pool A: Personagens com piloto na lista (disponíveis)
-   Pool B: Personagens sem piloto definido (livres)
-   Pool C: Sobra dos pools acima
-5. Dentro de cada pool, ordena por score (KDA, consistência, participação)
-6. Preenche o time até o limite (25 ou 20 para Arka War)
-7. Quem ficar fora (mesmo com piloto na lista) vai para RESERVA
-   → O sistema mostra explicitamente: "Piloto X está disponível mas seu personagem Y ficou como reserva por desempenho inferior"
+Sidebar
+└── 📊 Análise PvP  [requiresAdmin: true]
+
+Dashboard (sub-abas internas via Tabs)
+├── Players      → Stats individuais + busca por nome
+├── Guilds       → Stats por guild + ranking interno
+├── PvP Direto   → Player vs Player / Guild vs Guild
+├── Classes      → Eficiência, dominância, matriz, meta
+├── Gráficos     → Evolução temporal (kills/dia, KDA)
+├── Escalação    → Team Builder com métricas avançadas por membro
+└── Insights IA  → Análise automática via Lovable AI
 ```
 
-### Mudanças em `TeamBuilder.tsx`
+## Módulo Escalação & Team Builder
 
-1. **Remover o filtro excludente** — `effectiveMembers` não vai mais excluir quem não tem piloto na lista; vai apenas marcar disponibilidade
-2. **Adicionar propriedade `pilotStatus`** a cada membro: `'available'` (piloto na lista), `'no_pilot'` (sem piloto definido), `'unavailable'` (piloto não está na lista)
-3. **Nova lógica de `suggestedTeam`**:
-   - Ordena todos por score
-   - Prioriza Pool A (available), depois Pool B (no_pilot) para preencher vagas
-   - Quem não entrar vai para lista de reservas com motivo
-4. **Nova lógica de `arkaWarParties`**: mesma priorização por pools
-5. **UI de resultado**: mostrar badges visuais (Titular / Reserva por Desempenho / Piloto Indisponível), e seção "Reservas com piloto disponível" destacada
+- Seleção de guild → tabela de membros com: Kills, Deaths, KDA, Participação%, Consistência (desvio padrão), Melhor/Pior evento, Tendência
+- Classificação automática: MVP, Constante, Oscilante, Destaque, Em Evolução, Reserva
+- Composição sugerida (melhor time por score combinado)
+- Insights IA táticos (prompt especializado em escalação)
+- **✅ Campo Piloto**: Cada personagem pode ter um `pilot_name` associado (pessoa real)
+- **✅ Importação de Lista de Pilotos**: Na Escalação, importar lista de pilotos disponíveis (TXT/Excel/textarea) para filtrar formação por disponibilidade
 
-### Arquivos Afetados
-- `src/components/analytics/TeamBuilder.tsx` — refatorar lógica de seleção e UI
+## Arquivos
 
+| Arquivo |
+|---------|
+| `src/hooks/useAnalyticsData.ts` |
+| `src/components/analytics/PvPAnalyticsDashboard.tsx` |
+| `src/components/analytics/AnalyticsFilters.tsx` |
+| `src/components/analytics/PlayerAnalytics.tsx` |
+| `src/components/analytics/GuildAnalytics.tsx` |
+| `src/components/analytics/DirectCombat.tsx` |
+| `src/components/analytics/ClassAnalytics.tsx` |
+| `src/components/analytics/AnalyticsCharts.tsx` |
+| `src/components/analytics/AIInsights.tsx` |
+| `src/components/analytics/TeamBuilder.tsx` |
+| `supabase/functions/pvp-ai-insights/index.ts` |

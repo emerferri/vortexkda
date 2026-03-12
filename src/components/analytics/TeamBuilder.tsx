@@ -17,6 +17,8 @@ interface Props {
   filters: AnalyticsFilters;
 }
 
+type PilotStatus = 'available' | 'no_pilot' | 'unavailable' | 'none';
+
 interface MemberStats {
   name: string;
   className: string;
@@ -31,6 +33,8 @@ interface MemberStats {
   classification: string;
   perMatchKDAs: number[];
   recentKDA: number;
+  pilotName?: string;
+  pilotStatus: PilotStatus;
 }
 
 function stdDev(values: number[]): number {
@@ -230,6 +234,7 @@ export const TeamBuilder = ({ filters }: Props) => {
         }
 
         const charInfo = charMap.get(name);
+        const pilotName = charInfo?.pilot_name || '';
 
         if (allMatchIds.size > 0) {
           stats.push({
@@ -246,6 +251,8 @@ export const TeamBuilder = ({ filters }: Props) => {
             classification: '', // filled after avg calc
             perMatchKDAs,
             recentKDA,
+            pilotName,
+            pilotStatus: 'none', // will be updated when pilot list is active
           });
         }
       }
@@ -340,60 +347,92 @@ export const TeamBuilder = ({ filters }: Props) => {
 
   type ScoredMember = MemberStats & { score: number };
 
-  // Filter members by available pilots
-  const effectiveMembers = useMemo(() => {
-    if (!pilotFilterActive || !pilotAvailability) return members;
-    return members.filter(m => pilotAvailability.availableCharNames.has(m.name));
+  // Enrich members with pilot status
+  const enrichedMembers = useMemo(() => {
+    if (!pilotFilterActive || !pilotAvailability) {
+      return members.map(m => ({ ...m, pilotStatus: 'none' as PilotStatus }));
+    }
+    return members.map(m => {
+      let status: PilotStatus;
+      if (pilotAvailability.availableCharNames.has(m.name)) {
+        status = 'available';
+      } else if (!m.pilotName) {
+        status = 'no_pilot';
+      } else {
+        status = 'unavailable';
+      }
+      return { ...m, pilotStatus: status };
+    });
   }, [members, pilotFilterActive, pilotAvailability]);
 
-  // Suggested composition: best players per class
-  const suggestedTeam = useMemo(() => {
-    const pool = pilotFilterActive ? effectiveMembers : members;
-    if (pool.length === 0) return [];
-    const scored = pool
-      .filter(m => m.classification !== 'Reserva')
-      .map(scorePlayer)
-      .sort((a, b) => b.score - a.score);
+  // Pool-based team selection
+  const selectTeamByPools = useCallback((pool: MemberStats[], maxSize: number): { team: ScoredMember[]; reserves: ScoredMember[] } => {
+    const scored = pool.map(scorePlayer).sort((a, b) => b.score - a.score);
 
-    const byClass = new Map<string, typeof scored>();
-    for (const s of scored) {
-      if (!byClass.has(s.className)) byClass.set(s.className, []);
-      byClass.get(s.className)!.push(s);
+    if (!pilotFilterActive) {
+      const team = scored.filter(m => m.classification !== 'Reserva').slice(0, maxSize);
+      const reserves = scored.filter(s => !team.find(t => t.name === s.name));
+      return { team, reserves };
     }
 
-    const team: typeof scored = [];
-    for (const [, players] of byClass) {
-      if (players.length > 0) team.push(players[0]);
-    }
-    const maxSize = TEAM_SIZE[eventType] || 25;
-    for (const s of scored) {
+    // Pool A: pilot available, Pool B: no pilot defined, Pool C: pilot unavailable
+    const poolA = scored.filter(s => s.pilotStatus === 'available');
+    const poolB = scored.filter(s => s.pilotStatus === 'no_pilot');
+    const poolC = scored.filter(s => s.pilotStatus === 'unavailable');
+
+    const team: ScoredMember[] = [];
+    const used = new Set<string>();
+
+    for (const s of poolA) {
       if (team.length >= maxSize) break;
-      if (!team.find(t => t.name === s.name)) team.push(s);
+      team.push(s);
+      used.add(s.name);
+    }
+    for (const s of poolB) {
+      if (team.length >= maxSize) break;
+      team.push(s);
+      used.add(s.name);
+    }
+    for (const s of poolC) {
+      if (team.length >= maxSize) break;
+      team.push(s);
+      used.add(s.name);
     }
 
-    return team.slice(0, maxSize);
-  }, [effectiveMembers, members, eventType, pilotFilterActive]);
+    const reserves = scored.filter(s => !used.has(s.name));
+    return { team, reserves };
+  }, [pilotFilterActive]);
+
+  // Suggested composition
+  const { suggestedTeam, suggestedReserves } = useMemo(() => {
+    if (enrichedMembers.length === 0) return { suggestedTeam: [] as ScoredMember[], suggestedReserves: [] as ScoredMember[] };
+    const maxSize = TEAM_SIZE[eventType] || 25;
+    const { team, reserves } = selectTeamByPools(enrichedMembers, maxSize);
+    return { suggestedTeam: team, suggestedReserves: reserves };
+  }, [enrichedMembers, eventType, selectTeamByPools]);
 
   // Arka War composition: 4 parties of 5, each must have 1 Darkness Wizard
-  // 2 EE total: 1 in a party, 1 reserve (outside)
   const arkaWarParties = useMemo(() => {
-    const pool = pilotFilterActive ? effectiveMembers : members;
-    if (pool.length === 0 || eventType !== 'arka_war') return null;
+    if (enrichedMembers.length === 0 || eventType !== 'arka_war') return null;
 
-    const scored = pool
-      .filter(m => m.classification !== 'Reserva')
-      .map(scorePlayer)
-      .sort((a, b) => b.score - a.score);
+    const scored = enrichedMembers.map(scorePlayer).sort((a, b) => b.score - a.score);
+
+    let prioritized: ScoredMember[];
+    if (pilotFilterActive) {
+      const pA = scored.filter(s => s.pilotStatus === 'available');
+      const pB = scored.filter(s => s.pilotStatus === 'no_pilot');
+      const pC = scored.filter(s => s.pilotStatus === 'unavailable');
+      prioritized = [...pA, ...pB, ...pC];
+    } else {
+      prioritized = scored.filter(m => m.classification !== 'Reserva');
+    }
 
     const DW_CLASS = 'Darkness Wizard';
     const EE_CLASS = 'Elf Elder';
 
-    // Separate pools
-    const dwPlayers = scored.filter(s => s.className === DW_CLASS);
-    const eePlayers = scored.filter(s => s.className === EE_CLASS);
-    const otherPlayers = scored.filter(s => s.className !== DW_CLASS && s.className !== EE_CLASS);
+    const dwPlayers = prioritized.filter(s => s.className === DW_CLASS);
+    const eePlayers = prioritized.filter(s => s.className === EE_CLASS);
 
-    // Need at least 4 DW
     if (dwPlayers.length < 4) {
       return { error: `Necessário pelo menos 4 ${DW_CLASS}, encontrados: ${dwPlayers.length}`, parties: [], reserve: [], eeReserve: null as ScoredMember | null };
     }
@@ -401,28 +440,23 @@ export const TeamBuilder = ({ filters }: Props) => {
     const parties: ScoredMember[][] = [[], [], [], []];
     const used = new Set<string>();
 
-    // Step 1: Assign 1 DW to each party
     for (let i = 0; i < 4; i++) {
       parties[i].push(dwPlayers[i]);
       used.add(dwPlayers[i].name);
     }
 
-    // Step 2: Assign 1 EE to a party (best EE), second EE goes to reserve
     let eeReserve: ScoredMember | null = null;
     if (eePlayers.length >= 2) {
-      parties[0].push(eePlayers[0]); // Best EE in PT1
+      parties[0].push(eePlayers[0]);
       used.add(eePlayers[0].name);
-      eeReserve = eePlayers[1]; // Second EE is reserve
+      eeReserve = eePlayers[1];
       used.add(eePlayers[1].name);
     } else if (eePlayers.length === 1) {
       parties[0].push(eePlayers[0]);
       used.add(eePlayers[0].name);
     }
 
-    // Step 3: Fill remaining slots (each party needs 5 total)
-    // Available pool: other players + remaining DW + remaining EE
-    const fillPool = scored.filter(s => !used.has(s.name));
-
+    const fillPool = prioritized.filter(s => !used.has(s.name));
     for (let i = 0; i < 4; i++) {
       while (parties[i].length < 5 && fillPool.length > 0) {
         const next = fillPool.shift()!;
@@ -431,11 +465,9 @@ export const TeamBuilder = ({ filters }: Props) => {
       }
     }
 
-    // Reserve: everyone not picked (excluding the EE reserve already tracked)
     const reserve = scored.filter(s => !used.has(s.name) && s.name !== eeReserve?.name);
-
     return { error: null, parties, reserve, eeReserve };
-  }, [members, eventType]);
+  }, [enrichedMembers, eventType, pilotFilterActive]);
 
   const generateAIInsights = async () => {
     if (members.length === 0) return;
@@ -519,7 +551,7 @@ export const TeamBuilder = ({ filters }: Props) => {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Importe a lista de pilotos disponíveis para o evento. O sistema cruzará com os personagens cadastrados e sugerirá a formação apenas com pilotos presentes.
+                Importe a lista de pilotos disponíveis. O sistema priorizará personagens com piloto na lista, complementará com personagens sem piloto definido, e rebaixará para reserva quem tiver desempenho inferior — mesmo com piloto disponível.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -608,7 +640,7 @@ export const TeamBuilder = ({ filters }: Props) => {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Users className="w-5 h-5 text-primary" />
-                {pilotFilterActive ? `Membros Disponíveis de ${guild} (${effectiveMembers.length}/${members.length})` : `Membros de ${guild} (${members.length})`}
+                {pilotFilterActive ? `Membros de ${guild} (${enrichedMembers.length})` : `Membros de ${guild} (${members.length})`}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -618,23 +650,24 @@ export const TeamBuilder = ({ filters }: Props) => {
                     <TableRow>
                       <TableHead>#</TableHead>
                       <TableHead>Jogador</TableHead>
+                      {pilotFilterActive && <TableHead>Piloto</TableHead>}
                       <TableHead>Classe</TableHead>
                       <TableHead>Kills</TableHead>
                       <TableHead>Deaths</TableHead>
                       <TableHead>KDA</TableHead>
                       <TableHead>Participação</TableHead>
                       <TableHead>Consistência</TableHead>
-                      <TableHead>Melhor Evento</TableHead>
-                      <TableHead>Pior Evento</TableHead>
                       <TableHead>Tendência</TableHead>
                       <TableHead>Classificação</TableHead>
+                      {pilotFilterActive && <TableHead>Status</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(pilotFilterActive ? effectiveMembers : members).map((m, i) => (
-                      <TableRow key={m.name}>
+                    {enrichedMembers.map((m, i) => (
+                      <TableRow key={m.name} className={m.pilotStatus === 'unavailable' ? 'opacity-50' : ''}>
                         <TableCell className="font-medium">{i + 1}</TableCell>
                         <TableCell className="font-semibold">{m.name}</TableCell>
+                        {pilotFilterActive && <TableCell className="text-xs">{m.pilotName || '—'}</TableCell>}
                         <TableCell>{m.className}</TableCell>
                         <TableCell className="text-green-500">{m.kills}</TableCell>
                         <TableCell className="text-red-500">{m.deaths}</TableCell>
@@ -645,10 +678,15 @@ export const TeamBuilder = ({ filters }: Props) => {
                             {m.consistency}
                           </span>
                         </TableCell>
-                        <TableCell>{eventLabel(m.bestEvent)}</TableCell>
-                        <TableCell>{eventLabel(m.worstEvent)}</TableCell>
                         <TableCell>{trendIcon(m.trend)}</TableCell>
                         <TableCell>{classificationBadge(m.classification)}</TableCell>
+                        {pilotFilterActive && (
+                          <TableCell>
+                            {m.pilotStatus === 'available' && <Badge variant="default" className="text-xs gap-1"><UserCheck className="w-3 h-3" />Disponível</Badge>}
+                            {m.pilotStatus === 'no_pilot' && <Badge variant="secondary" className="text-xs">Sem piloto</Badge>}
+                            {m.pilotStatus === 'unavailable' && <Badge variant="destructive" className="text-xs gap-1"><UserX className="w-3 h-3" />Indisponível</Badge>}
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -694,6 +732,12 @@ export const TeamBuilder = ({ filters }: Props) => {
                                 <Badge variant={p.className === 'Darkness Wizard' ? 'default' : p.className === 'Elf Elder' ? 'secondary' : 'outline'} className="text-xs shrink-0">
                                   {p.className}
                                 </Badge>
+                                {pilotFilterActive && p.pilotStatus === 'available' && (
+                                  <Badge variant="default" className="text-xs shrink-0 gap-1"><UserCheck className="w-3 h-3" />{p.pilotName}</Badge>
+                                )}
+                                {pilotFilterActive && p.pilotStatus === 'no_pilot' && (
+                                  <Badge variant="outline" className="text-xs shrink-0">Sem piloto</Badge>
+                                )}
                               </div>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
                                 <span>KDA: {p.kda}</span>
@@ -752,24 +796,35 @@ export const TeamBuilder = ({ filters }: Props) => {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Target className="w-5 h-5 text-primary" />
-                  Composição Sugerida
+                  Composição Sugerida ({suggestedTeam.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Melhor formação baseada em KDA, consistência e participação.
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {pilotFilterActive
+                    ? 'Formação prioriza pilotos disponíveis, complementada por personagens sem piloto e por desempenho.'
+                    : 'Melhor formação baseada em KDA, consistência e participação.'}
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                   {suggestedTeam.map(s => (
-                    <div key={s.name} className="border border-border rounded-lg p-3 text-center space-y-1 bg-card">
+                    <div key={s.name} className={`border rounded-lg p-3 text-center space-y-1 bg-card ${
+                      s.pilotStatus === 'available' ? 'border-primary/50' :
+                      s.pilotStatus === 'no_pilot' ? 'border-border' : 'border-destructive/30'
+                    }`}>
                       <p className="font-semibold text-sm truncate">{s.name}</p>
                       <Badge variant="secondary" className="text-xs">{s.className}</Badge>
                       <p className="text-xs text-muted-foreground">KDA: {s.kda} | Score: {s.score.toFixed(1)}</p>
                       {classificationBadge(s.classification)}
+                      {pilotFilterActive && s.pilotStatus === 'available' && (
+                        <Badge variant="default" className="text-xs gap-1 mt-1"><UserCheck className="w-3 h-3" />{s.pilotName}</Badge>
+                      )}
+                      {pilotFilterActive && s.pilotStatus === 'no_pilot' && (
+                        <Badge variant="outline" className="text-xs mt-1">Sem piloto</Badge>
+                      )}
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2">
                   <span className="text-sm text-muted-foreground">Composição por classe:</span>
                   {Object.entries(
                     suggestedTeam.reduce<Record<string, number>>((acc, s) => {
@@ -780,6 +835,66 @@ export const TeamBuilder = ({ filters }: Props) => {
                     <Badge key={cls} variant="outline" className="text-xs">{count}x {cls}</Badge>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Reserves Section */}
+          {pilotFilterActive && suggestedReserves.length > 0 && eventType !== 'arka_war' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Users className="w-5 h-5 text-muted-foreground" />
+                  Reservas ({suggestedReserves.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Reserves with available pilot (benched by performance) */}
+                {(() => {
+                  const benchedWithPilot = suggestedReserves.filter(r => r.pilotStatus === 'available');
+                  if (benchedWithPilot.length === 0) return null;
+                  return (
+                    <div className="border border-yellow-500/30 rounded-lg p-4 bg-yellow-500/5">
+                      <h4 className="font-bold text-sm mb-3 flex items-center gap-2 text-yellow-600">
+                        <AlertTriangle className="w-4 h-4" />
+                        Piloto disponível — reserva por desempenho
+                      </h4>
+                      <div className="space-y-2">
+                        {benchedWithPilot.map(r => (
+                          <div key={r.name} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold">{r.name}</span>
+                              <Badge variant="secondary" className="text-xs">{r.className}</Badge>
+                              <Badge variant="outline" className="text-xs">Piloto: {r.pilotName}</Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground">KDA: {r.kda} | Score: {r.score.toFixed(1)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Reserves with unavailable pilot */}
+                {(() => {
+                  const unavailablePilot = suggestedReserves.filter(r => r.pilotStatus === 'unavailable');
+                  if (unavailablePilot.length === 0) return null;
+                  return (
+                    <div className="border border-border rounded-lg p-4 bg-muted/30">
+                      <h4 className="font-bold text-sm mb-2 flex items-center gap-2 text-muted-foreground">
+                        <UserX className="w-4 h-4" />
+                        Piloto indisponível
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {unavailablePilot.map(r => (
+                          <Badge key={r.name} variant="outline" className="text-xs gap-1">
+                            {r.name} ({r.className}) — {r.pilotName}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           )}
