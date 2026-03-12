@@ -329,6 +329,15 @@ export const CharacterManagement = () => {
                   required
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="pilot_name">Piloto</Label>
+                <Input
+                  id="pilot_name"
+                  placeholder="Nome do piloto (pessoa real)"
+                  value={formData.pilot_name}
+                  onChange={(e) => setFormData({ ...formData, pilot_name: e.target.value })}
+                />
+              </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={handleCloseDialog}>
