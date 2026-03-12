@@ -640,7 +640,7 @@ export const TeamBuilder = ({ filters }: Props) => {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Users className="w-5 h-5 text-primary" />
-                {pilotFilterActive ? `Membros Disponíveis de ${guild} (${effectiveMembers.length}/${members.length})` : `Membros de ${guild} (${members.length})`}
+                {pilotFilterActive ? `Membros de ${guild} (${enrichedMembers.length})` : `Membros de ${guild} (${members.length})`}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -650,23 +650,24 @@ export const TeamBuilder = ({ filters }: Props) => {
                     <TableRow>
                       <TableHead>#</TableHead>
                       <TableHead>Jogador</TableHead>
+                      {pilotFilterActive && <TableHead>Piloto</TableHead>}
                       <TableHead>Classe</TableHead>
                       <TableHead>Kills</TableHead>
                       <TableHead>Deaths</TableHead>
                       <TableHead>KDA</TableHead>
                       <TableHead>Participação</TableHead>
                       <TableHead>Consistência</TableHead>
-                      <TableHead>Melhor Evento</TableHead>
-                      <TableHead>Pior Evento</TableHead>
                       <TableHead>Tendência</TableHead>
                       <TableHead>Classificação</TableHead>
+                      {pilotFilterActive && <TableHead>Status</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(pilotFilterActive ? effectiveMembers : members).map((m, i) => (
-                      <TableRow key={m.name}>
+                    {enrichedMembers.map((m, i) => (
+                      <TableRow key={m.name} className={m.pilotStatus === 'unavailable' ? 'opacity-50' : ''}>
                         <TableCell className="font-medium">{i + 1}</TableCell>
                         <TableCell className="font-semibold">{m.name}</TableCell>
+                        {pilotFilterActive && <TableCell className="text-xs">{m.pilotName || '—'}</TableCell>}
                         <TableCell>{m.className}</TableCell>
                         <TableCell className="text-green-500">{m.kills}</TableCell>
                         <TableCell className="text-red-500">{m.deaths}</TableCell>
@@ -677,10 +678,15 @@ export const TeamBuilder = ({ filters }: Props) => {
                             {m.consistency}
                           </span>
                         </TableCell>
-                        <TableCell>{eventLabel(m.bestEvent)}</TableCell>
-                        <TableCell>{eventLabel(m.worstEvent)}</TableCell>
                         <TableCell>{trendIcon(m.trend)}</TableCell>
                         <TableCell>{classificationBadge(m.classification)}</TableCell>
+                        {pilotFilterActive && (
+                          <TableCell>
+                            {m.pilotStatus === 'available' && <Badge variant="default" className="text-xs gap-1"><UserCheck className="w-3 h-3" />Disponível</Badge>}
+                            {m.pilotStatus === 'no_pilot' && <Badge variant="secondary" className="text-xs">Sem piloto</Badge>}
+                            {m.pilotStatus === 'unavailable' && <Badge variant="destructive" className="text-xs gap-1"><UserX className="w-3 h-3" />Indisponível</Badge>}
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
