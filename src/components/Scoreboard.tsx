@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trophy, Skull, Crosshair, TrendingUp, FileSpreadsheet, Image, Database } from 'lucide-react';
+import { Trophy, Skull, Crosshair, TrendingUp, FileSpreadsheet, Image, Database, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import * as XLSX from 'xlsx';
@@ -25,16 +25,21 @@ interface ScoreboardProps {
   eventType?: EventType;
 }
 
-type SortKey = 'kills' | 'deaths' | 'kda';
+type SortKey = 'kills' | 'deaths' | 'kda' | 'score';
+
+const calcScore = (p: PlayerStats) => (p.kills * 3) + (p.kda * 2) - (p.deaths * 1.5);
 
 export const Scoreboard = ({ players, bossLabel, killLogs = [], eventType = 'boss_event' }: ScoreboardProps) => {
-  const [sortBy, setSortBy] = useState<SortKey>('kills');
+  const [sortBy, setSortBy] = useState<SortKey>('score');
   const scoreboardRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const sortedPlayers = useMemo(() => {
-    return [...players].sort((a, b) => b[sortBy] - a[sortBy]);
+    return [...players].sort((a, b) => {
+      if (sortBy === 'score') return calcScore(b) - calcScore(a);
+      return b[sortBy] - a[sortBy];
+    });
   }, [players, sortBy]);
 
   const topPlayer = sortedPlayers[0];
@@ -67,7 +72,8 @@ export const Scoreboard = ({ players, bossLabel, killLogs = [], eventType = 'bos
       'Jogador': player.name,
       'Kills': player.kills,
       'Deaths': player.deaths,
-      'KDA': player.kda.toFixed(2)
+      'KDA': player.kda.toFixed(2),
+      'Pontuação': calcScore(player).toFixed(2)
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -280,6 +286,7 @@ export const Scoreboard = ({ players, bossLabel, killLogs = [], eventType = 'bos
       </div>
 
       <div className="flex flex-wrap gap-3 justify-center items-center">
+        <SortButton label="Pontuação" sortKey="score" icon={Star} />
         <SortButton label="Kills" sortKey="kills" icon={Crosshair} />
         <SortButton label="Deaths" sortKey="deaths" icon={Skull} />
         <SortButton label="KDA" sortKey="kda" icon={TrendingUp} />
@@ -338,6 +345,12 @@ export const Scoreboard = ({ players, bossLabel, killLogs = [], eventType = 'bos
                     KDA
                   </div>
                 </th>
+                <th className="px-6 py-4 text-center text-sm font-bold text-primary uppercase tracking-wider">
+                  <div className="flex items-center justify-center gap-2">
+                    <Star className="w-4 h-4" />
+                    Pontuação
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -385,6 +398,11 @@ export const Scoreboard = ({ players, bossLabel, killLogs = [], eventType = 'bos
                     <td className="px-6 py-4 text-center">
                       <span className="font-bold text-warning text-lg">
                         {player.kda.toFixed(2)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="font-bold text-primary text-lg glow-primary">
+                        {calcScore(player).toFixed(2)}
                       </span>
                     </td>
                   </tr>

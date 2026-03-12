@@ -1,24 +1,45 @@
 
+# Sistema de Análise de Desempenho PvP - Plano de Implementação
 
-## Plano: Adicionar Coluna de Pontuação no Scoreboard
+## Status: ✅ Implementado
 
-### O que será feito
-Adicionar a coluna **Pontuação** na tabela do Scoreboard (tela de Incluir Dados), usando a mesma fórmula dos rankings: `(kills × 3) + (KDA × 2) - (deaths × 1.5)`.
+## Estrutura de Navegação
 
-### Mudanças em `src/components/Scoreboard.tsx`
-
-1. **Adicionar `score` como opção de ordenação** — incluir `'score'` no tipo `SortKey`
-2. **Calcular o score** para cada jogador no `sortedPlayers` usando a fórmula padrão
-3. **Adicionar coluna "Pontuação"** no `<thead>` e `<tbody>` da tabela, com ícone e estilo visual consistente
-4. **Adicionar botão de ordenação** por Pontuação nos filtros
-5. **Incluir no export Excel** a coluna de pontuação
-6. **Ordenação padrão** passa a ser por `score` (mais relevante)
-
-### Fórmula
 ```text
-Score = (kills × 3) + (kda × 2) - (deaths × 1.5)
+Sidebar
+└── 📊 Análise PvP  [requiresAdmin: true]
+
+Dashboard (sub-abas internas via Tabs)
+├── Players      → Stats individuais + busca por nome
+├── Guilds       → Stats por guild + ranking interno
+├── PvP Direto   → Player vs Player / Guild vs Guild
+├── Classes      → Eficiência, dominância, matriz, meta
+├── Gráficos     → Evolução temporal (kills/dia, KDA)
+├── Escalação    → Team Builder com métricas avançadas por membro
+└── Insights IA  → Análise automática via Lovable AI
 ```
 
-### Arquivo Afetado
-- `src/components/Scoreboard.tsx`
+## Módulo Escalação & Team Builder
 
+- Seleção de guild → tabela de membros com: Kills, Deaths, KDA, Participação%, Consistência (desvio padrão), Melhor/Pior evento, Tendência
+- Classificação automática: MVP, Constante, Oscilante, Destaque, Em Evolução, Reserva
+- Composição sugerida (melhor time por score combinado)
+- Insights IA táticos (prompt especializado em escalação)
+- **✅ Campo Piloto**: Cada personagem pode ter um `pilot_name` associado (pessoa real)
+- **✅ Importação de Lista de Pilotos**: Na Escalação, importar lista de pilotos disponíveis (TXT/Excel/textarea) para filtrar formação por disponibilidade
+
+## Arquivos
+
+| Arquivo |
+|---------|
+| `src/hooks/useAnalyticsData.ts` |
+| `src/components/analytics/PvPAnalyticsDashboard.tsx` |
+| `src/components/analytics/AnalyticsFilters.tsx` |
+| `src/components/analytics/PlayerAnalytics.tsx` |
+| `src/components/analytics/GuildAnalytics.tsx` |
+| `src/components/analytics/DirectCombat.tsx` |
+| `src/components/analytics/ClassAnalytics.tsx` |
+| `src/components/analytics/AnalyticsCharts.tsx` |
+| `src/components/analytics/AIInsights.tsx` |
+| `src/components/analytics/TeamBuilder.tsx` |
+| `supabase/functions/pvp-ai-insights/index.ts` |
