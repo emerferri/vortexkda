@@ -274,7 +274,7 @@ export const Characters = () => {
 
   const openEditDialog = (character: Character) => {
     setEditingCharacter(character);
-    setFormData({ name: character.name, guild: character.guild, class: character.class });
+    setFormData({ name: character.name, guild: character.guild, class: character.class, pilot_name: (character as any).pilot_name || '' });
     setDialogOpen(true);
   };
 
