@@ -400,6 +400,11 @@ export const Scoreboard = ({ players, bossLabel, killLogs = [], eventType = 'bos
                         {player.kda.toFixed(2)}
                       </span>
                     </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="font-bold text-primary text-lg glow-primary">
+                        {calcScore(player).toFixed(2)}
+                      </span>
+                    </td>
                   </tr>
                 );
               })}
