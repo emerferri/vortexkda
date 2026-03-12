@@ -94,24 +94,14 @@ const TEAM_SIZE: Record<string, number> = {
 };
 
 export const TeamBuilder = ({ filters }: Props) => {
-  const [guild, setGuild] = useState<string>('');
-  const [guilds, setGuilds] = useState<string[]>([]);
   const [members, setMembers] = useState<MemberStats[]>([]);
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsights, setAiInsights] = useState('');
 
-  // Use event type from parent filters
+  // Use filters from parent
   const eventType = filters.eventType === 'all' ? 'all' : filters.eventType;
-
-  // Load guild list
-  useEffect(() => {
-    fetchAllCharacters().then(chars => {
-      const gs = [...new Set(chars.filter(c => !c.banned && c.guild).map(c => c.guild))].sort();
-      setGuilds(gs);
-    });
-  }, []);
-
+  const guild = filters.guild || '';
 
   // Analyze guild when selected
   useEffect(() => {
