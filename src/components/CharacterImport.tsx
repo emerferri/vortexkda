@@ -11,6 +11,7 @@ interface CharacterData {
   name: string;
   guild: string;
   class: string;
+  pilot_name: string;
 }
 
 interface ImportSummary {
