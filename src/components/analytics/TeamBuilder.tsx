@@ -365,41 +365,32 @@ export const TeamBuilder = ({ filters }: Props) => {
     });
   }, [members, pilotFilterActive, pilotAvailability]);
 
-  // Pool-based team selection
+  // Performance-first team selection with pilot availability as tiebreaker
   const selectTeamByPools = useCallback((pool: MemberStats[], maxSize: number): { team: ScoredMember[]; reserves: ScoredMember[] } => {
-    const scored = pool.map(scorePlayer).sort((a, b) => b.score - a.score);
+    const scored = pool.map(scorePlayer);
 
     if (!pilotFilterActive) {
+      scored.sort((a, b) => b.score - a.score);
       const team = scored.filter(m => m.classification !== 'Reserva').slice(0, maxSize);
       const reserves = scored.filter(s => !team.find(t => t.name === s.name));
       return { team, reserves };
     }
 
-    // Pool A: pilot available, Pool B: no pilot defined, Pool C: pilot unavailable
-    const poolA = scored.filter(s => s.pilotStatus === 'available');
-    const poolB = scored.filter(s => s.pilotStatus === 'no_pilot');
-    const poolC = scored.filter(s => s.pilotStatus === 'unavailable');
+    // Sort by score DESC, using pilot availability as tiebreaker when scores are within 5%
+    const pilotPriority: Record<string, number> = { available: 0, no_pilot: 1, unavailable: 2 };
+    scored.sort((a, b) => {
+      const diff = Math.abs(a.score - b.score);
+      const threshold = Math.max(a.score, b.score) * 0.05;
+      if (diff <= threshold) {
+        const pA = pilotPriority[a.pilotStatus ?? 'no_pilot'] ?? 1;
+        const pB = pilotPriority[b.pilotStatus ?? 'no_pilot'] ?? 1;
+        if (pA !== pB) return pA - pB;
+      }
+      return b.score - a.score;
+    });
 
-    const team: ScoredMember[] = [];
-    const used = new Set<string>();
-
-    for (const s of poolA) {
-      if (team.length >= maxSize) break;
-      team.push(s);
-      used.add(s.name);
-    }
-    for (const s of poolB) {
-      if (team.length >= maxSize) break;
-      team.push(s);
-      used.add(s.name);
-    }
-    for (const s of poolC) {
-      if (team.length >= maxSize) break;
-      team.push(s);
-      used.add(s.name);
-    }
-
-    const reserves = scored.filter(s => !used.has(s.name));
+    const team = scored.slice(0, maxSize);
+    const reserves = scored.slice(maxSize);
     return { team, reserves };
   }, [pilotFilterActive]);
 
