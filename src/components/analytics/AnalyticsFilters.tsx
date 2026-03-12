@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
-import { CalendarIcon, Filter, RotateCcw } from 'lucide-react';
+import { Filter, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
 import { AnalyticsFilters as FiltersType, defaultFilters } from '@/hooks/useAnalyticsData';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -16,8 +13,27 @@ interface AnalyticsFiltersProps {
 
 const hours = Array.from({ length: 24 }, (_, i) => i);
 
+// Parse dd/mm/yyyy input to yyyy-mm-dd
+function parseInputDate(value: string): string | null {
+  const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, day, month, year] = match;
+  const d = parseInt(day), m = parseInt(month), y = parseInt(year);
+  if (m < 1 || m > 12 || d < 1 || d > 31 || y < 2000) return null;
+  return `${year}-${month}-${day}`;
+}
+
+// Format yyyy-mm-dd to dd/mm/yyyy for display
+function formatForDisplay(isoDate: string | null): string {
+  if (!isoDate) return '';
+  const [y, m, d] = isoDate.split('-');
+  return `${d}/${m}/${y}`;
+}
+
 export const AnalyticsFiltersBar = ({ filters, onChange }: AnalyticsFiltersProps) => {
   const [guilds, setGuilds] = useState<string[]>([]);
+  const [dateFromInput, setDateFromInput] = useState(formatForDisplay(filters.dateFrom));
+  const [dateToInput, setDateToInput] = useState(formatForDisplay(filters.dateTo));
 
   useEffect(() => {
     const fetchGuilds = async () => {
@@ -33,12 +49,46 @@ export const AnalyticsFiltersBar = ({ filters, onChange }: AnalyticsFiltersProps
     fetchGuilds();
   }, []);
 
-  const handleDateFrom = (date: Date | undefined) => {
-    onChange({ ...filters, dateFrom: date ? format(date, 'yyyy-MM-dd') : null });
+  // Sync inputs when filters change externally (e.g. reset)
+  useEffect(() => {
+    setDateFromInput(formatForDisplay(filters.dateFrom));
+  }, [filters.dateFrom]);
+
+  useEffect(() => {
+    setDateToInput(formatForDisplay(filters.dateTo));
+  }, [filters.dateTo]);
+
+  const handleDateFromBlur = () => {
+    if (dateFromInput === '') {
+      onChange({ ...filters, dateFrom: null });
+      return;
+    }
+    const parsed = parseInputDate(dateFromInput);
+    if (parsed) {
+      onChange({ ...filters, dateFrom: parsed });
+    } else {
+      // revert to current filter value
+      setDateFromInput(formatForDisplay(filters.dateFrom));
+    }
   };
 
-  const handleDateTo = (date: Date | undefined) => {
-    onChange({ ...filters, dateTo: date ? format(date, 'yyyy-MM-dd') : null });
+  const handleDateToBlur = () => {
+    if (dateToInput === '') {
+      onChange({ ...filters, dateTo: null });
+      return;
+    }
+    const parsed = parseInputDate(dateToInput);
+    if (parsed) {
+      onChange({ ...filters, dateTo: parsed });
+    } else {
+      setDateToInput(formatForDisplay(filters.dateTo));
+    }
+  };
+
+  const handleDateKeyDown = (e: React.KeyboardEvent, type: 'from' | 'to') => {
+    if (e.key === 'Enter') {
+      type === 'from' ? handleDateFromBlur() : handleDateToBlur();
+    }
   };
 
   const reset = () => onChange({ ...defaultFilters });
@@ -48,40 +98,24 @@ export const AnalyticsFiltersBar = ({ filters, onChange }: AnalyticsFiltersProps
       <Filter className="w-4 h-4 text-muted-foreground" />
 
       {/* Date From */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" className={cn("gap-2 text-xs", !filters.dateFrom && "text-muted-foreground")}>
-            <CalendarIcon className="w-3 h-3" />
-            {filters.dateFrom ? format(new Date(filters.dateFrom), 'dd/MM/yyyy') : 'Data início'}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={filters.dateFrom ? new Date(filters.dateFrom) : undefined}
-            onSelect={handleDateFrom}
-            className="p-3 pointer-events-auto"
-          />
-        </PopoverContent>
-      </Popover>
+      <Input
+        placeholder="Data início (dd/mm/aaaa)"
+        value={dateFromInput}
+        onChange={(e) => setDateFromInput(e.target.value)}
+        onBlur={handleDateFromBlur}
+        onKeyDown={(e) => handleDateKeyDown(e, 'from')}
+        className="w-[170px] h-8 text-xs"
+      />
 
       {/* Date To */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" className={cn("gap-2 text-xs", !filters.dateTo && "text-muted-foreground")}>
-            <CalendarIcon className="w-3 h-3" />
-            {filters.dateTo ? format(new Date(filters.dateTo), 'dd/MM/yyyy') : 'Data fim'}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={filters.dateTo ? new Date(filters.dateTo) : undefined}
-            onSelect={handleDateTo}
-            className="p-3 pointer-events-auto"
-          />
-        </PopoverContent>
-      </Popover>
+      <Input
+        placeholder="Data fim (dd/mm/aaaa)"
+        value={dateToInput}
+        onChange={(e) => setDateToInput(e.target.value)}
+        onBlur={handleDateToBlur}
+        onKeyDown={(e) => handleDateKeyDown(e, 'to')}
+        className="w-[170px] h-8 text-xs"
+      />
 
       {/* Hour From */}
       <Select
