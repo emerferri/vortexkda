@@ -437,16 +437,6 @@ export const TeamBuilder = ({ filters }: Props) => {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={eventType} onValueChange={setEventType}>
-              <SelectTrigger className="w-full max-w-xs">
-                <SelectValue placeholder="Tipo de evento" />
-              </SelectTrigger>
-              <SelectContent>
-                {eventOptions.map(e => (
-                  <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
         </CardContent>
       </Card>
