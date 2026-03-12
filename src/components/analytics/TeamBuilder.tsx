@@ -406,17 +406,21 @@ export const TeamBuilder = ({ filters }: Props) => {
   const arkaWarParties = useMemo(() => {
     if (enrichedMembers.length === 0 || eventType !== 'arka_war') return null;
 
-    const scored = enrichedMembers.map(scorePlayer).sort((a, b) => b.score - a.score);
+    const pilotPriority: Record<string, number> = { available: 0, no_pilot: 1, unavailable: 2 };
+    const scored = enrichedMembers.map(scorePlayer).sort((a, b) => {
+      if (pilotFilterActive) {
+        const diff = Math.abs(a.score - b.score);
+        const threshold = Math.max(a.score, b.score) * 0.05;
+        if (diff <= threshold) {
+          const pA = pilotPriority[a.pilotStatus ?? 'no_pilot'] ?? 1;
+          const pB = pilotPriority[b.pilotStatus ?? 'no_pilot'] ?? 1;
+          if (pA !== pB) return pA - pB;
+        }
+      }
+      return b.score - a.score;
+    });
 
-    let prioritized: ScoredMember[];
-    if (pilotFilterActive) {
-      const pA = scored.filter(s => s.pilotStatus === 'available');
-      const pB = scored.filter(s => s.pilotStatus === 'no_pilot');
-      const pC = scored.filter(s => s.pilotStatus === 'unavailable');
-      prioritized = [...pA, ...pB, ...pC];
-    } else {
-      prioritized = scored.filter(m => m.classification !== 'Reserva');
-    }
+    const prioritized = scored.filter(m => pilotFilterActive || m.classification !== 'Reserva');
 
     const DW_CLASS = 'Darkness Wizard';
     const EE_CLASS = 'Elf Elder';
