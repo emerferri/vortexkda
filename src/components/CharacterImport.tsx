@@ -320,9 +320,9 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
           <div className="mt-6 text-left bg-muted/50 rounded-md p-4">
             <p className="text-sm font-medium mb-2">Formato esperado:</p>
             <code className="text-xs block bg-background p-2 rounded">
-              Nome;Guild;Classe<br/>
-              KOMBAT;BADBOYS;Force Emperor<br/>
-              Melisandre;BADBOYS;Endless Summoner
+              Nome;Guild;Classe;Piloto<br/>
+              KOMBAT;BADBOYS;Force Emperor;João<br/>
+              Melisandre;BADBOYS;Endless Summoner;Maria
             </code>
           </div>
         </div>
