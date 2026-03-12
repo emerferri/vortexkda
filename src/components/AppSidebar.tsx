@@ -55,6 +55,7 @@ export const AppSidebar = ({ activeTab, onTabChange }: AppSidebarProps) => {
   const filteredItems = navItems.filter(item => {
     if (item.requiresAdmin && !isAdmin) return false;
     if (item.requiresEdit && !canEditData) return false;
+    if (item.requiresAuth && !user) return false;
     return true;
   });
 
