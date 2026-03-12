@@ -99,6 +99,7 @@ export const CharacterManagement = () => {
               name: validatedData.name,
               guild: validatedData.guild,
               class: validatedData.class,
+              pilot_name: validatedData.pilot_name,
             },
           ]);
 
