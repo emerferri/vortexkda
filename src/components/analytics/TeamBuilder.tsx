@@ -266,6 +266,72 @@ export const TeamBuilder = ({ filters }: Props) => {
     }
   };
 
+  // Pilot import helpers
+  const normalizePilotName = (name: string) => name.trim().toLowerCase();
+
+  const handleImportPilotList = () => {
+    const lines = pilotListText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) { toast.error('Cole ao menos um nome de piloto'); return; }
+    setImportedPilots(lines);
+    setPilotFilterActive(true);
+    toast.success(`${lines.length} pilotos importados`);
+  };
+
+  const handlePilotFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext === 'xlsx' || ext === 'xls') {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const wb = XLSX.read(ev.target?.result, { type: 'binary' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet);
+        const names = rows.map(r => {
+          const normRow: Record<string, any> = {};
+          for (const k of Object.keys(r)) normRow[k.toLowerCase().trim()] = r[k];
+          return String(normRow['piloto'] || normRow['pilot'] || normRow['nome'] || normRow['name'] || Object.values(r)[0] || '').trim();
+        }).filter(Boolean);
+        setImportedPilots(names);
+        setPilotFilterActive(true);
+        setPilotListText(names.join('\n'));
+        toast.success(`${names.length} pilotos importados do arquivo`);
+      };
+      reader.readAsBinaryString(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const content = ev.target?.result as string;
+        const names = content.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        setImportedPilots(names);
+        setPilotFilterActive(true);
+        setPilotListText(names.join('\n'));
+        toast.success(`${names.length} pilotos importados do arquivo`);
+      };
+      reader.readAsText(file);
+    }
+    e.target.value = '';
+  };
+
+  const clearPilotFilter = () => {
+    setImportedPilots([]);
+    setPilotFilterActive(false);
+    setPilotListText('');
+  };
+
+  // Build pilot availability map
+  const pilotAvailability = useMemo(() => {
+    if (!pilotFilterActive || importedPilots.length === 0) return null;
+    const guildChars = allCharacters.filter(c => c.guild === guild && !c.banned);
+    const pilotSet = new Set(importedPilots.map(normalizePilotName));
+    const availableChars = guildChars.filter(c => c.pilot_name && pilotSet.has(normalizePilotName(c.pilot_name)));
+    const availableCharNames = new Set(availableChars.map(c => c.name));
+    const noPilotChars = guildChars.filter(c => !c.pilot_name);
+    const assignedPilots = new Set(guildChars.filter(c => c.pilot_name).map(c => normalizePilotName(c.pilot_name)));
+    const orphanPilots = importedPilots.filter(p => !assignedPilots.has(normalizePilotName(p)));
+    return { availableCharNames, noPilotChars, orphanPilots, availableChars };
+  }, [pilotFilterActive, importedPilots, allCharacters, guild]);
+
   // Score helper
   const scorePlayer = (m: MemberStats) => ({
     ...m,
@@ -274,10 +340,17 @@ export const TeamBuilder = ({ filters }: Props) => {
 
   type ScoredMember = MemberStats & { score: number };
 
+  // Filter members by available pilots
+  const effectiveMembers = useMemo(() => {
+    if (!pilotFilterActive || !pilotAvailability) return members;
+    return members.filter(m => pilotAvailability.availableCharNames.has(m.name));
+  }, [members, pilotFilterActive, pilotAvailability]);
+
   // Suggested composition: best players per class
   const suggestedTeam = useMemo(() => {
-    if (members.length === 0) return [];
-    const scored = members
+    const pool = pilotFilterActive ? effectiveMembers : members;
+    if (pool.length === 0) return [];
+    const scored = pool
       .filter(m => m.classification !== 'Reserva')
       .map(scorePlayer)
       .sort((a, b) => b.score - a.score);
@@ -299,7 +372,7 @@ export const TeamBuilder = ({ filters }: Props) => {
     }
 
     return team.slice(0, maxSize);
-  }, [members, eventType]);
+  }, [effectiveMembers, members, eventType, pilotFilterActive]);
 
   // Arka War composition: 4 parties of 5, each must have 1 Darkness Wizard
   // 2 EE total: 1 in a party, 1 reserve (outside)
