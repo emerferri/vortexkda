@@ -166,7 +166,7 @@ export const Characters = () => {
       }
 
       setDialogOpen(false);
-      setFormData({ name: '', guild: '', class: '' });
+      setFormData({ name: '', guild: '', class: '', pilot_name: '' });
       setEditingCharacter(null);
       loadCharacters();
     } catch (error: any) {
