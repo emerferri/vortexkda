@@ -96,11 +96,13 @@ const TEAM_SIZE: Record<string, number> = {
 export const TeamBuilder = ({ filters }: Props) => {
   const [guild, setGuild] = useState<string>('');
   const [guilds, setGuilds] = useState<string[]>([]);
-  const [eventType, setEventType] = useState<string>('all');
   const [members, setMembers] = useState<MemberStats[]>([]);
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsights, setAiInsights] = useState('');
+
+  // Use event type from parent filters
+  const eventType = filters.eventType === 'all' ? 'all' : filters.eventType;
 
   // Load guild list
   useEffect(() => {
