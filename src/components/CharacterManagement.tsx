@@ -30,6 +30,7 @@ interface Character {
   name: string;
   guild: string;
   class: string;
+  pilot_name: string;
   created_at: string;
   banned: boolean;
 }
