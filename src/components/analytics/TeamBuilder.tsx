@@ -377,9 +377,10 @@ export const TeamBuilder = ({ filters }: Props) => {
   // Arka War composition: 4 parties of 5, each must have 1 Darkness Wizard
   // 2 EE total: 1 in a party, 1 reserve (outside)
   const arkaWarParties = useMemo(() => {
-    if (members.length === 0 || eventType !== 'arka_war') return null;
+    const pool = pilotFilterActive ? effectiveMembers : members;
+    if (pool.length === 0 || eventType !== 'arka_war') return null;
 
-    const scored = members
+    const scored = pool
       .filter(m => m.classification !== 'Reserva')
       .map(scorePlayer)
       .sort((a, b) => b.score - a.score);
