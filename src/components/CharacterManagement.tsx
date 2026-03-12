@@ -169,7 +169,7 @@ export const CharacterManagement = () => {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingCharacter(null);
-    setFormData({ name: '', guild: '', class: '' });
+    setFormData({ name: '', guild: '', class: '', pilot_name: '' });
   };
 
   const filteredCharacters = characters.filter(
