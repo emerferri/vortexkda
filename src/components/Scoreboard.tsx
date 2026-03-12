@@ -72,7 +72,8 @@ export const Scoreboard = ({ players, bossLabel, killLogs = [], eventType = 'bos
       'Jogador': player.name,
       'Kills': player.kills,
       'Deaths': player.deaths,
-      'KDA': player.kda.toFixed(2)
+      'KDA': player.kda.toFixed(2),
+      'Pontuação': calcScore(player).toFixed(2)
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
