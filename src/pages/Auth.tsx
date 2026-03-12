@@ -35,56 +35,6 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    // Validate input with zod
-    const validation = authSchema.safeParse({ email, password });
-    if (!validation.success) {
-      const firstError = validation.error.errors[0];
-      toast({
-        title: "Erro de validação",
-        description: firstError.message,
-        variant: "destructive"
-      });
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const { error } = await supabase.auth.signUp({
-        email: validation.data.email,
-        password: validation.data.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`
-        }
-      });
-
-      if (error) {
-        toast({
-          title: "Erro no cadastro",
-          description: error.message,
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Sucesso!",
-          description: "Conta criada com sucesso. Você já pode fazer login.",
-        });
-        setEmail('');
-        setPassword('');
-      }
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Ocorreu um erro ao criar a conta",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
