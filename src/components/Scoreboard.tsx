@@ -25,10 +25,12 @@ interface ScoreboardProps {
   eventType?: EventType;
 }
 
-type SortKey = 'kills' | 'deaths' | 'kda';
+type SortKey = 'kills' | 'deaths' | 'kda' | 'score';
+
+const calcScore = (p: PlayerStats) => (p.kills * 3) + (p.kda * 2) - (p.deaths * 1.5);
 
 export const Scoreboard = ({ players, bossLabel, killLogs = [], eventType = 'boss_event' }: ScoreboardProps) => {
-  const [sortBy, setSortBy] = useState<SortKey>('kills');
+  const [sortBy, setSortBy] = useState<SortKey>('score');
   const scoreboardRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
