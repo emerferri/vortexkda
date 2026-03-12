@@ -161,6 +161,7 @@ export const CharacterManagement = () => {
       name: character.name,
       guild: character.guild,
       class: character.class,
+      pilot_name: character.pilot_name || '',
     });
     setIsDialogOpen(true);
   };
