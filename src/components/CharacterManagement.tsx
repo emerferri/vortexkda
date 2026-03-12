@@ -14,6 +14,7 @@ const characterSchema = z.object({
   name: z.string().trim().min(1, 'Nome é obrigatório').max(50, 'Nome deve ter no máximo 50 caracteres'),
   guild: z.string().trim().min(1, 'Guild é obrigatória').max(50, 'Guild deve ter no máximo 50 caracteres'),
   class: z.string().trim().min(1, 'Classe é obrigatória').max(50, 'Classe deve ter no máximo 50 caracteres'),
+  pilot_name: z.string().trim().max(50, 'Piloto deve ter no máximo 50 caracteres').default(''),
 });
 import {
   Dialog,
