@@ -239,8 +239,9 @@ export const CharacterManagement = () => {
                           {char.name}
                         </div>
                       </TableCell>
-                      <TableCell>{char.guild}</TableCell>
-                      <TableCell>{char.class}</TableCell>
+                      <TableCell className="text-muted-foreground">{char.pilot_name || '-'}</TableCell>
+                       <TableCell>{char.guild}</TableCell>
+                       <TableCell>{char.class}</TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-2">
                           <Switch
