@@ -87,11 +87,13 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
               const name = normalizedRow['nome'] || normalizedRow['name'] || normalizedRow['personagem'] || '';
               const guild = normalizedRow['guild'] || normalizedRow['guilda'] || '';
               const charClass = normalizedRow['classe'] || normalizedRow['class'] || '';
+              const pilot = normalizedRow['piloto'] || normalizedRow['pilot'] || normalizedRow['pilot_name'] || '';
               
               return {
                 name: String(name).trim(),
                 guild: String(guild).trim(),
                 class: String(charClass).trim(),
+                pilot_name: String(pilot).trim(),
               };
             })
             .filter((c) => c.name.length > 0);
