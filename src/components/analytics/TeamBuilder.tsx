@@ -732,6 +732,12 @@ export const TeamBuilder = ({ filters }: Props) => {
                                 <Badge variant={p.className === 'Darkness Wizard' ? 'default' : p.className === 'Elf Elder' ? 'secondary' : 'outline'} className="text-xs shrink-0">
                                   {p.className}
                                 </Badge>
+                                {pilotFilterActive && p.pilotStatus === 'available' && (
+                                  <Badge variant="default" className="text-xs shrink-0 gap-1"><UserCheck className="w-3 h-3" />{p.pilotName}</Badge>
+                                )}
+                                {pilotFilterActive && p.pilotStatus === 'no_pilot' && (
+                                  <Badge variant="outline" className="text-xs shrink-0">Sem piloto</Badge>
+                                )}
                               </div>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
                                 <span>KDA: {p.kda}</span>
