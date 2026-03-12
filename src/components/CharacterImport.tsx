@@ -379,6 +379,7 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
                       <TableCell className="font-medium">{char.name}</TableCell>
                       <TableCell>{char.guild || '-'}</TableCell>
                       <TableCell>{char.class || '-'}</TableCell>
+                      <TableCell>{char.pilot_name || '-'}</TableCell>
                     </TableRow>
                   );
                 })}
