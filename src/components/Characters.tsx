@@ -34,7 +34,7 @@ export const Characters = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCharacter, setEditingCharacter] = useState<Character | null>(null);
-  const [formData, setFormData] = useState({ name: '', guild: '', class: '' });
+  const [formData, setFormData] = useState({ name: '', guild: '', class: '', pilot_name: '' });
   const [submitting, setSubmitting] = useState(false);
   const [showUnregisteredOnly, setShowUnregisteredOnly] = useState(false);
   const [searchParams] = useSearchParams();
