@@ -22,6 +22,7 @@ export type Database = {
           guild: string
           id: string
           name: string
+          pilot_name: string
         }
         Insert: {
           banned?: boolean
@@ -30,6 +31,7 @@ export type Database = {
           guild: string
           id?: string
           name: string
+          pilot_name?: string
         }
         Update: {
           banned?: boolean
@@ -38,6 +40,7 @@ export type Database = {
           guild?: string
           id?: string
           name?: string
+          pilot_name?: string
         }
         Relationships: []
       }
