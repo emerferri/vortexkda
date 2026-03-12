@@ -424,7 +424,7 @@ export const TeamBuilder = ({ filters }: Props) => {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Selecione uma guild e o tipo de evento para analisar o desempenho individual dos membros e montar a melhor formação.
+            Selecione uma guild para analisar o desempenho individual dos membros e montar a melhor formação. Use os filtros superiores para definir período e tipo de evento.
           </p>
           <div className="flex flex-wrap gap-3">
             <Select value={guild} onValueChange={setGuild}>
