@@ -244,10 +244,9 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
               .maybeSingle();
             
             if (existing) {
-              // Update
               const { error } = await supabase
                 .from('characters')
-                .update({ guild: char.guild, class: char.class })
+                .update({ guild: char.guild, class: char.class, pilot_name: char.pilot_name })
                 .eq('id', existing.id);
               
               if (error) throw error;
