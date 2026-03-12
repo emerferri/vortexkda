@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Brain, Loader2, Shield, TrendingUp, TrendingDown, Minus, Star, Users, Target, AlertTriangle, ArrowUpRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -94,24 +93,14 @@ const TEAM_SIZE: Record<string, number> = {
 };
 
 export const TeamBuilder = ({ filters }: Props) => {
-  const [guild, setGuild] = useState<string>('');
-  const [guilds, setGuilds] = useState<string[]>([]);
   const [members, setMembers] = useState<MemberStats[]>([]);
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsights, setAiInsights] = useState('');
 
-  // Use event type from parent filters
+  // Use filters from parent
   const eventType = filters.eventType === 'all' ? 'all' : filters.eventType;
-
-  // Load guild list
-  useEffect(() => {
-    fetchAllCharacters().then(chars => {
-      const gs = [...new Set(chars.filter(c => !c.banned && c.guild).map(c => c.guild))].sort();
-      setGuilds(gs);
-    });
-  }, []);
-
+  const guild = filters.guild || '';
 
   // Analyze guild when selected
   useEffect(() => {
@@ -414,32 +403,13 @@ export const TeamBuilder = ({ filters }: Props) => {
 
   return (
     <div className="space-y-6">
-      {/* Guild Selector */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Shield className="w-5 h-5 text-primary" />
-            Escalação & Team Builder
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Selecione uma guild para analisar o desempenho individual dos membros e montar a melhor formação. Use os filtros superiores para definir período e tipo de evento.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <Select value={guild} onValueChange={setGuild}>
-              <SelectTrigger className="w-full max-w-xs">
-                <SelectValue placeholder="Selecione a guild" />
-              </SelectTrigger>
-              <SelectContent>
-                {guilds.map(g => (
-                  <SelectItem key={g} value={g}>{g}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      {!guild && (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            Selecione uma guild no filtro superior para analisar o desempenho dos membros e montar a melhor formação.
+          </CardContent>
+        </Card>
+      )}
 
       {loading && (
         <div className="flex items-center justify-center py-12">
