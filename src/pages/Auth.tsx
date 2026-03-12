@@ -90,7 +90,7 @@ const Auth = () => {
           </div>
           <CardTitle className="text-3xl">Placar da Humilhação</CardTitle>
           <CardDescription>
-            Faça login ou crie uma conta para salvar estatísticas
+            Faça login para acessar o sistema
           </CardDescription>
         </CardHeader>
         <CardContent>
