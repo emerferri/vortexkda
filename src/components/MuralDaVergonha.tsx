@@ -82,13 +82,28 @@ export const MuralDaVergonha = () => {
         return [];
       }
 
-      // Fetch player data filtered by match IDs
-      const { data: matchPlayers, error: playersError } = await supabase
-        .from('pvp_match_players')
-        .select('player_name, kills, deaths, match_id')
-        .in('match_id', matchIds);
+      // Fetch player data filtered by match IDs with pagination
+      const pageSize = 1000;
+      const BATCH_SIZE = 100;
+      let allMatchPlayers: { player_name: string; kills: number; deaths: number; match_id: string }[] = [];
 
-      if (playersError) throw playersError;
+      for (let b = 0; b < matchIds.length; b += BATCH_SIZE) {
+        const batchIds = matchIds.slice(b, b + BATCH_SIZE);
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from('pvp_match_players')
+            .select('player_name, kills, deaths, match_id')
+            .in('match_id', batchIds)
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+          if (data && data.length > 0) allMatchPlayers = allMatchPlayers.concat(data);
+          if (!data || data.length < pageSize) break;
+          from += pageSize;
+        }
+      }
+
+      const matchPlayers = allMatchPlayers;
 
       // Buscar informações de guild e classe dos personagens
       const { data: characters } = await supabase

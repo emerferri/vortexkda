@@ -83,39 +83,43 @@ export const ClassGuildRanking = () => {
 
   const { data: playersData, isLoading } = useQuery({
     queryKey: ['players-with-characters', dateFrom, dateTo, hourFrom, hourTo, eventType],
+    staleTime: 30000,
     queryFn: async () => {
-      // Fetch all match players with their aggregate stats
-      let query = supabase
-        .from('pvp_match_players')
-        .select(`
-          player_name,
-          kills,
-          deaths,
-          pvp_matches!inner(match_date, match_hour, event_type)
-        `);
+      // Fetch match IDs first to use pagination properly
+      let matchQuery = supabase.from('pvp_matches').select('id');
+      if (eventType !== 'all') matchQuery = matchQuery.eq('event_type', eventType);
+      if (dateFrom) matchQuery = matchQuery.gte('match_date', format(dateFrom, 'yyyy-MM-dd'));
+      if (dateTo) matchQuery = matchQuery.lte('match_date', format(dateTo, 'yyyy-MM-dd'));
+      if (hourFrom !== undefined) matchQuery = matchQuery.gte('match_hour', hourFrom);
+      if (hourTo !== undefined) matchQuery = matchQuery.lte('match_hour', hourTo);
 
-      if (eventType !== 'all') {
-        query = query.eq('pvp_matches.event_type', eventType);
+      const { data: matches, error: matchErr } = await matchQuery;
+      if (matchErr) throw matchErr;
+      const matchIds = matches?.map(m => m.id) || [];
+      if (matchIds.length === 0) return [];
+
+      // Fetch match players with pagination
+      const pageSize = 1000;
+      const BATCH_SIZE = 100;
+      let allMatchPlayers: { player_name: string; kills: number; deaths: number }[] = [];
+
+      for (let b = 0; b < matchIds.length; b += BATCH_SIZE) {
+        const batchIds = matchIds.slice(b, b + BATCH_SIZE);
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from('pvp_match_players')
+            .select('player_name, kills, deaths')
+            .in('match_id', batchIds)
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+          if (data && data.length > 0) allMatchPlayers = allMatchPlayers.concat(data);
+          if (!data || data.length < pageSize) break;
+          from += pageSize;
+        }
       }
 
-      if (dateFrom) {
-        query = query.gte('pvp_matches.match_date', format(dateFrom, 'yyyy-MM-dd'));
-      }
-      if (dateTo) {
-        query = query.lte('pvp_matches.match_date', format(dateTo, 'yyyy-MM-dd'));
-      }
-      if (hourFrom !== undefined) {
-        query = query.gte('pvp_matches.match_hour', hourFrom);
-      }
-      if (hourTo !== undefined) {
-        query = query.lte('pvp_matches.match_hour', hourTo);
-      }
-
-      const { data: matchPlayers, error: matchError } = await query;
-
-      if (matchError) throw matchError;
-
-      // Strong normalization function (NFKC + collapse spaces + trim + lowercase)
+      // Strong normalization function
       const normalize = (s?: string) =>
         (s ?? '')
           .normalize('NFKC')
@@ -123,10 +127,10 @@ export const ClassGuildRanking = () => {
           .trim()
           .toLowerCase();
 
-      // Aggregate stats by player name (using normalized key + keeping display name)
+      // Aggregate stats by player name
       const playerStats = new Map<string, { kills: number; deaths: number; displayName: string }>();
       
-      matchPlayers?.forEach((player) => {
+      allMatchPlayers.forEach((player) => {
         const display = (player.player_name || '').replace(/\s+/g, ' ').trim();
         const key = normalize(display);
         if (!key) return;
@@ -135,7 +139,7 @@ export const ClassGuildRanking = () => {
         playerStats.set(key, {
           kills: existing.kills + player.kills,
           deaths: existing.deaths + player.deaths,
-          displayName: display, // Keep the last seen display name
+          displayName: display,
         });
       });
 
@@ -147,12 +151,12 @@ export const ClassGuildRanking = () => {
 
       if (charError) throw charError;
 
-      // Build character map with consistent normalization
+      // Build character map
       const characterMap = new Map(
         (characters || []).map((char) => [normalize(char.name), { class: char.class, guild: char.guild }])
       );
 
-      // Combine data using normalized keys but display names
+      // Combine data
       const result: PlayerWithCharacter[] = Array.from(playerStats.entries()).map(
         ([normKey, stats]) => {
           const character = characterMap.get(normKey);
