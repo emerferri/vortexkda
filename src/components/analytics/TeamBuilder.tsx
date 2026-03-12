@@ -17,6 +17,8 @@ interface Props {
   filters: AnalyticsFilters;
 }
 
+type PilotStatus = 'available' | 'no_pilot' | 'unavailable' | 'none';
+
 interface MemberStats {
   name: string;
   className: string;
@@ -31,6 +33,8 @@ interface MemberStats {
   classification: string;
   perMatchKDAs: number[];
   recentKDA: number;
+  pilotName?: string;
+  pilotStatus: PilotStatus;
 }
 
 function stdDev(values: number[]): number {
