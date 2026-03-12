@@ -61,38 +61,45 @@ export const KillStreakRanking = () => {
 
   const { data: killLogs = [], isLoading } = useQuery({
     queryKey: ['kill-streak-logs', dateFrom, dateTo, hourFrom, hourTo, eventType],
+    staleTime: 30000,
     queryFn: async () => {
-      let query = supabase
-        .from('pvp_kill_logs')
-        .select(`
-          killer_name,
-          victim_name,
-          created_at,
-          match_id,
-          pvp_matches!inner(match_date, match_hour, event_type)
-        `)
-        .order('created_at', { ascending: true });
+      // First fetch match IDs with filters
+      let matchQuery = supabase.from('pvp_matches').select('id');
+      if (eventType !== 'all') matchQuery = matchQuery.eq('event_type', eventType);
+      if (dateFrom) matchQuery = matchQuery.gte('match_date', format(dateFrom, 'yyyy-MM-dd'));
+      if (dateTo) matchQuery = matchQuery.lte('match_date', format(dateTo, 'yyyy-MM-dd'));
+      if (hourFrom !== undefined) matchQuery = matchQuery.gte('match_hour', hourFrom);
+      if (hourTo !== undefined) matchQuery = matchQuery.lte('match_hour', hourTo);
 
-      if (eventType !== 'all') {
-        query = query.eq('pvp_matches.event_type', eventType);
+      const { data: matches, error: matchError } = await matchQuery;
+      if (matchError) throw matchError;
+      const matchIds = matches?.map(m => m.id) || [];
+      if (matchIds.length === 0) return [];
+
+      // Fetch kill logs with pagination
+      const pageSize = 1000;
+      const BATCH_SIZE = 100;
+      let allLogs: KillLog[] = [];
+
+      for (let b = 0; b < matchIds.length; b += BATCH_SIZE) {
+        const batchIds = matchIds.slice(b, b + BATCH_SIZE);
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from('pvp_kill_logs')
+            .select('killer_name, victim_name, created_at, match_id')
+            .in('match_id', batchIds)
+            .order('created_at', { ascending: true })
+            .range(from, from + pageSize - 1);
+
+          if (error) throw error;
+          if (data && data.length > 0) allLogs = allLogs.concat(data as KillLog[]);
+          if (!data || data.length < pageSize) break;
+          from += pageSize;
+        }
       }
 
-      if (dateFrom) {
-        query = query.gte('pvp_matches.match_date', format(dateFrom, 'yyyy-MM-dd'));
-      }
-      if (dateTo) {
-        query = query.lte('pvp_matches.match_date', format(dateTo, 'yyyy-MM-dd'));
-      }
-      if (hourFrom !== undefined) {
-        query = query.gte('pvp_matches.match_hour', hourFrom);
-      }
-      if (hourTo !== undefined) {
-        query = query.lte('pvp_matches.match_hour', hourTo);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as KillLog[];
+      return allLogs;
     },
   });
 

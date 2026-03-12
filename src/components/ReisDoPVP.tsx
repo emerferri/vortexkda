@@ -33,7 +33,7 @@ export const ReisDoPVP = () => {
 
   const { data: rankingData, isLoading } = useQuery({
     queryKey: ['reis-cone-pvp', startDate, endDate, eventType],
-    staleTime: 0,
+    staleTime: 30000,
     queryFn: async () => {
       console.log('[ReisDoPVP] Starting query...');
       let query = supabase
