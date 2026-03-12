@@ -115,7 +115,6 @@ export const TeamBuilder = ({ filters }: Props) => {
     if (!guild) { setMembers([]); setAllCharacters([]); return; }
     analyzeGuild();
   }, [guild, filters, eventType]);
-  }, [guild, filters, eventType]);
 
   const analyzeGuild = async () => {
     setLoading(true);
