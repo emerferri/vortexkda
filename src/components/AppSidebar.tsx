@@ -34,7 +34,7 @@ const navItems: NavItem[] = [
   { id: 'vergonha', label: 'Mural da Vergonha', icon: Skull },
   { id: 'never-positive', label: 'Nunca Positivo', icon: TrendingDown },
   { id: 'killstreak', label: 'Kill Streak', icon: Swords },
-  { id: 'analytics', label: 'Análise PvP', icon: BarChart3, requiresAdmin: true },
+  { id: 'analytics', label: 'Análise PvP', icon: BarChart3, requiresAuth: true },
   { id: 'placar', label: 'Incluir Dados', icon: Swords, requiresAdmin: true },
   { id: 'admin', label: 'Admin', icon: Shield, requiresAdmin: true },
 ];
@@ -55,6 +55,7 @@ export const AppSidebar = ({ activeTab, onTabChange }: AppSidebarProps) => {
   const filteredItems = navItems.filter(item => {
     if (item.requiresAdmin && !isAdmin) return false;
     if (item.requiresEdit && !canEditData) return false;
+    if (item.requiresAuth && !user) return false;
     return true;
   });
 
