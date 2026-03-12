@@ -112,20 +112,6 @@ export const TeamBuilder = ({ filters }: Props) => {
     });
   }, []);
 
-  // Load available event types dynamically
-  const [eventOptions, setEventOptions] = useState(EVENT_OPTIONS);
-  useEffect(() => {
-    supabase.from('pvp_matches').select('event_type').then(({ data }) => {
-      if (!data) return;
-      const types = [...new Set(data.map(d => d.event_type))].sort();
-      const opts = [{ value: 'all', label: 'Todos os Eventos' }];
-      for (const t of types) {
-        const existing = EVENT_OPTIONS.find(e => e.value === t);
-        opts.push(existing || { value: t, label: t });
-      }
-      setEventOptions(opts);
-    });
-  }, []);
 
   // Analyze guild when selected
   useEffect(() => {
