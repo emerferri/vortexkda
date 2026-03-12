@@ -280,7 +280,7 @@ export const Characters = () => {
 
   const openAddDialog = () => {
     setEditingCharacter(null);
-    setFormData({ name: '', guild: '', class: '' });
+    setFormData({ name: '', guild: '', class: '', pilot_name: '' });
     setDialogOpen(true);
   };
 
