@@ -54,6 +54,7 @@ export const ClassMatchup = () => {
   // Fetch all kill logs with pagination
   const { data: killLogs, isLoading } = useQuery({
     queryKey: ['kill-logs-matchup', dateFrom, dateTo, eventType],
+    staleTime: 30000,
     queryFn: async () => {
       // First get match IDs filtered by date if needed
       let matchQuery = supabase.from('pvp_matches').select('id');
