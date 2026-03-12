@@ -1,15 +1,17 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Brain, Loader2, Shield, TrendingUp, TrendingDown, Minus, Star, Users, Target, AlertTriangle, ArrowUpRight } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Brain, Loader2, Shield, TrendingUp, TrendingDown, Minus, Star, Users, Target, AlertTriangle, ArrowUpRight, Upload, ClipboardList, CheckCircle2, XCircle, UserCheck, UserX } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   AnalyticsFilters, fetchMatchesWithType, fetchKillLogsForMatches,
   fetchAllCharacters, buildCharacterMap, filterBanned, MatchWithType, CharacterInfo
 } from '@/hooks/useAnalyticsData';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 
 interface Props {
   filters: AnalyticsFilters;
