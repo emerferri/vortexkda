@@ -790,24 +790,35 @@ export const TeamBuilder = ({ filters }: Props) => {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Target className="w-5 h-5 text-primary" />
-                  Composição Sugerida
+                  Composição Sugerida ({suggestedTeam.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Melhor formação baseada em KDA, consistência e participação.
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {pilotFilterActive
+                    ? 'Formação prioriza pilotos disponíveis, complementada por personagens sem piloto e por desempenho.'
+                    : 'Melhor formação baseada em KDA, consistência e participação.'}
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                   {suggestedTeam.map(s => (
-                    <div key={s.name} className="border border-border rounded-lg p-3 text-center space-y-1 bg-card">
+                    <div key={s.name} className={`border rounded-lg p-3 text-center space-y-1 bg-card ${
+                      s.pilotStatus === 'available' ? 'border-primary/50' :
+                      s.pilotStatus === 'no_pilot' ? 'border-border' : 'border-destructive/30'
+                    }`}>
                       <p className="font-semibold text-sm truncate">{s.name}</p>
                       <Badge variant="secondary" className="text-xs">{s.className}</Badge>
                       <p className="text-xs text-muted-foreground">KDA: {s.kda} | Score: {s.score.toFixed(1)}</p>
                       {classificationBadge(s.classification)}
+                      {pilotFilterActive && s.pilotStatus === 'available' && (
+                        <Badge variant="default" className="text-xs gap-1 mt-1"><UserCheck className="w-3 h-3" />{s.pilotName}</Badge>
+                      )}
+                      {pilotFilterActive && s.pilotStatus === 'no_pilot' && (
+                        <Badge variant="outline" className="text-xs mt-1">Sem piloto</Badge>
+                      )}
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2">
                   <span className="text-sm text-muted-foreground">Composição por classe:</span>
                   {Object.entries(
                     suggestedTeam.reduce<Record<string, number>>((acc, s) => {
@@ -818,6 +829,66 @@ export const TeamBuilder = ({ filters }: Props) => {
                     <Badge key={cls} variant="outline" className="text-xs">{count}x {cls}</Badge>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Reserves Section */}
+          {pilotFilterActive && suggestedReserves.length > 0 && eventType !== 'arka_war' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Users className="w-5 h-5 text-muted-foreground" />
+                  Reservas ({suggestedReserves.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Reserves with available pilot (benched by performance) */}
+                {(() => {
+                  const benchedWithPilot = suggestedReserves.filter(r => r.pilotStatus === 'available');
+                  if (benchedWithPilot.length === 0) return null;
+                  return (
+                    <div className="border border-yellow-500/30 rounded-lg p-4 bg-yellow-500/5">
+                      <h4 className="font-bold text-sm mb-3 flex items-center gap-2 text-yellow-600">
+                        <AlertTriangle className="w-4 h-4" />
+                        Piloto disponível — reserva por desempenho
+                      </h4>
+                      <div className="space-y-2">
+                        {benchedWithPilot.map(r => (
+                          <div key={r.name} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold">{r.name}</span>
+                              <Badge variant="secondary" className="text-xs">{r.className}</Badge>
+                              <Badge variant="outline" className="text-xs">Piloto: {r.pilotName}</Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground">KDA: {r.kda} | Score: {r.score.toFixed(1)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Reserves with unavailable pilot */}
+                {(() => {
+                  const unavailablePilot = suggestedReserves.filter(r => r.pilotStatus === 'unavailable');
+                  if (unavailablePilot.length === 0) return null;
+                  return (
+                    <div className="border border-border rounded-lg p-4 bg-muted/30">
+                      <h4 className="font-bold text-sm mb-2 flex items-center gap-2 text-muted-foreground">
+                        <UserX className="w-4 h-4" />
+                        Piloto indisponível
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {unavailablePilot.map(r => (
+                          <Badge key={r.name} variant="outline" className="text-xs gap-1">
+                            {r.name} ({r.className}) — {r.pilotName}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           )}
