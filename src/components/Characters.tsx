@@ -59,7 +59,7 @@ export const Characters = () => {
       // Get all registered characters (explicit columns to avoid reserved-word issues)
       const { data: registeredChars, error: charsError } = await supabase
         .from('characters')
-        .select('id, name, guild, class, banned')
+        .select('id, name, guild, class, banned, pilot_name')
         .order('name');
 
       if (charsError) throw charsError;
