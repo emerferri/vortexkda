@@ -25,6 +25,8 @@ Dashboard (sub-abas internas via Tabs)
 - Classificação automática: MVP, Constante, Oscilante, Destaque, Em Evolução, Reserva
 - Composição sugerida (melhor time por score combinado)
 - Insights IA táticos (prompt especializado em escalação)
+- **✅ Campo Piloto**: Cada personagem pode ter um `pilot_name` associado (pessoa real)
+- **✅ Importação de Lista de Pilotos**: Na Escalação, importar lista de pilotos disponíveis (TXT/Excel/textarea) para filtrar formação por disponibilidade
 
 ## Arquivos
 
