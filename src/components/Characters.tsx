@@ -668,6 +668,16 @@ export const Characters = () => {
                         disabled={submitting}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="pilot_name">Piloto</Label>
+                      <Input
+                        id="pilot_name"
+                        value={formData.pilot_name}
+                        onChange={(e) => setFormData({ ...formData, pilot_name: e.target.value })}
+                        placeholder="Nome do piloto (pessoa real)"
+                        disabled={submitting}
+                      />
+                    </div>
                   </div>
                   <DialogFooter>
                     <Button type="submit" disabled={submitting}>
