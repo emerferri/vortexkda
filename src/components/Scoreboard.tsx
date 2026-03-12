@@ -36,7 +36,10 @@ export const Scoreboard = ({ players, bossLabel, killLogs = [], eventType = 'bos
   const navigate = useNavigate();
 
   const sortedPlayers = useMemo(() => {
-    return [...players].sort((a, b) => b[sortBy] - a[sortBy]);
+    return [...players].sort((a, b) => {
+      if (sortBy === 'score') return calcScore(b) - calcScore(a);
+      return b[sortBy] - a[sortBy];
+    });
   }, [players, sortBy]);
 
   const topPlayer = sortedPlayers[0];
