@@ -234,6 +234,7 @@ export const TeamBuilder = ({ filters }: Props) => {
         }
 
         const charInfo = charMap.get(name);
+        const pilotName = charInfo?.pilot_name || '';
 
         if (allMatchIds.size > 0) {
           stats.push({
@@ -250,6 +251,8 @@ export const TeamBuilder = ({ filters }: Props) => {
             classification: '', // filled after avg calc
             perMatchKDAs,
             recentKDA,
+            pilotName,
+            pilotStatus: 'none', // will be updated when pilot list is active
           });
         }
       }
