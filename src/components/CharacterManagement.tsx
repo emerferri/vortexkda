@@ -41,7 +41,7 @@ export const CharacterManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCharacter, setEditingCharacter] = useState<Character | null>(null);
-  const [formData, setFormData] = useState({ name: '', guild: '', class: '' });
+  const [formData, setFormData] = useState({ name: '', guild: '', class: '', pilot_name: '' });
 
   useEffect(() => {
     fetchCharacters();
