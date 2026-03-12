@@ -216,9 +216,10 @@ export const CharacterManagement = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Assassino</TableHead>
-                  <TableHead>Guild</TableHead>
-                  <TableHead>Classe</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
+                   <TableHead>Piloto</TableHead>
+                   <TableHead>Guild</TableHead>
+                   <TableHead>Classe</TableHead>
+                   <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
