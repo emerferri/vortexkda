@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trophy, Skull, Crosshair, TrendingUp, FileSpreadsheet, Image, Database } from 'lucide-react';
+import { Trophy, Skull, Crosshair, TrendingUp, FileSpreadsheet, Image, Database, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import * as XLSX from 'xlsx';
