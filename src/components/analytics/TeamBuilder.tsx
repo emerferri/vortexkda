@@ -99,10 +99,12 @@ export const TeamBuilder = ({ filters }: Props) => {
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsights, setAiInsights] = useState('');
+  const [allCharacters, setAllCharacters] = useState<CharacterInfo[]>([]);
 
-  // Use filters from parent
-  const eventType = filters.eventType === 'all' ? 'all' : filters.eventType;
-  const guild = filters.guild || '';
+  // Pilot list import state
+  const [pilotListText, setPilotListText] = useState('');
+  const [importedPilots, setImportedPilots] = useState<string[]>([]);
+  const [pilotFilterActive, setPilotFilterActive] = useState(false);
 
   // Analyze guild when selected
   useEffect(() => {
