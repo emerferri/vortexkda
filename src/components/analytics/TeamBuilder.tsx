@@ -502,12 +502,112 @@ export const TeamBuilder = ({ filters }: Props) => {
 
       {!loading && guild && members.length > 0 && (
         <>
+          {/* Pilot Import Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-primary" />
+                Lista de Pilotos Disponíveis
+                {pilotFilterActive && (
+                  <Badge variant="default" className="ml-2 gap-1">
+                    <UserCheck className="w-3 h-3" />
+                    {importedPilots.length} pilotos
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Importe a lista de pilotos disponíveis para o evento. O sistema cruzará com os personagens cadastrados e sugerirá a formação apenas com pilotos presentes.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Textarea
+                    placeholder="Cole os nomes dos pilotos (um por linha)..."
+                    value={pilotListText}
+                    onChange={(e) => setPilotListText(e.target.value)}
+                    rows={6}
+                    className="font-mono text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <Button onClick={handleImportPilotList} size="sm" className="gap-1">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Aplicar Lista
+                    </Button>
+                    <label className="cursor-pointer">
+                      <Button variant="outline" size="sm" asChild className="gap-1">
+                        <span>
+                          <Upload className="w-4 h-4" />
+                          Importar Arquivo
+                        </span>
+                      </Button>
+                      <input type="file" accept=".txt,.csv,.xlsx,.xls" onChange={handlePilotFileUpload} className="hidden" />
+                    </label>
+                    {pilotFilterActive && (
+                      <Button variant="ghost" size="sm" onClick={clearPilotFilter} className="gap-1 text-destructive">
+                        <XCircle className="w-4 h-4" />
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Pilot cross-reference results */}
+                {pilotFilterActive && pilotAvailability && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-muted/50 rounded-lg p-3 text-center">
+                        <p className="text-xl font-bold text-primary">{pilotAvailability.availableChars.length}</p>
+                        <p className="text-xs text-muted-foreground">Disponíveis</p>
+                      </div>
+                      <div className="bg-muted/50 rounded-lg p-3 text-center">
+                        <p className="text-xl font-bold text-destructive">{pilotAvailability.orphanPilots.length}</p>
+                        <p className="text-xs text-muted-foreground">Sem personagem</p>
+                      </div>
+                      <div className="bg-muted/50 rounded-lg p-3 text-center">
+                        <p className="text-xl font-bold text-muted-foreground">{pilotAvailability.noPilotChars.length}</p>
+                        <p className="text-xs text-muted-foreground">Sem piloto</p>
+                      </div>
+                    </div>
+
+                    {pilotAvailability.orphanPilots.length > 0 && (
+                      <div className="border border-destructive/30 rounded-lg p-3 bg-destructive/5">
+                        <p className="text-xs font-medium text-destructive mb-1 flex items-center gap-1">
+                          <UserX className="w-3 h-3" /> Pilotos sem personagem cadastrado:
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {pilotAvailability.orphanPilots.map(p => (
+                            <Badge key={p} variant="outline" className="text-xs">{p}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {pilotAvailability.noPilotChars.length > 0 && (
+                      <div className="border border-border rounded-lg p-3 bg-muted/30">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Personagens sem piloto definido:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {pilotAvailability.noPilotChars.slice(0, 20).map(c => (
+                            <Badge key={c.name} variant="outline" className="text-xs">{c.name}</Badge>
+                          ))}
+                          {pilotAvailability.noPilotChars.length > 20 && (
+                            <Badge variant="outline" className="text-xs">+{pilotAvailability.noPilotChars.length - 20} mais</Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Members Table */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Users className="w-5 h-5 text-primary" />
-                Membros de {guild} ({members.length})
+                {pilotFilterActive ? `Membros Disponíveis de ${guild} (${effectiveMembers.length}/${members.length})` : `Membros de ${guild} (${members.length})`}
               </CardTitle>
             </CardHeader>
             <CardContent>
