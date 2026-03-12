@@ -96,11 +96,13 @@ const TEAM_SIZE: Record<string, number> = {
 export const TeamBuilder = ({ filters }: Props) => {
   const [guild, setGuild] = useState<string>('');
   const [guilds, setGuilds] = useState<string[]>([]);
-  const [eventType, setEventType] = useState<string>('all');
   const [members, setMembers] = useState<MemberStats[]>([]);
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsights, setAiInsights] = useState('');
+
+  // Use event type from parent filters
+  const eventType = filters.eventType === 'all' ? 'all' : filters.eventType;
 
   // Load guild list
   useEffect(() => {
@@ -110,20 +112,6 @@ export const TeamBuilder = ({ filters }: Props) => {
     });
   }, []);
 
-  // Load available event types dynamically
-  const [eventOptions, setEventOptions] = useState(EVENT_OPTIONS);
-  useEffect(() => {
-    supabase.from('pvp_matches').select('event_type').then(({ data }) => {
-      if (!data) return;
-      const types = [...new Set(data.map(d => d.event_type))].sort();
-      const opts = [{ value: 'all', label: 'Todos os Eventos' }];
-      for (const t of types) {
-        const existing = EVENT_OPTIONS.find(e => e.value === t);
-        opts.push(existing || { value: t, label: t });
-      }
-      setEventOptions(opts);
-    });
-  }, []);
 
   // Analyze guild when selected
   useEffect(() => {
@@ -436,7 +424,7 @@ export const TeamBuilder = ({ filters }: Props) => {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Selecione uma guild e o tipo de evento para analisar o desempenho individual dos membros e montar a melhor formação.
+            Selecione uma guild para analisar o desempenho individual dos membros e montar a melhor formação. Use os filtros superiores para definir período e tipo de evento.
           </p>
           <div className="flex flex-wrap gap-3">
             <Select value={guild} onValueChange={setGuild}>
@@ -446,16 +434,6 @@ export const TeamBuilder = ({ filters }: Props) => {
               <SelectContent>
                 {guilds.map(g => (
                   <SelectItem key={g} value={g}>{g}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={eventType} onValueChange={setEventType}>
-              <SelectTrigger className="w-full max-w-xs">
-                <SelectValue placeholder="Tipo de evento" />
-              </SelectTrigger>
-              <SelectContent>
-                {eventOptions.map(e => (
-                  <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
