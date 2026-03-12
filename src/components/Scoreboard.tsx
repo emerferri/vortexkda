@@ -345,6 +345,12 @@ export const Scoreboard = ({ players, bossLabel, killLogs = [], eventType = 'bos
                     KDA
                   </div>
                 </th>
+                <th className="px-6 py-4 text-center text-sm font-bold text-primary uppercase tracking-wider">
+                  <div className="flex items-center justify-center gap-2">
+                    <Star className="w-4 h-4" />
+                    Pontuação
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
