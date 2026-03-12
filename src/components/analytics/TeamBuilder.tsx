@@ -1,15 +1,17 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Brain, Loader2, Shield, TrendingUp, TrendingDown, Minus, Star, Users, Target, AlertTriangle, ArrowUpRight } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Brain, Loader2, Shield, TrendingUp, TrendingDown, Minus, Star, Users, Target, AlertTriangle, ArrowUpRight, Upload, ClipboardList, CheckCircle2, XCircle, UserCheck, UserX } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   AnalyticsFilters, fetchMatchesWithType, fetchKillLogsForMatches,
   fetchAllCharacters, buildCharacterMap, filterBanned, MatchWithType, CharacterInfo
 } from '@/hooks/useAnalyticsData';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 
 interface Props {
   filters: AnalyticsFilters;
@@ -97,6 +99,12 @@ export const TeamBuilder = ({ filters }: Props) => {
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsights, setAiInsights] = useState('');
+  const [allCharacters, setAllCharacters] = useState<CharacterInfo[]>([]);
+
+  // Pilot list import state
+  const [pilotListText, setPilotListText] = useState('');
+  const [importedPilots, setImportedPilots] = useState<string[]>([]);
+  const [pilotFilterActive, setPilotFilterActive] = useState(false);
 
   // Use filters from parent
   const eventType = filters.eventType === 'all' ? 'all' : filters.eventType;
@@ -104,7 +112,7 @@ export const TeamBuilder = ({ filters }: Props) => {
 
   // Analyze guild when selected
   useEffect(() => {
-    if (!guild) { setMembers([]); return; }
+    if (!guild) { setMembers([]); setAllCharacters([]); return; }
     analyzeGuild();
   }, [guild, filters, eventType]);
 
@@ -117,6 +125,7 @@ export const TeamBuilder = ({ filters }: Props) => {
       ]);
       const matches = eventType === 'all' ? allMatches : allMatches.filter(m => m.event_type === eventType);
       const charMap = buildCharacterMap(characters);
+      setAllCharacters(characters);
       const matchIds = matches.map(m => m.id);
       let logs = await fetchKillLogsForMatches(matchIds);
       logs = filterBanned(logs, charMap);
@@ -257,6 +266,72 @@ export const TeamBuilder = ({ filters }: Props) => {
     }
   };
 
+  // Pilot import helpers
+  const normalizePilotName = (name: string) => name.trim().toLowerCase();
+
+  const handleImportPilotList = () => {
+    const lines = pilotListText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) { toast.error('Cole ao menos um nome de piloto'); return; }
+    setImportedPilots(lines);
+    setPilotFilterActive(true);
+    toast.success(`${lines.length} pilotos importados`);
+  };
+
+  const handlePilotFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext === 'xlsx' || ext === 'xls') {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const wb = XLSX.read(ev.target?.result, { type: 'binary' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet);
+        const names = rows.map(r => {
+          const normRow: Record<string, any> = {};
+          for (const k of Object.keys(r)) normRow[k.toLowerCase().trim()] = r[k];
+          return String(normRow['piloto'] || normRow['pilot'] || normRow['nome'] || normRow['name'] || Object.values(r)[0] || '').trim();
+        }).filter(Boolean);
+        setImportedPilots(names);
+        setPilotFilterActive(true);
+        setPilotListText(names.join('\n'));
+        toast.success(`${names.length} pilotos importados do arquivo`);
+      };
+      reader.readAsBinaryString(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const content = ev.target?.result as string;
+        const names = content.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        setImportedPilots(names);
+        setPilotFilterActive(true);
+        setPilotListText(names.join('\n'));
+        toast.success(`${names.length} pilotos importados do arquivo`);
+      };
+      reader.readAsText(file);
+    }
+    e.target.value = '';
+  };
+
+  const clearPilotFilter = () => {
+    setImportedPilots([]);
+    setPilotFilterActive(false);
+    setPilotListText('');
+  };
+
+  // Build pilot availability map
+  const pilotAvailability = useMemo(() => {
+    if (!pilotFilterActive || importedPilots.length === 0) return null;
+    const guildChars = allCharacters.filter(c => c.guild === guild && !c.banned);
+    const pilotSet = new Set(importedPilots.map(normalizePilotName));
+    const availableChars = guildChars.filter(c => c.pilot_name && pilotSet.has(normalizePilotName(c.pilot_name)));
+    const availableCharNames = new Set(availableChars.map(c => c.name));
+    const noPilotChars = guildChars.filter(c => !c.pilot_name);
+    const assignedPilots = new Set(guildChars.filter(c => c.pilot_name).map(c => normalizePilotName(c.pilot_name)));
+    const orphanPilots = importedPilots.filter(p => !assignedPilots.has(normalizePilotName(p)));
+    return { availableCharNames, noPilotChars, orphanPilots, availableChars };
+  }, [pilotFilterActive, importedPilots, allCharacters, guild]);
+
   // Score helper
   const scorePlayer = (m: MemberStats) => ({
     ...m,
@@ -265,10 +340,17 @@ export const TeamBuilder = ({ filters }: Props) => {
 
   type ScoredMember = MemberStats & { score: number };
 
+  // Filter members by available pilots
+  const effectiveMembers = useMemo(() => {
+    if (!pilotFilterActive || !pilotAvailability) return members;
+    return members.filter(m => pilotAvailability.availableCharNames.has(m.name));
+  }, [members, pilotFilterActive, pilotAvailability]);
+
   // Suggested composition: best players per class
   const suggestedTeam = useMemo(() => {
-    if (members.length === 0) return [];
-    const scored = members
+    const pool = pilotFilterActive ? effectiveMembers : members;
+    if (pool.length === 0) return [];
+    const scored = pool
       .filter(m => m.classification !== 'Reserva')
       .map(scorePlayer)
       .sort((a, b) => b.score - a.score);
@@ -290,14 +372,15 @@ export const TeamBuilder = ({ filters }: Props) => {
     }
 
     return team.slice(0, maxSize);
-  }, [members, eventType]);
+  }, [effectiveMembers, members, eventType, pilotFilterActive]);
 
   // Arka War composition: 4 parties of 5, each must have 1 Darkness Wizard
   // 2 EE total: 1 in a party, 1 reserve (outside)
   const arkaWarParties = useMemo(() => {
-    if (members.length === 0 || eventType !== 'arka_war') return null;
+    const pool = pilotFilterActive ? effectiveMembers : members;
+    if (pool.length === 0 || eventType !== 'arka_war') return null;
 
-    const scored = members
+    const scored = pool
       .filter(m => m.classification !== 'Reserva')
       .map(scorePlayer)
       .sort((a, b) => b.score - a.score);
@@ -420,12 +503,112 @@ export const TeamBuilder = ({ filters }: Props) => {
 
       {!loading && guild && members.length > 0 && (
         <>
+          {/* Pilot Import Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-primary" />
+                Lista de Pilotos Disponíveis
+                {pilotFilterActive && (
+                  <Badge variant="default" className="ml-2 gap-1">
+                    <UserCheck className="w-3 h-3" />
+                    {importedPilots.length} pilotos
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Importe a lista de pilotos disponíveis para o evento. O sistema cruzará com os personagens cadastrados e sugerirá a formação apenas com pilotos presentes.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Textarea
+                    placeholder="Cole os nomes dos pilotos (um por linha)..."
+                    value={pilotListText}
+                    onChange={(e) => setPilotListText(e.target.value)}
+                    rows={6}
+                    className="font-mono text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <Button onClick={handleImportPilotList} size="sm" className="gap-1">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Aplicar Lista
+                    </Button>
+                    <label className="cursor-pointer">
+                      <Button variant="outline" size="sm" asChild className="gap-1">
+                        <span>
+                          <Upload className="w-4 h-4" />
+                          Importar Arquivo
+                        </span>
+                      </Button>
+                      <input type="file" accept=".txt,.csv,.xlsx,.xls" onChange={handlePilotFileUpload} className="hidden" />
+                    </label>
+                    {pilotFilterActive && (
+                      <Button variant="ghost" size="sm" onClick={clearPilotFilter} className="gap-1 text-destructive">
+                        <XCircle className="w-4 h-4" />
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Pilot cross-reference results */}
+                {pilotFilterActive && pilotAvailability && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-muted/50 rounded-lg p-3 text-center">
+                        <p className="text-xl font-bold text-primary">{pilotAvailability.availableChars.length}</p>
+                        <p className="text-xs text-muted-foreground">Disponíveis</p>
+                      </div>
+                      <div className="bg-muted/50 rounded-lg p-3 text-center">
+                        <p className="text-xl font-bold text-destructive">{pilotAvailability.orphanPilots.length}</p>
+                        <p className="text-xs text-muted-foreground">Sem personagem</p>
+                      </div>
+                      <div className="bg-muted/50 rounded-lg p-3 text-center">
+                        <p className="text-xl font-bold text-muted-foreground">{pilotAvailability.noPilotChars.length}</p>
+                        <p className="text-xs text-muted-foreground">Sem piloto</p>
+                      </div>
+                    </div>
+
+                    {pilotAvailability.orphanPilots.length > 0 && (
+                      <div className="border border-destructive/30 rounded-lg p-3 bg-destructive/5">
+                        <p className="text-xs font-medium text-destructive mb-1 flex items-center gap-1">
+                          <UserX className="w-3 h-3" /> Pilotos sem personagem cadastrado:
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {pilotAvailability.orphanPilots.map(p => (
+                            <Badge key={p} variant="outline" className="text-xs">{p}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {pilotAvailability.noPilotChars.length > 0 && (
+                      <div className="border border-border rounded-lg p-3 bg-muted/30">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Personagens sem piloto definido:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {pilotAvailability.noPilotChars.slice(0, 20).map(c => (
+                            <Badge key={c.name} variant="outline" className="text-xs">{c.name}</Badge>
+                          ))}
+                          {pilotAvailability.noPilotChars.length > 20 && (
+                            <Badge variant="outline" className="text-xs">+{pilotAvailability.noPilotChars.length - 20} mais</Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Members Table */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Users className="w-5 h-5 text-primary" />
-                Membros de {guild} ({members.length})
+                {pilotFilterActive ? `Membros Disponíveis de ${guild} (${effectiveMembers.length}/${members.length})` : `Membros de ${guild} (${members.length})`}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -448,7 +631,7 @@ export const TeamBuilder = ({ filters }: Props) => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {members.map((m, i) => (
+                    {(pilotFilterActive ? effectiveMembers : members).map((m, i) => (
                       <TableRow key={m.name}>
                         <TableCell className="font-medium">{i + 1}</TableCell>
                         <TableCell className="font-semibold">{m.name}</TableCell>

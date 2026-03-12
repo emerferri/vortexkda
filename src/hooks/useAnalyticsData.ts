@@ -23,6 +23,7 @@ export interface CharacterInfo {
   class: string;
   guild: string;
   banned: boolean;
+  pilot_name: string;
 }
 
 export const defaultFilters: AnalyticsFilters = {
@@ -113,7 +114,7 @@ export async function fetchAllCharacters(): Promise<CharacterInfo[]> {
   while (hasMore) {
     const { data, error } = await supabase
       .from('characters')
-      .select('name, class, guild, banned')
+      .select('name, class, guild, banned, pilot_name')
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
     if (error) throw error;

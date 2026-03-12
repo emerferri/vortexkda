@@ -11,6 +11,7 @@ interface CharacterData {
   name: string;
   guild: string;
   class: string;
+  pilot_name: string;
 }
 
 interface ImportSummary {
@@ -86,11 +87,13 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
               const name = normalizedRow['nome'] || normalizedRow['name'] || normalizedRow['personagem'] || '';
               const guild = normalizedRow['guild'] || normalizedRow['guilda'] || '';
               const charClass = normalizedRow['classe'] || normalizedRow['class'] || '';
+              const pilot = normalizedRow['piloto'] || normalizedRow['pilot'] || normalizedRow['pilot_name'] || '';
               
               return {
                 name: String(name).trim(),
                 guild: String(guild).trim(),
                 class: String(charClass).trim(),
+                pilot_name: String(pilot).trim(),
               };
             })
             .filter((c) => c.name.length > 0);
@@ -138,6 +141,7 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
                 name: parts[0],
                 guild: parts[1] || '',
                 class: parts[2] || '',
+                pilot_name: parts[3] || '',
               });
             }
           }
@@ -240,18 +244,16 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
               .maybeSingle();
             
             if (existing) {
-              // Update
               const { error } = await supabase
                 .from('characters')
-                .update({ guild: char.guild, class: char.class })
+                .update({ guild: char.guild, class: char.class, pilot_name: char.pilot_name })
                 .eq('id', existing.id);
               
               if (error) throw error;
             } else {
-              // Insert
               const { error } = await supabase
                 .from('characters')
-                .insert({ name: char.name, guild: char.guild, class: char.class });
+                .insert({ name: char.name, guild: char.guild, class: char.class, pilot_name: char.pilot_name });
               
               if (error) throw error;
             }
@@ -318,9 +320,9 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
           <div className="mt-6 text-left bg-muted/50 rounded-md p-4">
             <p className="text-sm font-medium mb-2">Formato esperado:</p>
             <code className="text-xs block bg-background p-2 rounded">
-              Nome;Guild;Classe<br/>
-              KOMBAT;BADBOYS;Force Emperor<br/>
-              Melisandre;BADBOYS;Endless Summoner
+              Nome;Guild;Classe;Piloto<br/>
+              KOMBAT;BADBOYS;Force Emperor;João<br/>
+              Melisandre;BADBOYS;Endless Summoner;Maria
             </code>
           </div>
         </div>
@@ -353,6 +355,7 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
                   <TableHead>Nome</TableHead>
                   <TableHead>Guild</TableHead>
                   <TableHead>Classe</TableHead>
+                  <TableHead>Piloto</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -376,6 +379,7 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
                       <TableCell className="font-medium">{char.name}</TableCell>
                       <TableCell>{char.guild || '-'}</TableCell>
                       <TableCell>{char.class || '-'}</TableCell>
+                      <TableCell>{char.pilot_name || '-'}</TableCell>
                     </TableRow>
                   );
                 })}

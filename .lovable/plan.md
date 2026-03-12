@@ -1,50 +1,45 @@
 
+# Sistema de Análise de Desempenho PvP - Plano de Implementação
 
-## Plano: Campo "Piloto" nos Personagens + Importação de Lista de Pilotos na Escalação
+## Status: ✅ Implementado
 
-### Contexto
-Cada personagem no jogo é controlado por um "piloto" (pessoa real). Atualmente não há essa associação no sistema. O objetivo é:
-1. Adicionar o campo `pilot_name` na tabela `characters`
-2. Permitir cadastrar/editar o piloto no gerenciamento de personagens e na importação em massa
-3. Na Escalação (Team Builder), permitir importar uma lista de pilotos disponíveis (TXT ou Excel), cruzar com os personagens cadastrados, e sugerir a formação apenas com os pilotos presentes
+## Estrutura de Navegação
 
-### Mudanças Planejadas
-
-#### 1. Migração de Banco de Dados
-- Adicionar coluna `pilot_name TEXT DEFAULT ''` na tabela `characters`
-- Coluna nullable/com default vazio para não quebrar dados existentes
-
-#### 2. CharacterManagement.tsx — Formulário de cadastro/edição
-- Adicionar campo "Piloto" no formulário (dialog)
-- Adicionar coluna "Piloto" na tabela de listagem
-- Atualizar schema zod e lógica de insert/update para incluir `pilot_name`
-
-#### 3. CharacterImport.tsx — Importação em massa
-- Aceitar coluna "Piloto" / "Pilot" no Excel/TXT/CSV
-- Incluir `pilot_name` no upsert durante importação
-
-#### 4. TeamBuilder.tsx — Importação de lista de pilotos disponíveis
-- Adicionar área de importação de lista (textarea para colar nomes ou upload de arquivo TXT/Excel)
-- A lista contém apenas nomes dos pilotos disponíveis para o evento
-- Ao importar, o sistema cruza `pilot_name` dos personagens da guild selecionada com a lista
-- Personagens cujo piloto está na lista são marcados como "Disponível"
-- A sugestão de formação considera apenas personagens com piloto disponível
-- Pilotos da lista sem personagem associado são mostrados como "Sem personagem cadastrado"
-- Personagens sem piloto definido são sinalizados
-
-#### 5. Fluxo do Usuário na Escalação
 ```text
-1. Seleciona guild no filtro superior
-2. Cola/importa lista de pilotos disponíveis
-3. Sistema cruza pilotos ↔ personagens
-4. Mostra: pilotos disponíveis com seus chars, pilotos sem char, chars sem piloto
-5. Gera formação sugerida apenas com pilotos disponíveis
+Sidebar
+└── 📊 Análise PvP  [requiresAdmin: true]
+
+Dashboard (sub-abas internas via Tabs)
+├── Players      → Stats individuais + busca por nome
+├── Guilds       → Stats por guild + ranking interno
+├── PvP Direto   → Player vs Player / Guild vs Guild
+├── Classes      → Eficiência, dominância, matriz, meta
+├── Gráficos     → Evolução temporal (kills/dia, KDA)
+├── Escalação    → Team Builder com métricas avançadas por membro
+└── Insights IA  → Análise automática via Lovable AI
 ```
 
-### Arquivos Afetados
-- **Migração SQL**: nova coluna `pilot_name` em `characters`
-- `src/components/CharacterManagement.tsx`: campo piloto no CRUD
-- `src/components/CharacterImport.tsx`: coluna piloto na importação em massa
-- `src/components/analytics/TeamBuilder.tsx`: importação de lista + cruzamento + formação filtrada
-- `src/hooks/useAnalyticsData.ts`: incluir `pilot_name` no `CharacterInfo` e `fetchAllCharacters`
+## Módulo Escalação & Team Builder
 
+- Seleção de guild → tabela de membros com: Kills, Deaths, KDA, Participação%, Consistência (desvio padrão), Melhor/Pior evento, Tendência
+- Classificação automática: MVP, Constante, Oscilante, Destaque, Em Evolução, Reserva
+- Composição sugerida (melhor time por score combinado)
+- Insights IA táticos (prompt especializado em escalação)
+- **✅ Campo Piloto**: Cada personagem pode ter um `pilot_name` associado (pessoa real)
+- **✅ Importação de Lista de Pilotos**: Na Escalação, importar lista de pilotos disponíveis (TXT/Excel/textarea) para filtrar formação por disponibilidade
+
+## Arquivos
+
+| Arquivo |
+|---------|
+| `src/hooks/useAnalyticsData.ts` |
+| `src/components/analytics/PvPAnalyticsDashboard.tsx` |
+| `src/components/analytics/AnalyticsFilters.tsx` |
+| `src/components/analytics/PlayerAnalytics.tsx` |
+| `src/components/analytics/GuildAnalytics.tsx` |
+| `src/components/analytics/DirectCombat.tsx` |
+| `src/components/analytics/ClassAnalytics.tsx` |
+| `src/components/analytics/AnalyticsCharts.tsx` |
+| `src/components/analytics/AIInsights.tsx` |
+| `src/components/analytics/TeamBuilder.tsx` |
+| `supabase/functions/pvp-ai-insights/index.ts` |

@@ -14,6 +14,7 @@ const characterSchema = z.object({
   name: z.string().trim().min(1, 'Nome é obrigatório').max(50, 'Nome deve ter no máximo 50 caracteres'),
   guild: z.string().trim().min(1, 'Guild é obrigatória').max(50, 'Guild deve ter no máximo 50 caracteres'),
   class: z.string().trim().min(1, 'Classe é obrigatória').max(50, 'Classe deve ter no máximo 50 caracteres'),
+  pilot_name: z.string().trim().max(50, 'Piloto deve ter no máximo 50 caracteres').default(''),
 });
 import {
   Dialog,
@@ -29,6 +30,7 @@ interface Character {
   name: string;
   guild: string;
   class: string;
+  pilot_name: string;
   created_at: string;
   banned: boolean;
 }
@@ -39,7 +41,7 @@ export const CharacterManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCharacter, setEditingCharacter] = useState<Character | null>(null);
-  const [formData, setFormData] = useState({ name: '', guild: '', class: '' });
+  const [formData, setFormData] = useState({ name: '', guild: '', class: '', pilot_name: '' });
 
   useEffect(() => {
     fetchCharacters();
@@ -83,6 +85,7 @@ export const CharacterManagement = () => {
             name: validatedData.name,
             guild: validatedData.guild,
             class: validatedData.class,
+            pilot_name: validatedData.pilot_name,
           })
           .eq('id', editingCharacter.id);
 
@@ -96,6 +99,7 @@ export const CharacterManagement = () => {
               name: validatedData.name,
               guild: validatedData.guild,
               class: validatedData.class,
+              pilot_name: validatedData.pilot_name,
             },
           ]);
 
@@ -157,6 +161,7 @@ export const CharacterManagement = () => {
       name: character.name,
       guild: character.guild,
       class: character.class,
+      pilot_name: character.pilot_name || '',
     });
     setIsDialogOpen(true);
   };
@@ -164,7 +169,7 @@ export const CharacterManagement = () => {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingCharacter(null);
-    setFormData({ name: '', guild: '', class: '' });
+    setFormData({ name: '', guild: '', class: '', pilot_name: '' });
   };
 
   const filteredCharacters = characters.filter(
@@ -211,16 +216,17 @@ export const CharacterManagement = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Assassino</TableHead>
-                  <TableHead>Guild</TableHead>
-                  <TableHead>Classe</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
+                   <TableHead>Piloto</TableHead>
+                   <TableHead>Guild</TableHead>
+                   <TableHead>Classe</TableHead>
+                   <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredCharacters.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
                       Nenhum personagem encontrado
                     </TableCell>
                   </TableRow>
@@ -233,8 +239,9 @@ export const CharacterManagement = () => {
                           {char.name}
                         </div>
                       </TableCell>
-                      <TableCell>{char.guild}</TableCell>
-                      <TableCell>{char.class}</TableCell>
+                      <TableCell className="text-muted-foreground">{char.pilot_name || '-'}</TableCell>
+                       <TableCell>{char.guild}</TableCell>
+                       <TableCell>{char.class}</TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-2">
                           <Switch
@@ -320,6 +327,15 @@ export const CharacterManagement = () => {
                   value={formData.class}
                   onChange={(e) => setFormData({ ...formData, class: e.target.value })}
                   required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pilot_name">Piloto</Label>
+                <Input
+                  id="pilot_name"
+                  placeholder="Nome do piloto (pessoa real)"
+                  value={formData.pilot_name}
+                  onChange={(e) => setFormData({ ...formData, pilot_name: e.target.value })}
                 />
               </div>
             </div>
