@@ -23,6 +23,7 @@ export interface CharacterInfo {
   class: string;
   guild: string;
   banned: boolean;
+  pilot_name: string;
 }
 
 export const defaultFilters: AnalyticsFilters = {
