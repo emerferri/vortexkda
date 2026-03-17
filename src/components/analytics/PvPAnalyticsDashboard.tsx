@@ -8,9 +8,8 @@ import { ClassAnalytics } from './ClassAnalytics';
 import { AnalyticsCharts } from './AnalyticsCharts';
 import { AIInsights } from './AIInsights';
 import { TeamBuilder } from './TeamBuilder';
-import { PlayerEventDevelopment } from './PlayerEventDevelopment';
 import { AnalyticsFilters, defaultFilters } from '@/hooks/useAnalyticsData';
-import { BarChart3, Users, Swords, Shield, LineChart, Brain, Target, Activity } from 'lucide-react';
+import { BarChart3, Users, Swords, Shield, LineChart, Brain, Target } from 'lucide-react';
 
 export const PvPAnalyticsDashboard = () => {
   const [filters, setFilters] = useState<AnalyticsFilters>(defaultFilters);
