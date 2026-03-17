@@ -218,6 +218,11 @@ export const PlayerAnalytics = ({ filters }: Props) => {
         </Card>
       )}
 
+      {/* Player Development (Evolution) */}
+      {selectedPlayer && (
+        <PlayerEventDevelopment filters={{ ...filters, playerName: selectedPlayer.name }} />
+      )}
+
       {/* Rankings */}
       <Tabs defaultValue="topKillers">
         <TabsList>

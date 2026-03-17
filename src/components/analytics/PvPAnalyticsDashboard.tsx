@@ -29,12 +29,9 @@ export const PvPAnalyticsDashboard = () => {
       <AnalyticsFiltersBar filters={filters} onChange={setFilters} />
 
       <Tabs defaultValue="players" className="w-full">
-        <TabsList className="grid grid-cols-4 md:grid-cols-8 w-full">
+        <TabsList className="grid grid-cols-4 md:grid-cols-7 w-full">
           <TabsTrigger value="players" className="gap-1 text-xs">
             <Users className="w-3 h-3" /> Players
-          </TabsTrigger>
-          <TabsTrigger value="development" className="gap-1 text-xs">
-            <Activity className="w-3 h-3" /> Evolução
           </TabsTrigger>
           <TabsTrigger value="guilds" className="gap-1 text-xs">
             <Shield className="w-3 h-3" /> Guilds
@@ -58,9 +55,6 @@ export const PvPAnalyticsDashboard = () => {
 
         <TabsContent value="players">
           <PlayerAnalytics filters={filters} />
-        </TabsContent>
-        <TabsContent value="development">
-          <PlayerEventDevelopment filters={filters} />
         </TabsContent>
         <TabsContent value="guilds">
           <GuildAnalytics filters={filters} />
