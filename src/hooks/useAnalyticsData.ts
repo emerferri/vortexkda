@@ -10,6 +10,8 @@ export interface AnalyticsFilters {
   hourTo: number | null;
   eventType: 'boss_event' | 'throne_conquest' | 'arka_war' | 'all';
   guild: string | null;
+  playerClass: string | null;
+  playerName: string | null;
 }
 
 export interface KillLog {
@@ -33,6 +35,8 @@ export const defaultFilters: AnalyticsFilters = {
   hourTo: null,
   eventType: 'all',
   guild: null,
+  playerClass: null,
+  playerName: null,
 };
 
 export async function fetchFilteredMatchIds(filters: AnalyticsFilters): Promise<string[]> {
@@ -154,6 +158,23 @@ export function filterByGuild(logs: KillLog[], guild: string | null, charMap: Ma
     const victim = charMap.get(l.victim_name);
     return killer?.guild === guild || victim?.guild === guild;
   });
+}
+
+export function filterByClass(logs: KillLog[], playerClass: string | null, charMap: Map<string, CharacterInfo>): KillLog[] {
+  if (!playerClass) return logs;
+  return logs.filter(l => {
+    const killer = charMap.get(l.killer_name);
+    const victim = charMap.get(l.victim_name);
+    return killer?.class === playerClass || victim?.class === playerClass;
+  });
+}
+
+export function filterByPlayerName(logs: KillLog[], playerName: string | null): KillLog[] {
+  if (!playerName) return logs;
+  const lower = playerName.toLowerCase();
+  return logs.filter(l =>
+    l.killer_name.toLowerCase().includes(lower) || l.victim_name.toLowerCase().includes(lower)
+  );
 }
 
 export interface MatchWithType {

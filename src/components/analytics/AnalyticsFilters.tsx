@@ -13,7 +13,6 @@ interface AnalyticsFiltersProps {
 
 const hours = Array.from({ length: 24 }, (_, i) => i);
 
-// Parse dd/mm/yyyy input to yyyy-mm-dd
 function parseInputDate(value: string): string | null {
   const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (!match) return null;
@@ -23,7 +22,6 @@ function parseInputDate(value: string): string | null {
   return `${year}-${month}-${day}`;
 }
 
-// Format yyyy-mm-dd to dd/mm/yyyy for display
 function formatForDisplay(isoDate: string | null): string {
   if (!isoDate) return '';
   const [y, m, d] = isoDate.split('-');
@@ -32,24 +30,29 @@ function formatForDisplay(isoDate: string | null): string {
 
 export const AnalyticsFiltersBar = ({ filters, onChange }: AnalyticsFiltersProps) => {
   const [guilds, setGuilds] = useState<string[]>([]);
+  const [classes, setClasses] = useState<string[]>([]);
+  const [playerNames, setPlayerNames] = useState<string[]>([]);
   const [dateFromInput, setDateFromInput] = useState(formatForDisplay(filters.dateFrom));
   const [dateToInput, setDateToInput] = useState(formatForDisplay(filters.dateTo));
 
   useEffect(() => {
-    const fetchGuilds = async () => {
+    const fetchOptions = async () => {
       const { data } = await supabase
         .from('characters')
-        .select('guild')
+        .select('guild, class, name')
         .eq('banned', false);
       if (data) {
-        const unique = [...new Set(data.map(c => c.guild).filter(Boolean))].sort();
-        setGuilds(unique);
+        const uniqueGuilds = [...new Set(data.map(c => c.guild).filter(Boolean))].sort();
+        const uniqueClasses = [...new Set(data.map(c => c.class).filter(Boolean))].sort();
+        const uniqueNames = [...new Set(data.map(c => c.name).filter(Boolean))].sort();
+        setGuilds(uniqueGuilds);
+        setClasses(uniqueClasses);
+        setPlayerNames(uniqueNames);
       }
     };
-    fetchGuilds();
+    fetchOptions();
   }, []);
 
-  // Sync inputs when filters change externally (e.g. reset)
   useEffect(() => {
     setDateFromInput(formatForDisplay(filters.dateFrom));
   }, [filters.dateFrom]);
@@ -67,7 +70,6 @@ export const AnalyticsFiltersBar = ({ filters, onChange }: AnalyticsFiltersProps
     if (parsed) {
       onChange({ ...filters, dateFrom: parsed });
     } else {
-      // revert to current filter value
       setDateFromInput(formatForDisplay(filters.dateFrom));
     }
   };
@@ -97,7 +99,6 @@ export const AnalyticsFiltersBar = ({ filters, onChange }: AnalyticsFiltersProps
     <div className="flex flex-wrap items-center gap-3 p-4 bg-card/50 rounded-lg border border-border">
       <Filter className="w-4 h-4 text-muted-foreground" />
 
-      {/* Date From */}
       <Input
         placeholder="Data início (dd/mm/aaaa)"
         value={dateFromInput}
@@ -107,7 +108,6 @@ export const AnalyticsFiltersBar = ({ filters, onChange }: AnalyticsFiltersProps
         className="w-[170px] h-8 text-xs"
       />
 
-      {/* Date To */}
       <Input
         placeholder="Data fim (dd/mm/aaaa)"
         value={dateToInput}
@@ -117,7 +117,6 @@ export const AnalyticsFiltersBar = ({ filters, onChange }: AnalyticsFiltersProps
         className="w-[170px] h-8 text-xs"
       />
 
-      {/* Hour From */}
       <Select
         value={filters.hourFrom !== null ? String(filters.hourFrom) : 'all'}
         onValueChange={(v) => onChange({ ...filters, hourFrom: v === 'all' ? null : Number(v) })}
@@ -133,7 +132,6 @@ export const AnalyticsFiltersBar = ({ filters, onChange }: AnalyticsFiltersProps
         </SelectContent>
       </Select>
 
-      {/* Hour To */}
       <Select
         value={filters.hourTo !== null ? String(filters.hourTo) : 'all'}
         onValueChange={(v) => onChange({ ...filters, hourTo: v === 'all' ? null : Number(v) })}
@@ -149,7 +147,6 @@ export const AnalyticsFiltersBar = ({ filters, onChange }: AnalyticsFiltersProps
         </SelectContent>
       </Select>
 
-      {/* Event Type */}
       <Select
         value={filters.eventType}
         onValueChange={(v) => onChange({ ...filters, eventType: v as FiltersType['eventType'] })}
@@ -165,7 +162,6 @@ export const AnalyticsFiltersBar = ({ filters, onChange }: AnalyticsFiltersProps
         </SelectContent>
       </Select>
 
-      {/* Guild */}
       <Select
         value={filters.guild || 'all'}
         onValueChange={(v) => onChange({ ...filters, guild: v === 'all' ? null : v })}
@@ -177,6 +173,36 @@ export const AnalyticsFiltersBar = ({ filters, onChange }: AnalyticsFiltersProps
           <SelectItem value="all">Todas Guilds</SelectItem>
           {guilds.map(g => (
             <SelectItem key={g} value={g}>{g}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={filters.playerClass || 'all'}
+        onValueChange={(v) => onChange({ ...filters, playerClass: v === 'all' ? null : v })}
+      >
+        <SelectTrigger className="w-[140px] h-8 text-xs">
+          <SelectValue placeholder="Classe" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todas Classes</SelectItem>
+          {classes.map(c => (
+            <SelectItem key={c} value={c}>{c}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={filters.playerName || 'all'}
+        onValueChange={(v) => onChange({ ...filters, playerName: v === 'all' ? null : v })}
+      >
+        <SelectTrigger className="w-[160px] h-8 text-xs">
+          <SelectValue placeholder="Personagem" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos Personagens</SelectItem>
+          {playerNames.map(n => (
+            <SelectItem key={n} value={n}>{n}</SelectItem>
           ))}
         </SelectContent>
       </Select>

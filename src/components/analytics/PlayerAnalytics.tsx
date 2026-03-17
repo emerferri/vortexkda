@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search, Skull, Target, Trophy, Flame, Crosshair, Users } from 'lucide-react';
 import {
   AnalyticsFilters, fetchFilteredMatchIds, fetchKillLogsForMatches,
-  fetchAllCharacters, buildCharacterMap, filterBanned, filterByGuild, KillLog
+  fetchAllCharacters, buildCharacterMap, filterBanned, filterByGuild, filterByClass, KillLog
 } from '@/hooks/useAnalyticsData';
 
 interface Props {
@@ -58,6 +58,7 @@ export const PlayerAnalytics = ({ filters }: Props) => {
       let logs = await fetchKillLogsForMatches(matchIds);
       logs = filterBanned(logs, charMap);
       logs = filterByGuild(logs, filters.guild, charMap);
+      logs = filterByClass(logs, filters.playerClass, charMap);
 
       // First bloods per match
       const firstBloodMap = new Map<string, string>();
