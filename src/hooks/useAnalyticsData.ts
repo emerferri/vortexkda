@@ -10,6 +10,8 @@ export interface AnalyticsFilters {
   hourTo: number | null;
   eventType: 'boss_event' | 'throne_conquest' | 'arka_war' | 'all';
   guild: string | null;
+  playerClass: string | null;
+  playerName: string | null;
 }
 
 export interface KillLog {
