@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search, Skull, Target, Trophy, Flame, Crosshair, Users } from 'lucide-react';
 import {
   AnalyticsFilters, fetchFilteredMatchIds, fetchKillLogsForMatches,
-  fetchAllCharacters, buildCharacterMap, filterBanned, filterByGuild, KillLog
+  fetchAllCharacters, buildCharacterMap, filterBanned, filterByGuild, filterByClass, KillLog
 } from '@/hooks/useAnalyticsData';
 
 interface Props {
