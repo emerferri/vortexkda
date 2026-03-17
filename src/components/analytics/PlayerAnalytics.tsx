@@ -58,6 +58,7 @@ export const PlayerAnalytics = ({ filters }: Props) => {
       let logs = await fetchKillLogsForMatches(matchIds);
       logs = filterBanned(logs, charMap);
       logs = filterByGuild(logs, filters.guild, charMap);
+      logs = filterByClass(logs, filters.playerClass, charMap);
 
       // First bloods per match
       const firstBloodMap = new Map<string, string>();
