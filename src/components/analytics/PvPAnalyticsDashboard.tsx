@@ -8,9 +8,8 @@ import { ClassAnalytics } from './ClassAnalytics';
 import { AnalyticsCharts } from './AnalyticsCharts';
 import { AIInsights } from './AIInsights';
 import { TeamBuilder } from './TeamBuilder';
-import { PlayerEventDevelopment } from './PlayerEventDevelopment';
 import { AnalyticsFilters, defaultFilters } from '@/hooks/useAnalyticsData';
-import { BarChart3, Users, Swords, Shield, LineChart, Brain, Target, Activity } from 'lucide-react';
+import { BarChart3, Users, Swords, Shield, LineChart, Brain, Target } from 'lucide-react';
 
 export const PvPAnalyticsDashboard = () => {
   const [filters, setFilters] = useState<AnalyticsFilters>(defaultFilters);
@@ -30,12 +29,9 @@ export const PvPAnalyticsDashboard = () => {
       <AnalyticsFiltersBar filters={filters} onChange={setFilters} />
 
       <Tabs defaultValue="players" className="w-full">
-        <TabsList className="grid grid-cols-4 md:grid-cols-8 w-full">
+        <TabsList className="grid grid-cols-4 md:grid-cols-7 w-full">
           <TabsTrigger value="players" className="gap-1 text-xs">
             <Users className="w-3 h-3" /> Players
-          </TabsTrigger>
-          <TabsTrigger value="development" className="gap-1 text-xs">
-            <Activity className="w-3 h-3" /> Evolução
           </TabsTrigger>
           <TabsTrigger value="guilds" className="gap-1 text-xs">
             <Shield className="w-3 h-3" /> Guilds
@@ -59,9 +55,6 @@ export const PvPAnalyticsDashboard = () => {
 
         <TabsContent value="players">
           <PlayerAnalytics filters={filters} />
-        </TabsContent>
-        <TabsContent value="development">
-          <PlayerEventDevelopment filters={filters} />
         </TabsContent>
         <TabsContent value="guilds">
           <GuildAnalytics filters={filters} />

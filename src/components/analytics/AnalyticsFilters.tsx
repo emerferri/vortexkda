@@ -192,20 +192,6 @@ export const AnalyticsFiltersBar = ({ filters, onChange }: AnalyticsFiltersProps
         </SelectContent>
       </Select>
 
-      <Select
-        value={filters.playerName || 'all'}
-        onValueChange={(v) => onChange({ ...filters, playerName: v === 'all' ? null : v })}
-      >
-        <SelectTrigger className="w-[160px] h-8 text-xs">
-          <SelectValue placeholder="Personagem" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todos Personagens</SelectItem>
-          {playerNames.map(n => (
-            <SelectItem key={n} value={n}>{n}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
 
       <Button variant="ghost" size="sm" onClick={reset} className="gap-1 text-xs text-muted-foreground">
         <RotateCcw className="w-3 h-3" /> Limpar

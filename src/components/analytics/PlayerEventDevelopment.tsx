@@ -157,14 +157,7 @@ export const PlayerEventDevelopment = ({ filters }: Props) => {
   });
 
   if (!playerName) {
-    return (
-      <Card className="border-dashed border-muted-foreground/30">
-        <CardContent className="py-12 text-center">
-          <User className="w-10 h-10 mx-auto text-muted-foreground/50 mb-3" />
-          <p className="text-muted-foreground">Selecione um personagem nos filtros acima para ver seu desenvolvimento por evento.</p>
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
   if (isLoading) {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import {
   AnalyticsFilters, fetchFilteredMatchIds, fetchKillLogsForMatches,
   fetchAllCharacters, buildCharacterMap, filterBanned, filterByGuild, filterByClass, KillLog
 } from '@/hooks/useAnalyticsData';
+import { PlayerEventDevelopment } from './PlayerEventDevelopment';
 
 interface Props {
   filters: AnalyticsFilters;
@@ -215,6 +216,11 @@ export const PlayerAnalytics = ({ filters }: Props) => {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Player Development (Evolution) */}
+      {selectedPlayer && (
+        <PlayerEventDevelopment filters={{ ...filters, playerName: selectedPlayer.name }} />
       )}
 
       {/* Rankings */}
