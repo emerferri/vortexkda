@@ -160,6 +160,23 @@ export function filterByGuild(logs: KillLog[], guild: string | null, charMap: Ma
   });
 }
 
+export function filterByClass(logs: KillLog[], playerClass: string | null, charMap: Map<string, CharacterInfo>): KillLog[] {
+  if (!playerClass) return logs;
+  return logs.filter(l => {
+    const killer = charMap.get(l.killer_name);
+    const victim = charMap.get(l.victim_name);
+    return killer?.class === playerClass || victim?.class === playerClass;
+  });
+}
+
+export function filterByPlayerName(logs: KillLog[], playerName: string | null): KillLog[] {
+  if (!playerName) return logs;
+  const lower = playerName.toLowerCase();
+  return logs.filter(l =>
+    l.killer_name.toLowerCase().includes(lower) || l.victim_name.toLowerCase().includes(lower)
+  );
+}
+
 export interface MatchWithType {
   id: string;
   event_type: string;
