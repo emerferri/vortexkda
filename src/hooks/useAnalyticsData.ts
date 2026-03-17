@@ -35,6 +35,8 @@ export const defaultFilters: AnalyticsFilters = {
   hourTo: null,
   eventType: 'all',
   guild: null,
+  playerClass: null,
+  playerName: null,
 };
 
 export async function fetchFilteredMatchIds(filters: AnalyticsFilters): Promise<string[]> {
