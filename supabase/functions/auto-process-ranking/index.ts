@@ -121,13 +121,13 @@ function parseExternalDbContentBoss(logs: ExternalLogEntry[]): ParseResult {
   console.log(`[Auto Parser Boss] Processing ${logs.length} logs`);
 
   const killPatternDoubleAsterisks = /:dagger:\s*\*\*(\w+)\*\*\s*matou\s*:skull:\s*\*\*(\w+)\*\*/i;
-  const mapPatternDoubleAsterisks = /\*\*PvP Square\*\*\s*-\s*\*\*\[Server: Boss Event PvP\]\*\*/i;
+  const mapPatternDoubleAsterisks = /\*\*PvP Square\*\*\s*-\s*\*\*\[Server: (?:Boss Event PvP|Platinum PvP)\]\*\*/i;
 
   const killPatternSingleAsterisks = /:dagger:\s*\*(\w+)\*\s*matou\s*:skull:\s*\*(\w+)\*/i;
-  const mapPatternSingleAsterisks = /\*PvP Square\*\s*-\s*\*\[Server: Boss Event PvP\]\*/i;
+  const mapPatternSingleAsterisks = /\*PvP Square\*\s*-\s*\*\[Server: (?:Boss Event PvP|Platinum PvP)\]\*/i;
 
   const killPatternNoAsterisks = /:dagger:\s*(\w+)\s+matou\s+:skull:\s*(\w+)\s+no mapa/i;
-  const mapPatternNoAsterisks = /PvP Square\s*-\s*\[Server: Boss Event PvP\]/i;
+  const mapPatternNoAsterisks = /PvP Square\s*-\s*\[Server: (?:Boss Event PvP|Platinum PvP)\]/i;
 
   const datePattern = /(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/;
 
@@ -306,9 +306,9 @@ function getLastKillMinute(logs: ExternalLogEntry[], eventType: 'boss_event' | '
         /Devias\s*-\s*\[Server: Boss Event PvP\]/i,
       ]
     : [
-        /\*\*PvP Square\*\*\s*-\s*\*\*\[Server: Boss Event PvP\]\*\*/i,
-        /\*PvP Square\*\s*-\s*\*\[Server: Boss Event PvP\]\*/i,
-        /PvP Square\s*-\s*\[Server: Boss Event PvP\]/i,
+        /\*\*PvP Square\*\*\s*-\s*\*\*\[Server: (?:Boss Event PvP|Platinum PvP)\]\*\*/i,
+        /\*PvP Square\*\s*-\s*\*\[Server: (?:Boss Event PvP|Platinum PvP)\]\*/i,
+        /PvP Square\s*-\s*\[Server: (?:Boss Event PvP|Platinum PvP)\]/i,
       ];
   
   // Find the most recent log from the valid map (logs are ordered DESC)
