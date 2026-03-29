@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
       if (mapFilter === 'devias') {
         query = query.ilike('content', '%Devias%[Server: Boss Event PvP]%');
       } else if (mapFilter === 'pvp_square') {
-        query = query.ilike('content', '%PvP Square%[Server: Boss Event PvP]%');
+        query = query.or('content.ilike.%PvP Square%[Server: Boss Event PvP]%,content.ilike.%PvP Square%[Server: Platinum PvP]%');
       }
 
       const { data: logs, error: logsError } = await query;
