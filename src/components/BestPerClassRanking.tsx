@@ -79,17 +79,15 @@ export const BestPerClassRanking = () => {
         displayName: string;
         kills: number;
         deaths: number;
-        kda: number;
         matches: number;
       }>();
 
       for (const p of allPlayers) {
         const key = normalize(p.player_name);
         if (!key) continue;
-        const ex = playerAgg.get(key) || { displayName: p.player_name, kills: 0, deaths: 0, kda: 0, matches: 0 };
+        const ex = playerAgg.get(key) || { displayName: p.player_name, kills: 0, deaths: 0, matches: 0 };
         ex.kills += Number(p.kills);
         ex.deaths += Number(p.deaths);
-        ex.kda += Number(p.kda);
         ex.matches += 1;
         ex.displayName = p.player_name;
         playerAgg.set(key, ex);
@@ -103,13 +101,14 @@ export const BestPerClassRanking = () => {
         const cls = charMap.get(key);
         if (!cls) continue;
 
-        const eventScore = stats.kills * 3 + stats.kda * 2 - stats.deaths * 1.5;
+        const kda = stats.deaths === 0 ? stats.kills : Math.round((stats.kills / stats.deaths) * 100) / 100;
+        const eventScore = stats.kills * 3 + kda * 2 - stats.deaths * 1.5;
         const entry: PlayerClassStats = {
           player_name: stats.displayName,
           className: cls,
           totalKills: stats.kills,
           totalDeaths: stats.deaths,
-          totalKda: stats.kda,
+          totalKda: kda,
           matchCount: stats.matches,
           eventScore,
         };
