@@ -79,17 +79,15 @@ export const BestPerClassRanking = () => {
         displayName: string;
         kills: number;
         deaths: number;
-        kda: number;
         matches: number;
       }>();
 
       for (const p of allPlayers) {
         const key = normalize(p.player_name);
         if (!key) continue;
-        const ex = playerAgg.get(key) || { displayName: p.player_name, kills: 0, deaths: 0, kda: 0, matches: 0 };
+        const ex = playerAgg.get(key) || { displayName: p.player_name, kills: 0, deaths: 0, matches: 0 };
         ex.kills += Number(p.kills);
         ex.deaths += Number(p.deaths);
-        ex.kda += Number(p.kda);
         ex.matches += 1;
         ex.displayName = p.player_name;
         playerAgg.set(key, ex);
