@@ -567,7 +567,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true,
-        playerCount: body.totals.playerCount 
+        playerCount: (body as any).totals?.playerCount || (body as any).totals?.relationCount || 0
       }),
       {
         status: 200,
