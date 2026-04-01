@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Skull, Target, Download, Calendar, Clock } from 'lucide-react';
+import { Loader2, Skull, Target, Download, Calendar, Clock, Send } from 'lucide-react';
 import { EventTypeFilter } from './EventTypeFilter';
 import { toast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
