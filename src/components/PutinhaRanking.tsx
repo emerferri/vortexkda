@@ -273,15 +273,39 @@ export const PutinhaRanking = () => {
               </CardDescription>
             </div>
           </div>
-          <Button
-            onClick={exportAsImage}
-            disabled={exporting || relations.length === 0}
-            variant="outline"
-            size="sm"
-          >
-            <Download className="w-4 h-4" />
-            Exportar
-          </Button>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <>
+                <Button
+                  onClick={() => postToDiscord('homolog')}
+                  disabled={postingDiscord || relations.length === 0}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Send className="w-4 h-4" />
+                  {postingDiscord ? 'Enviando...' : 'Discord HML'}
+                </Button>
+                <Button
+                  onClick={() => postToDiscord('prod')}
+                  disabled={postingDiscord || relations.length === 0}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Send className="w-4 h-4" />
+                  {postingDiscord ? 'Enviando...' : 'Discord Prod'}
+                </Button>
+              </>
+            )}
+            <Button
+              onClick={exportAsImage}
+              disabled={exporting || relations.length === 0}
+              variant="outline"
+              size="sm"
+            >
+              <Download className="w-4 h-4" />
+              Exportar
+            </Button>
+          </div>
         </div>
         
         {/* Date and Hour Filters */}
