@@ -28,7 +28,10 @@ interface PutinhaRelation {
 }
 
 export const PutinhaRanking = () => {
+  const { session } = useAuth();
+  const { isAdmin } = useUserRole();
   const [exporting, setExporting] = useState(false);
+  const [postingDiscord, setPostingDiscord] = useState(false);
   const [eventType, setEventType] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
