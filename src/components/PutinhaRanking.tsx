@@ -164,12 +164,7 @@ export const PutinhaRanking = () => {
           victimGuild: characterMap.get(r.victim),
           killerGuild: characterMap.get(r.killer),
         }))
-        .sort((a, b) => {
-          if (a.killer !== b.killer) {
-            return (killerTotals.get(b.killer) || 0) - (killerTotals.get(a.killer) || 0);
-          }
-          return b.deaths - a.deaths;
-        });
+        .sort((a, b) => b.deaths - a.deaths);
 
       return putinhaRelations;
     }
