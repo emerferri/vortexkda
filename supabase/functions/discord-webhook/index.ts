@@ -312,7 +312,37 @@ serve(async (req) => {
     let embeds: any[];
     const formData = new FormData();
     
-    if (rankingType === 'killstreak') {
+    if (rankingType === 'putinha') {
+      const putinhaBody = body as PutinhaBody;
+      
+      const embed1 = {
+        title: '💀 Ranking: Minha Putinha',
+        description: `Quem morre 10+ vezes para o mesmo jogador\n**${putinhaBody.totals.relationCount}** relações de dominância`,
+        color: 0xEF4444,
+        fields: [
+          {
+            name: '🔍 Filtros Aplicados',
+            value: formatFilters(putinhaBody.filters),
+            inline: false
+          }
+        ],
+        timestamp: new Date().toISOString()
+      };
+
+      const tableText = formatPutinhaTable(putinhaBody.putinhaData);
+      const embed2 = {
+        description: '```\n' + tableText.substring(0, 4000) + '\n```',
+        color: 0xEF4444
+      };
+
+      const frontendUrl = 'https://rankingpvpboss.lovable.app';
+      const embed3 = {
+        description: `🔗 **[Ver ranking completo no site](${frontendUrl}/?tab=putinha)**`,
+        color: 0x9b87f5
+      };
+
+      embeds = [embed1, embed2, embed3];
+    } else if (rankingType === 'killstreak') {
       // Kill streak still uses image
       const killStreakBody = body as KillStreakBody;
       
