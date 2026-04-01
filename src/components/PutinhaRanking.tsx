@@ -202,6 +202,56 @@ export const PutinhaRanking = () => {
     }
   };
 
+  const postToDiscord = async (environment: 'homolog' | 'prod') => {
+    if (relations.length === 0) return;
+    try {
+      setPostingDiscord(true);
+
+      const putinhaData = relations.map((r, i) => ({
+        position: i + 1,
+        killer: r.killer,
+        killerGuild: r.killerGuild || '',
+        victim: r.victim,
+        victimGuild: r.victimGuild || '',
+        deaths: r.deaths,
+        level: r.deaths >= 50 ? 'DEVASTADOR' : r.deaths >= 30 ? 'CRUEL' : r.deaths >= 20 ? 'IMPLACÁVEL' : 'DOMINANTE',
+      }));
+
+      const filters: Record<string, any> = {};
+      if (eventType !== 'all') filters.eventType = eventType;
+      if (debouncedDateFrom) filters.dateFrom = format(debouncedDateFrom, 'yyyy-MM-dd');
+      if (debouncedDateTo) filters.dateTo = format(debouncedDateTo, 'yyyy-MM-dd');
+      if (debouncedHourFrom !== undefined) filters.hourFrom = debouncedHourFrom;
+      if (debouncedHourTo !== undefined) filters.hourTo = debouncedHourTo;
+
+      const { data, error } = await supabaseClient.functions.invoke('discord-webhook', {
+        body: {
+          type: 'putinha',
+          environment,
+          filters,
+          putinhaData,
+          totals: { relationCount: relations.length },
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Sucesso',
+        description: `Ranking postado no Discord (${environment === 'prod' ? 'Produção' : 'Homologação'})!`,
+      });
+    } catch (error: any) {
+      console.error('Error posting to Discord:', error);
+      toast({
+        title: 'Erro',
+        description: error.message || 'Falha ao postar no Discord',
+        variant: 'destructive',
+      });
+    } finally {
+      setPostingDiscord(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
