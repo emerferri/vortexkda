@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Skull, Target, Download, Calendar, Clock } from 'lucide-react';
+import { Loader2, Skull, Target, Download, Calendar, Clock, Send } from 'lucide-react';
 import { EventTypeFilter } from './EventTypeFilter';
 import { toast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
@@ -15,6 +15,9 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { supabase as supabaseClient } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface PutinhaRelation {
   victim: string;
@@ -25,7 +28,10 @@ interface PutinhaRelation {
 }
 
 export const PutinhaRanking = () => {
+  const { session } = useAuth();
+  const { isAdmin } = useUserRole();
   const [exporting, setExporting] = useState(false);
+  const [postingDiscord, setPostingDiscord] = useState(false);
   const [eventType, setEventType] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
@@ -149,12 +155,7 @@ export const PutinhaRanking = () => {
         return true;
       });
 
-      // 6) Map to final format and sort by deaths
-      // Pre-compute total kills per killer for sorting
-      const killerTotals = new Map<string, number>();
-      for (const r of filteredRelations) {
-        killerTotals.set(r.killer, (killerTotals.get(r.killer) || 0) + r.count);
-      }
+      // 6) Map to final format and sort by deaths (level)
 
       const putinhaRelations: PutinhaRelation[] = filteredRelations
         .map((r) => ({
@@ -164,12 +165,7 @@ export const PutinhaRanking = () => {
           victimGuild: characterMap.get(r.victim),
           killerGuild: characterMap.get(r.killer),
         }))
-        .sort((a, b) => {
-          if (a.killer !== b.killer) {
-            return (killerTotals.get(b.killer) || 0) - (killerTotals.get(a.killer) || 0);
-          }
-          return b.deaths - a.deaths;
-        });
+        .sort((a, b) => b.deaths - a.deaths);
 
       return putinhaRelations;
     }
@@ -206,6 +202,56 @@ export const PutinhaRanking = () => {
     }
   };
 
+  const postToDiscord = async (environment: 'homolog' | 'prod') => {
+    if (relations.length === 0) return;
+    try {
+      setPostingDiscord(true);
+
+      const putinhaData = relations.map((r, i) => ({
+        position: i + 1,
+        killer: r.killer,
+        killerGuild: r.killerGuild || '',
+        victim: r.victim,
+        victimGuild: r.victimGuild || '',
+        deaths: r.deaths,
+        level: r.deaths >= 50 ? 'DEVASTADOR' : r.deaths >= 30 ? 'CRUEL' : r.deaths >= 20 ? 'IMPLACÁVEL' : 'DOMINANTE',
+      }));
+
+      const filters: Record<string, any> = {};
+      if (eventType !== 'all') filters.eventType = eventType;
+      if (debouncedDateFrom) filters.dateFrom = format(debouncedDateFrom, 'yyyy-MM-dd');
+      if (debouncedDateTo) filters.dateTo = format(debouncedDateTo, 'yyyy-MM-dd');
+      if (debouncedHourFrom !== undefined) filters.hourFrom = debouncedHourFrom;
+      if (debouncedHourTo !== undefined) filters.hourTo = debouncedHourTo;
+
+      const { data, error } = await supabaseClient.functions.invoke('discord-webhook', {
+        body: {
+          type: 'putinha',
+          environment,
+          filters,
+          putinhaData,
+          totals: { relationCount: relations.length },
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Sucesso',
+        description: `Ranking postado no Discord (${environment === 'prod' ? 'Produção' : 'Homologação'})!`,
+      });
+    } catch (error: any) {
+      console.error('Error posting to Discord:', error);
+      toast({
+        title: 'Erro',
+        description: error.message || 'Falha ao postar no Discord',
+        variant: 'destructive',
+      });
+    } finally {
+      setPostingDiscord(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -227,15 +273,39 @@ export const PutinhaRanking = () => {
               </CardDescription>
             </div>
           </div>
-          <Button
-            onClick={exportAsImage}
-            disabled={exporting || relations.length === 0}
-            variant="outline"
-            size="sm"
-          >
-            <Download className="w-4 h-4" />
-            Exportar
-          </Button>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <>
+                <Button
+                  onClick={() => postToDiscord('homolog')}
+                  disabled={postingDiscord || relations.length === 0}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Send className="w-4 h-4" />
+                  {postingDiscord ? 'Enviando...' : 'Discord HML'}
+                </Button>
+                <Button
+                  onClick={() => postToDiscord('prod')}
+                  disabled={postingDiscord || relations.length === 0}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Send className="w-4 h-4" />
+                  {postingDiscord ? 'Enviando...' : 'Discord Prod'}
+                </Button>
+              </>
+            )}
+            <Button
+              onClick={exportAsImage}
+              disabled={exporting || relations.length === 0}
+              variant="outline"
+              size="sm"
+            >
+              <Download className="w-4 h-4" />
+              Exportar
+            </Button>
+          </div>
         </div>
         
         {/* Date and Hour Filters */}

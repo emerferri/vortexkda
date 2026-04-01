@@ -67,6 +67,24 @@ interface GeneralRankingBody {
   eventType?: 'boss_event' | 'throne_conquest'; // Type of event
 }
 
+interface PutinhaEntry {
+  position: number;
+  killer: string;
+  killerGuild: string;
+  victim: string;
+  victimGuild: string;
+  deaths: number;
+  level: string;
+}
+
+interface PutinhaBody {
+  type: 'putinha';
+  environment: 'homolog' | 'prod';
+  filters: Filters;
+  putinhaData: PutinhaEntry[];
+  totals: { relationCount: number };
+}
+
 interface KillStreakBody {
   type: 'killstreak';
   environment: 'homolog' | 'prod';
@@ -78,7 +96,7 @@ interface KillStreakBody {
   };
 }
 
-type RequestBody = GeneralRankingBody | KillStreakBody;
+type RequestBody = GeneralRankingBody | KillStreakBody | PutinhaBody;
 
 // Format guild ranking as monospaced table for Discord (same as auto-process-ranking)
 function formatGuildRankingTable(guilds: GuildData[]): string {
@@ -144,7 +162,39 @@ function formatRankingTable(players: PlayerData[]): string {
   return table;
 }
 
-// Calculate best kill streak from kill log entries
+// Format putinha ranking as monospaced table for Discord
+function formatPutinhaTable(entries: PutinhaEntry[]): string {
+  if (!entries || entries.length === 0) return 'Nenhuma relação encontrada';
+  
+  const maxKillerLen = Math.max(9, ...entries.map(e => e.killer.length));
+  const maxVictimLen = Math.max(8, ...entries.map(e => e.victim.length));
+  
+  let table = '💀 RANKING MINHA PUTINHA\n';
+  table += '═'.repeat(60) + '\n\n';
+  table += ' Pos  ' + 'Dominador'.padEnd(maxKillerLen + 2) + 'Kills  ' + 'Putinha'.padEnd(maxVictimLen + 2) + 'Nível\n';
+  table += '─'.repeat(60) + '\n';
+  
+  entries.forEach((entry, index) => {
+    const pos = index + 1;
+    let posStr: string;
+    
+    if (pos === 1) posStr = ' 🥇  ';
+    else if (pos === 2) posStr = ' 🥈  ';
+    else if (pos === 3) posStr = ' 🥉  ';
+    else posStr = ` #${pos.toString().padStart(2)} `;
+    
+    const killerStr = entry.killer.padEnd(maxKillerLen + 2);
+    const killsStr = (entry.deaths.toString() + '×').padStart(5) + '  ';
+    const victimStr = entry.victim.padEnd(maxVictimLen + 2);
+    const levelStr = entry.level;
+    
+    table += `${posStr} ${killerStr}${killsStr}${victimStr}${levelStr}\n`;
+  });
+  
+  return table;
+}
+
+
 function calculateBestKillStreakFromLogs(killLogs: KillLogEntry[]): { name: string; streak: number } | null {
   if (!killLogs || killLogs.length === 0) return null;
 
@@ -262,7 +312,37 @@ serve(async (req) => {
     let embeds: any[];
     const formData = new FormData();
     
-    if (rankingType === 'killstreak') {
+    if (rankingType === 'putinha') {
+      const putinhaBody = body as PutinhaBody;
+      
+      const embed1 = {
+        title: '💀 Ranking: Minha Putinha',
+        description: `Quem morre 10+ vezes para o mesmo jogador\n**${putinhaBody.totals.relationCount}** relações de dominância`,
+        color: 0xEF4444,
+        fields: [
+          {
+            name: '🔍 Filtros Aplicados',
+            value: formatFilters(putinhaBody.filters),
+            inline: false
+          }
+        ],
+        timestamp: new Date().toISOString()
+      };
+
+      const tableText = formatPutinhaTable(putinhaBody.putinhaData);
+      const embed2 = {
+        description: '```\n' + tableText.substring(0, 4000) + '\n```',
+        color: 0xEF4444
+      };
+
+      const frontendUrl = 'https://rankingpvpboss.lovable.app';
+      const embed3 = {
+        description: `🔗 **[Ver ranking completo no site](${frontendUrl}/?tab=putinha)**`,
+        color: 0x9b87f5
+      };
+
+      embeds = [embed1, embed2, embed3];
+    } else if (rankingType === 'killstreak') {
       // Kill streak still uses image
       const killStreakBody = body as KillStreakBody;
       
@@ -487,7 +567,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true,
-        playerCount: body.totals.playerCount 
+        playerCount: (body as any).totals?.playerCount || (body as any).totals?.relationCount || 0
       }),
       {
         status: 200,
