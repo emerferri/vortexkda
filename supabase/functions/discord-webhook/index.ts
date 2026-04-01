@@ -162,7 +162,39 @@ function formatRankingTable(players: PlayerData[]): string {
   return table;
 }
 
-// Calculate best kill streak from kill log entries
+// Format putinha ranking as monospaced table for Discord
+function formatPutinhaTable(entries: PutinhaEntry[]): string {
+  if (!entries || entries.length === 0) return 'Nenhuma relação encontrada';
+  
+  const maxKillerLen = Math.max(9, ...entries.map(e => e.killer.length));
+  const maxVictimLen = Math.max(8, ...entries.map(e => e.victim.length));
+  
+  let table = '💀 RANKING MINHA PUTINHA\n';
+  table += '═'.repeat(60) + '\n\n';
+  table += ' Pos  ' + 'Dominador'.padEnd(maxKillerLen + 2) + 'Kills  ' + 'Putinha'.padEnd(maxVictimLen + 2) + 'Nível\n';
+  table += '─'.repeat(60) + '\n';
+  
+  entries.forEach((entry, index) => {
+    const pos = index + 1;
+    let posStr: string;
+    
+    if (pos === 1) posStr = ' 🥇  ';
+    else if (pos === 2) posStr = ' 🥈  ';
+    else if (pos === 3) posStr = ' 🥉  ';
+    else posStr = ` #${pos.toString().padStart(2)} `;
+    
+    const killerStr = entry.killer.padEnd(maxKillerLen + 2);
+    const killsStr = (entry.deaths.toString() + '×').padStart(5) + '  ';
+    const victimStr = entry.victim.padEnd(maxVictimLen + 2);
+    const levelStr = entry.level;
+    
+    table += `${posStr} ${killerStr}${killsStr}${victimStr}${levelStr}\n`;
+  });
+  
+  return table;
+}
+
+
 function calculateBestKillStreakFromLogs(killLogs: KillLogEntry[]): { name: string; streak: number } | null {
   if (!killLogs || killLogs.length === 0) return null;
 
