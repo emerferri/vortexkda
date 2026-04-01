@@ -67,6 +67,24 @@ interface GeneralRankingBody {
   eventType?: 'boss_event' | 'throne_conquest'; // Type of event
 }
 
+interface PutinhaEntry {
+  position: number;
+  killer: string;
+  killerGuild: string;
+  victim: string;
+  victimGuild: string;
+  deaths: number;
+  level: string;
+}
+
+interface PutinhaBody {
+  type: 'putinha';
+  environment: 'homolog' | 'prod';
+  filters: Filters;
+  putinhaData: PutinhaEntry[];
+  totals: { relationCount: number };
+}
+
 interface KillStreakBody {
   type: 'killstreak';
   environment: 'homolog' | 'prod';
@@ -78,7 +96,7 @@ interface KillStreakBody {
   };
 }
 
-type RequestBody = GeneralRankingBody | KillStreakBody;
+type RequestBody = GeneralRankingBody | KillStreakBody | PutinhaBody;
 
 // Format guild ranking as monospaced table for Discord (same as auto-process-ranking)
 function formatGuildRankingTable(guilds: GuildData[]): string {
