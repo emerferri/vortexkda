@@ -152,12 +152,7 @@ export const PutinhaRanking = () => {
         return true;
       });
 
-      // 6) Map to final format and sort by deaths
-      // Pre-compute total kills per killer for sorting
-      const killerTotals = new Map<string, number>();
-      for (const r of filteredRelations) {
-        killerTotals.set(r.killer, (killerTotals.get(r.killer) || 0) + r.count);
-      }
+      // 6) Map to final format and sort by deaths (level)
 
       const putinhaRelations: PutinhaRelation[] = filteredRelations
         .map((r) => ({
