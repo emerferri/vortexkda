@@ -118,6 +118,21 @@ export const RankingGeral = () => {
     }
   });
 
+  const { data: guilds } = useQuery({
+    queryKey: ['guilds-ranking'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('characters')
+        .select('guild')
+        .not('guild', 'is', null);
+      
+      if (error) throw error;
+      
+      const uniqueGuilds = [...new Set(data?.map(c => (c.guild || '').trim()).filter(Boolean))];
+      return uniqueGuilds.sort();
+    }
+  });
+
   // Normalização de classe e opções deduplicadas por chave canônica
   const normalizeClassKey = (s?: string) =>
     (s ?? '')
