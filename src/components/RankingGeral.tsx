@@ -581,6 +581,7 @@ export const RankingGeral = () => {
               setHourFrom(undefined);
               setHourTo(undefined);
               setClassFilter('all');
+              setGuildFilter('all');
             }}
             className="text-sm"
           >
