@@ -489,6 +489,7 @@ export const RankingGeral = () => {
             </Select>
           </div>
 
+          <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-muted-foreground">De:</span>
             <Popover>
               <PopoverTrigger asChild>
