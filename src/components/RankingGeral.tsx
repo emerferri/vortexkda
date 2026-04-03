@@ -473,6 +473,22 @@ export const RankingGeral = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">Guild:</span>
+            <Select value={guildFilter} onValueChange={setGuildFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Todas as guilds" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {guilds?.map((g) => (
+                  <SelectItem key={g} value={g}>
+                    {g}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
             <span className="text-sm font-semibold text-muted-foreground">De:</span>
             <Popover>
               <PopoverTrigger asChild>
