@@ -47,6 +47,7 @@ export const RankingGeral = () => {
   const [debouncedHourFrom, setDebouncedHourFrom] = useState<number>();
   const [debouncedHourTo, setDebouncedHourTo] = useState<number>();
   const [classFilter, setClassFilter] = useState<string>('all');
+  const [guildFilter, setGuildFilter] = useState<string>('all');
   const [showDiscordModal, setShowDiscordModal] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [environment, setEnvironment] = useState<'homolog' | 'prod'>('homolog');
