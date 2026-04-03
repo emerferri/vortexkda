@@ -239,7 +239,7 @@ export const RankingGeral = () => {
     }
     
     return [...filtered].sort((a, b) => b[sortBy] - a[sortBy]);
-  }, [aggregatedData, sortBy, classFilter, debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo]);
+  }, [aggregatedData, sortBy, classFilter, guildFilter, debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo]);
 
   const topPlayer = sortedPlayers[0];
 
