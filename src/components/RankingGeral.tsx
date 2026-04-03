@@ -225,9 +225,15 @@ export const RankingGeral = () => {
     let filtered = base;
 
     if (classFilter !== 'all') {
-      // Filtra por classe E apenas jogadores com atividade (kills > 0 ou deaths > 0)
-      filtered = base.filter(p => 
+      filtered = filtered.filter(p => 
         normalizeClassKey(p.class || '') === classFilter && 
+        (p.kills > 0 || p.deaths > 0)
+      );
+    }
+
+    if (guildFilter !== 'all') {
+      filtered = filtered.filter(p => 
+        (p.guild || '').trim() === guildFilter &&
         (p.kills > 0 || p.deaths > 0)
       );
     }
