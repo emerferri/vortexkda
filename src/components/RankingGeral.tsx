@@ -47,6 +47,7 @@ export const RankingGeral = () => {
   const [debouncedHourFrom, setDebouncedHourFrom] = useState<number>();
   const [debouncedHourTo, setDebouncedHourTo] = useState<number>();
   const [classFilter, setClassFilter] = useState<string>('all');
+  const [guildFilter, setGuildFilter] = useState<string>('all');
   const [showDiscordModal, setShowDiscordModal] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [environment, setEnvironment] = useState<'homolog' | 'prod'>('homolog');
@@ -114,6 +115,21 @@ export const RankingGeral = () => {
       
       const uniqueClasses = [...new Set(data?.map(c => (c.class || '').replace(/\s+/g, ' ').trim()).filter(Boolean))];
       return uniqueClasses.sort();
+    }
+  });
+
+  const { data: guilds } = useQuery({
+    queryKey: ['guilds-ranking'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('characters')
+        .select('guild')
+        .not('guild', 'is', null);
+      
+      if (error) throw error;
+      
+      const uniqueGuilds = [...new Set(data?.map(c => (c.guild || '').trim()).filter(Boolean))];
+      return uniqueGuilds.sort();
     }
   });
 
@@ -209,15 +225,21 @@ export const RankingGeral = () => {
     let filtered = base;
 
     if (classFilter !== 'all') {
-      // Filtra por classe E apenas jogadores com atividade (kills > 0 ou deaths > 0)
-      filtered = base.filter(p => 
+      filtered = filtered.filter(p => 
         normalizeClassKey(p.class || '') === classFilter && 
+        (p.kills > 0 || p.deaths > 0)
+      );
+    }
+
+    if (guildFilter !== 'all') {
+      filtered = filtered.filter(p => 
+        (p.guild || '').trim() === guildFilter &&
         (p.kills > 0 || p.deaths > 0)
       );
     }
     
     return [...filtered].sort((a, b) => b[sortBy] - a[sortBy]);
-  }, [aggregatedData, sortBy, classFilter, debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo]);
+  }, [aggregatedData, sortBy, classFilter, guildFilter, debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo]);
 
   const topPlayer = sortedPlayers[0];
 
@@ -451,6 +473,23 @@ export const RankingGeral = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">Guild:</span>
+            <Select value={guildFilter} onValueChange={setGuildFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Todas as guilds" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {guilds?.map((g) => (
+                  <SelectItem key={g} value={g}>
+                    {g}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-muted-foreground">De:</span>
             <Popover>
               <PopoverTrigger asChild>
@@ -542,6 +581,7 @@ export const RankingGeral = () => {
               setHourFrom(undefined);
               setHourTo(undefined);
               setClassFilter('all');
+              setGuildFilter('all');
             }}
             className="text-sm"
           >
