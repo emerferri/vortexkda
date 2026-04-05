@@ -595,30 +595,15 @@ serve(async (req) => {
           const filteredPlayers = (genBody.playerRanking || []).filter(p => legendsNames.has(p.name));
           
           if (filteredPlayers.length > 0) {
-            const legendsTable = formatRankingTable(filteredPlayers);
+            // Simple list with only player names
+            const namesList = filteredPlayers.map((p, i) => `${i + 1}. ${p.name}`).join('\n');
             
             const legendsEmbeds = [
               {
-                title: '⚔️ Ranking LEGENDS & iLEGENDS',
-                description: `Desempenho dos membros das guilds LEGENDS e iLEGENDS`,
+                title: '⚔️ LEGENDS & iLEGENDS - Jogadores no Evento',
+                description: `${filteredPlayers.length} jogadores participaram\n\n${namesList}`,
                 color: 0xFFD700,
-                fields: [
-                  {
-                    name: '🔍 Filtros Aplicados',
-                    value: formatFilters(genBody.filters),
-                    inline: false
-                  },
-                  {
-                    name: '📈 Totais',
-                    value: `${filteredPlayers.length} jogadores`,
-                    inline: false
-                  }
-                ],
                 timestamp: new Date().toISOString()
-              },
-              {
-                description: '```\n' + legendsTable.substring(0, 4000) + '\n```',
-                color: 0xFFD700
               }
             ];
 
