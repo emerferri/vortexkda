@@ -564,6 +564,88 @@ serve(async (req) => {
 
     console.log('Successfully posted ranking to Discord');
 
+    // After posting general ranking, also post filtered LEGENDS/iLEGENDS ranking
+    if (rankingType === 'general') {
+      const legendsWebhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_LEGENDS');
+      if (legendsWebhookUrl) {
+        try {
+          const genBody = body as GeneralRankingBody;
+          const legendsGuilds = ['LEGENDS', 'iLEGENDS'];
+          
+          // Filter players by guild
+          const legendsPlayers = (genBody.playerRanking || []).filter(p => {
+            // We need guild info - fetch from guildRanking or characters
+            // playerRanking doesn't have guild, so we need to cross-reference
+            return true; // placeholder - will filter below
+          });
+
+          // We need to get guild info for each player from the characters table
+          const serviceClient = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+          );
+          
+          const { data: legendsChars } = await serviceClient
+            .from('characters')
+            .select('name, guild')
+            .in('guild', legendsGuilds);
+          
+          const legendsNames = new Set((legendsChars || []).map(c => c.name));
+          
+          const filteredPlayers = (genBody.playerRanking || []).filter(p => legendsNames.has(p.name));
+          
+          if (filteredPlayers.length > 0) {
+            const legendsTable = formatRankingTable(filteredPlayers);
+            
+            const legendsEmbeds = [
+              {
+                title: '⚔️ Ranking LEGENDS & iLEGENDS',
+                description: `Desempenho dos membros das guilds LEGENDS e iLEGENDS`,
+                color: 0xFFD700,
+                fields: [
+                  {
+                    name: '🔍 Filtros Aplicados',
+                    value: formatFilters(genBody.filters),
+                    inline: false
+                  },
+                  {
+                    name: '📈 Totais',
+                    value: `${filteredPlayers.length} jogadores`,
+                    inline: false
+                  }
+                ],
+                timestamp: new Date().toISOString()
+              },
+              {
+                description: '```\n' + legendsTable.substring(0, 4000) + '\n```',
+                color: 0xFFD700
+              }
+            ];
+
+            const legendsFormData = new FormData();
+            legendsFormData.append('payload_json', JSON.stringify({ embeds: legendsEmbeds }));
+
+            const legendsResponse = await fetch(legendsWebhookUrl, {
+              method: 'POST',
+              body: legendsFormData,
+            });
+
+            if (!legendsResponse.ok) {
+              const errText = await legendsResponse.text();
+              console.error('Discord LEGENDS webhook error:', errText);
+            } else {
+              console.log(`Successfully posted LEGENDS ranking (${filteredPlayers.length} players) to Discord`);
+            }
+          } else {
+            console.log('No LEGENDS/iLEGENDS players found in ranking, skipping legends webhook');
+          }
+        } catch (legendsError: any) {
+          console.error('Error posting LEGENDS ranking:', legendsError.message);
+          // Don't fail the main request
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true,
