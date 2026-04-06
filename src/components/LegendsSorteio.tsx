@@ -189,12 +189,30 @@ export const LegendsSorteio = () => {
               <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Hora De</label>
-              <Input type="number" min={0} max={23} placeholder="0" value={hourFrom} onChange={e => setHourFrom(e.target.value)} />
+              <label className="text-xs text-muted-foreground">Hora Inicial</label>
+              <select
+                value={hourFrom}
+                onChange={e => setHourFrom(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="">Todas</option>
+                {[20, 21, 22].map(h => (
+                  <option key={h} value={h}>{h}:00</option>
+                ))}
+              </select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Hora Até</label>
-              <Input type="number" min={0} max={23} placeholder="23" value={hourTo} onChange={e => setHourTo(e.target.value)} />
+              <label className="text-xs text-muted-foreground">Hora Final</label>
+              <select
+                value={hourTo}
+                onChange={e => setHourTo(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="">Todas</option>
+                {[20, 21, 22].map(h => (
+                  <option key={h} value={h}>{h}:00</option>
+                ))}
+              </select>
             </div>
           </div>
 
