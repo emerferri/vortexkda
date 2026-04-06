@@ -96,7 +96,16 @@ interface KillStreakBody {
   };
 }
 
-type RequestBody = GeneralRankingBody | KillStreakBody | PutinhaBody;
+interface SorteioBody {
+  type: 'sorteio';
+  environment: 'homolog' | 'prod';
+  participants: { name: string; guild: string; matchCount: number }[];
+  winners: { name: string; guild: string }[];
+  filters: Filters;
+  totals: { participantCount: number; prizeCount: number };
+}
+
+type RequestBody = GeneralRankingBody | KillStreakBody | PutinhaBody | SorteioBody;
 
 // Format guild ranking as monospaced table for Discord (same as auto-process-ranking)
 function formatGuildRankingTable(guilds: GuildData[]): string {
