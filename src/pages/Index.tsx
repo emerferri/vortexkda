@@ -135,6 +135,8 @@ const Index = () => {
         return <KillStreakRanking />;
       case 'analytics':
         return <PvPAnalyticsDashboard />;
+      case 'sorteio':
+        return <LegendsSorteio />;
       case 'admin':
         return <DatabaseManager />;
       default:

@@ -35,6 +35,7 @@ const navItems: NavItem[] = [
   { id: 'never-positive', label: 'Nunca Positivo', icon: TrendingDown },
   { id: 'killstreak', label: 'Kill Streak', icon: Swords },
   { id: 'analytics', label: 'Análise PvP', icon: BarChart3, requiresAuth: true },
+  { id: 'sorteio', label: 'Sorteio', icon: Gift, requiresEdit: true },
   { id: 'placar', label: 'Incluir Dados', icon: Swords, requiresAdmin: true },
   { id: 'admin', label: 'Admin', icon: Shield, requiresAdmin: true },
 ];
