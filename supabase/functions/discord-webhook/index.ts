@@ -96,7 +96,16 @@ interface KillStreakBody {
   };
 }
 
-type RequestBody = GeneralRankingBody | KillStreakBody | PutinhaBody;
+interface SorteioBody {
+  type: 'sorteio';
+  environment: 'homolog' | 'prod';
+  participants: { name: string; guild: string; matchCount: number }[];
+  winners: { name: string; guild: string }[];
+  filters: Filters;
+  totals: { participantCount: number; prizeCount: number };
+}
+
+type RequestBody = GeneralRankingBody | KillStreakBody | PutinhaBody | SorteioBody;
 
 // Format guild ranking as monospaced table for Discord (same as auto-process-ranking)
 function formatGuildRankingTable(guilds: GuildData[]): string {
@@ -292,8 +301,10 @@ serve(async (req) => {
     const isThrone = generalBody?.eventType === 'throne_conquest';
     
     let webhookUrl: string | undefined;
-    if (isThrone) {
-      // Throne Conquest uses its own dedicated webhook
+    // Sorteio always uses LEGENDS webhook
+    if (rankingType === 'sorteio') {
+      webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_LEGENDS');
+    } else if (isThrone) {
       webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_THRONE');
     } else if (body.environment === 'prod') {
       webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_PROD');
@@ -302,7 +313,7 @@ serve(async (req) => {
     }
     
     if (!webhookUrl) {
-      const webhookType = isThrone ? 'Throne Conquest' : body.environment;
+      const webhookType = rankingType === 'sorteio' ? 'LEGENDS' : isThrone ? 'Throne Conquest' : body.environment;
       throw new Error(`Webhook URL not configured for ${webhookType}`);
     }
     
@@ -311,8 +322,28 @@ serve(async (req) => {
     // Criar embeds baseado no tipo
     let embeds: any[];
     const formData = new FormData();
-    
-    if (rankingType === 'putinha') {
+    if (rankingType === 'sorteio') {
+      const sorteioBody = body as SorteioBody;
+      const participantList = sorteioBody.participants.map((p, i) => `${i + 1}. ${p.name} (${p.guild}) - ${p.matchCount}x`).join('\n');
+      const winnerList = sorteioBody.winners.map((w, i) => {
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
+        return `${medal} **${w.name}** (${w.guild})`;
+      }).join('\n');
+
+      embeds = [
+        {
+          title: '🎉 Sorteio LEGENDS & iLEGENDS',
+          description: `**${sorteioBody.totals.participantCount}** participantes • **${sorteioBody.totals.prizeCount}** prêmio(s)`,
+          color: 0xFFD700,
+          fields: [
+            { name: '🔍 Filtros', value: formatFilters(sorteioBody.filters), inline: false },
+            { name: '🏆 Ganhadores', value: winnerList, inline: false },
+            { name: '👥 Participantes', value: '```\n' + participantList.substring(0, 1000) + '\n```', inline: false },
+          ],
+          timestamp: new Date().toISOString()
+        }
+      ];
+    } else if (rankingType === 'putinha') {
       const putinhaBody = body as PutinhaBody;
       
       const embed1 = {

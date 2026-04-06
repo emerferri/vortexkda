@@ -15,6 +15,7 @@ import { NeverPositiveKDA } from '@/components/NeverPositiveKDA';
 import { DatabaseManager } from '@/components/DatabaseManager';
 import { PvPAnalyticsDashboard } from '@/components/analytics/PvPAnalyticsDashboard';
 import { RankingArkaWar } from '@/components/RankingArkaWar';
+import { LegendsSorteio } from '@/components/LegendsSorteio';
 import { DatabaseImport } from '@/components/DatabaseImport';
 import { ArkaWarImport } from '@/components/ArkaWarImport';
 import { parseTxtFile, ParseResult } from '@/utils/txtParser';
@@ -134,6 +135,8 @@ const Index = () => {
         return <KillStreakRanking />;
       case 'analytics':
         return <PvPAnalyticsDashboard />;
+      case 'sorteio':
+        return <LegendsSorteio />;
       case 'admin':
         return <DatabaseManager />;
       default:

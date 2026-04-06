@@ -5,8 +5,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import {
   Swords, LogIn, LogOut, User, Crown, Skull, Users,
   Trophy, Target, Flame, Award, Menu, X, Shield,
-  ChevronsLeft, ChevronsRight, Crosshair, TrendingDown, BarChart3,
-
+  ChevronsLeft, ChevronsRight, Crosshair, TrendingDown, BarChart3, Gift,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
@@ -35,6 +34,7 @@ const navItems: NavItem[] = [
   { id: 'never-positive', label: 'Nunca Positivo', icon: TrendingDown },
   { id: 'killstreak', label: 'Kill Streak', icon: Swords },
   { id: 'analytics', label: 'Análise PvP', icon: BarChart3, requiresAuth: true },
+  { id: 'sorteio', label: 'Sorteio', icon: Gift, requiresEdit: true },
   { id: 'placar', label: 'Incluir Dados', icon: Swords, requiresAdmin: true },
   { id: 'admin', label: 'Admin', icon: Shield, requiresAdmin: true },
 ];
