@@ -301,8 +301,10 @@ serve(async (req) => {
     const isThrone = generalBody?.eventType === 'throne_conquest';
     
     let webhookUrl: string | undefined;
-    if (isThrone) {
-      // Throne Conquest uses its own dedicated webhook
+    // Sorteio always uses LEGENDS webhook
+    if (rankingType === 'sorteio') {
+      webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_LEGENDS');
+    } else if (isThrone) {
       webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_THRONE');
     } else if (body.environment === 'prod') {
       webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_PROD');
@@ -311,7 +313,7 @@ serve(async (req) => {
     }
     
     if (!webhookUrl) {
-      const webhookType = isThrone ? 'Throne Conquest' : body.environment;
+      const webhookType = rankingType === 'sorteio' ? 'LEGENDS' : isThrone ? 'Throne Conquest' : body.environment;
       throw new Error(`Webhook URL not configured for ${webhookType}`);
     }
     
