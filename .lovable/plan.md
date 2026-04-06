@@ -1,45 +1,47 @@
 
-# Sistema de Análise de Desempenho PvP - Plano de Implementação
 
-## Status: ✅ Implementado
+## Plano: Sorteador de Prêmios para LEGENDS/iLEGENDS
 
-## Estrutura de Navegação
+### Visão Geral
+Nova aba "Sorteio" no menu lateral, acessível apenas para admin e moderador. Permite filtrar eventos por data/hora, listar participantes das guilds LEGENDS/iLEGENDS, sortear prêmios e postar resultado no webhook LEGENDS.
 
+### Mudanças
+
+#### 1. Nova aba no menu — `src/components/AppSidebar.tsx`
+- Adicionar item `{ id: 'sorteio', label: 'Sorteio', icon: Gift, requiresEdit: true }` (visível para admin/moderador)
+
+#### 2. Rota no Index — `src/pages/Index.tsx`
+- Adicionar case `'sorteio'` no `renderContent()` renderizando o novo componente
+
+#### 3. Novo componente — `src/components/LegendsSorteio.tsx`
+- **Filtros**: Data de/até, hora de/até (mesmos filtros dos outros rankings)
+- **Botão "Buscar Participantes"**: Consulta `pvp_matches` + `pvp_kill_logs` + `characters` para listar jogadores das guilds LEGENDS/iLEGENDS que participaram nos eventos filtrados
+- **Lista de participantes**: Exibe os nomes encontrados com total de participações
+- **Campo "Quantidade de prêmios"**: Input numérico
+- **Botão "Sortear"**: Animação visual de embaralhamento dos nomes, seleciona N ganhadores aleatórios sem repetição, exibe resultado ordenado (1º, 2º, 3º...)
+- **Post automático no Discord**: Ao finalizar o sorteio, chama a edge function `discord-webhook` com tipo `sorteio`, enviando participantes e ganhadores para o `DISCORD_WEBHOOK_URL_LEGENDS`
+
+#### 4. Edge function — `supabase/functions/discord-webhook/index.ts`
+- Novo handler para `type: 'sorteio'`
+- Formata embed com:
+  - Lista de participantes
+  - Lista de ganhadores por ordem de sorteio (🥇 🥈 🥉 + numerados)
+  - Filtros aplicados (período)
+- Posta no `DISCORD_WEBHOOK_URL_LEGENDS`
+
+### Lógica do sorteio
 ```text
-Sidebar
-└── 📊 Análise PvP  [requiresAdmin: true]
-
-Dashboard (sub-abas internas via Tabs)
-├── Players      → Stats individuais + busca por nome
-├── Guilds       → Stats por guild + ranking interno
-├── PvP Direto   → Player vs Player / Guild vs Guild
-├── Classes      → Eficiência, dominância, matriz, meta
-├── Gráficos     → Evolução temporal (kills/dia, KDA)
-├── Escalação    → Team Builder com métricas avançadas por membro
-└── Insights IA  → Análise automática via Lovable AI
+1. Filtra matches por data/hora
+2. Busca kill_logs dos matches filtrados
+3. Cruza killer_name + victim_name com characters onde guild IN ('LEGENDS', 'iLEGENDS')
+4. Lista única de participantes (sem duplicatas)
+5. Ao sortear: shuffle aleatório → seleciona os N primeiros
+6. Exibe resultado com animação → posta no Discord
 ```
 
-## Módulo Escalação & Team Builder
+### Arquivos afetados
+- `src/components/AppSidebar.tsx` — nova aba
+- `src/pages/Index.tsx` — novo case
+- `src/components/LegendsSorteio.tsx` — componente novo
+- `supabase/functions/discord-webhook/index.ts` — handler de sorteio
 
-- Seleção de guild → tabela de membros com: Kills, Deaths, KDA, Participação%, Consistência (desvio padrão), Melhor/Pior evento, Tendência
-- Classificação automática: MVP, Constante, Oscilante, Destaque, Em Evolução, Reserva
-- Composição sugerida (melhor time por score combinado)
-- Insights IA táticos (prompt especializado em escalação)
-- **✅ Campo Piloto**: Cada personagem pode ter um `pilot_name` associado (pessoa real)
-- **✅ Importação de Lista de Pilotos**: Na Escalação, importar lista de pilotos disponíveis (TXT/Excel/textarea) para filtrar formação por disponibilidade
-
-## Arquivos
-
-| Arquivo |
-|---------|
-| `src/hooks/useAnalyticsData.ts` |
-| `src/components/analytics/PvPAnalyticsDashboard.tsx` |
-| `src/components/analytics/AnalyticsFilters.tsx` |
-| `src/components/analytics/PlayerAnalytics.tsx` |
-| `src/components/analytics/GuildAnalytics.tsx` |
-| `src/components/analytics/DirectCombat.tsx` |
-| `src/components/analytics/ClassAnalytics.tsx` |
-| `src/components/analytics/AnalyticsCharts.tsx` |
-| `src/components/analytics/AIInsights.tsx` |
-| `src/components/analytics/TeamBuilder.tsx` |
-| `supabase/functions/pvp-ai-insights/index.ts` |
