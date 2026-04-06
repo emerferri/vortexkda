@@ -322,8 +322,28 @@ serve(async (req) => {
     // Criar embeds baseado no tipo
     let embeds: any[];
     const formData = new FormData();
-    
-    if (rankingType === 'putinha') {
+    if (rankingType === 'sorteio') {
+      const sorteioBody = body as SorteioBody;
+      const participantList = sorteioBody.participants.map((p, i) => `${i + 1}. ${p.name} (${p.guild}) - ${p.matchCount}x`).join('\n');
+      const winnerList = sorteioBody.winners.map((w, i) => {
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
+        return `${medal} **${w.name}** (${w.guild})`;
+      }).join('\n');
+
+      embeds = [
+        {
+          title: '🎉 Sorteio LEGENDS & iLEGENDS',
+          description: `**${sorteioBody.totals.participantCount}** participantes • **${sorteioBody.totals.prizeCount}** prêmio(s)`,
+          color: 0xFFD700,
+          fields: [
+            { name: '🔍 Filtros', value: formatFilters(sorteioBody.filters), inline: false },
+            { name: '🏆 Ganhadores', value: winnerList, inline: false },
+            { name: '👥 Participantes', value: '```\n' + participantList.substring(0, 1000) + '\n```', inline: false },
+          ],
+          timestamp: new Date().toISOString()
+        }
+      ];
+    } else if (rankingType === 'putinha') {
       const putinhaBody = body as PutinhaBody;
       
       const embed1 = {
