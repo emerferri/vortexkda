@@ -59,9 +59,12 @@ export const ConfrontosDiretos = () => {
     debouncedSetFilters(dateFrom, dateTo, hourFrom, hourTo);
   }, [dateFrom, dateTo, hourFrom, hourTo, debouncedSetFilters]);
 
+  const hasDateFilter = !!(debouncedDateFrom || debouncedDateTo);
+
   const { data: killLogs = [], isLoading: loading } = useQuery({
     queryKey: ['confrontos-diretos', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
     staleTime: 30000,
+    enabled: hasDateFilter,
     queryFn: async () => {
       // Buscar lista de personagens banidos
       const { data: bannedChars } = await supabase
@@ -78,7 +81,7 @@ export const ConfrontosDiretos = () => {
       
       const bannedNames = new Set((bannedChars || []).map(c => normalize((c.name || '').trim())));
 
-      // Se houver filtros de data/hora, filtramos pelos match_ids de pvp_matches
+      // Filtramos pelos match_ids de pvp_matches
       const matchFilterActive = !!(debouncedDateFrom || debouncedDateTo || debouncedHourFrom !== undefined || debouncedHourTo !== undefined);
       let matchIds: string[] | undefined = undefined;
 
@@ -215,16 +218,10 @@ export const ConfrontosDiretos = () => {
     );
   }
 
-  if (killLogs.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-muted-foreground">
-            Nenhum confronto registrado. Aguardando dados de partidas.
-          </div>
-        </CardContent>
-      </Card>
-    );
+  if (!hasDateFilter) {
+    // Will render the filters below, but show a message to apply filters first
+  } else if (killLogs.length === 0 && !loading) {
+    // After filtering, no data found — will show message below
   }
 
   return (
