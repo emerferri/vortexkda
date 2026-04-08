@@ -311,10 +311,11 @@ export const ConfrontosDiretos = () => {
                 ))}
               </SelectContent>
             </Select>
+            <EventTypeFilter value={eventType} onChange={setEventType} />
           </div>
 
           {/* Botão para limpar filtros */}
-          {(dateFrom || dateTo || hourFrom !== undefined || hourTo !== undefined) && (
+          {(dateFrom || dateTo || hourFrom !== undefined || hourTo !== undefined || eventType !== 'all') && (
             <Button
               variant="outline"
               size="sm"
@@ -323,10 +324,11 @@ export const ConfrontosDiretos = () => {
                 setDateTo(undefined);
                 setHourFrom(undefined);
                 setHourTo(undefined);
+                setEventType('all');
               }}
             >
               <X className="w-4 h-4 mr-2" />
-              Limpar filtros de data/hora
+              Limpar filtros
             </Button>
           )}
 
