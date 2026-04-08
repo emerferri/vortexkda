@@ -208,22 +208,6 @@ export const ConfrontosDiretos = () => {
 
   const filteredStats = getFilteredStats();
 
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-muted-foreground">Carregando dados...</div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!hasDateFilter) {
-    // Will render the filters below, but show a message to apply filters first
-  } else if (killLogs.length === 0 && !loading) {
-    // After filtering, no data found — will show message below
-  }
-
   return (
     <Card>
       <CardHeader>
