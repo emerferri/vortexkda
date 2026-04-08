@@ -48,19 +48,20 @@ export const ConfrontosDiretos = () => {
 
   // Debounce filter updates
   const debouncedSetFilters = useCallback(
-    debounce((from: Date | undefined, to: Date | undefined, hFrom: number | undefined, hTo: number | undefined) => {
+    debounce((from: Date | undefined, to: Date | undefined, hFrom: number | undefined, hTo: number | undefined, evType: string) => {
       setDebouncedDateFrom(from);
       setDebouncedDateTo(to);
       setDebouncedHourFrom(hFrom);
       setDebouncedHourTo(hTo);
+      setDebouncedEventType(evType);
     }, 500),
     []
   );
 
   // Update debounced values when filters change
   useMemo(() => {
-    debouncedSetFilters(dateFrom, dateTo, hourFrom, hourTo);
-  }, [dateFrom, dateTo, hourFrom, hourTo, debouncedSetFilters]);
+    debouncedSetFilters(dateFrom, dateTo, hourFrom, hourTo, eventType);
+  }, [dateFrom, dateTo, hourFrom, hourTo, eventType, debouncedSetFilters]);
 
   const hasDateFilter = !!(debouncedDateFrom || debouncedDateTo);
 
