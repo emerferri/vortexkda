@@ -59,9 +59,12 @@ export const ConfrontosDiretos = () => {
     debouncedSetFilters(dateFrom, dateTo, hourFrom, hourTo);
   }, [dateFrom, dateTo, hourFrom, hourTo, debouncedSetFilters]);
 
+  const hasDateFilter = !!(debouncedDateFrom || debouncedDateTo);
+
   const { data: killLogs = [], isLoading: loading } = useQuery({
     queryKey: ['confrontos-diretos', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
     staleTime: 30000,
+    enabled: hasDateFilter,
     queryFn: async () => {
       // Buscar lista de personagens banidos
       const { data: bannedChars } = await supabase
@@ -78,7 +81,7 @@ export const ConfrontosDiretos = () => {
       
       const bannedNames = new Set((bannedChars || []).map(c => normalize((c.name || '').trim())));
 
-      // Se houver filtros de data/hora, filtramos pelos match_ids de pvp_matches
+      // Filtramos pelos match_ids de pvp_matches
       const matchFilterActive = !!(debouncedDateFrom || debouncedDateTo || debouncedHourFrom !== undefined || debouncedHourTo !== undefined);
       let matchIds: string[] | undefined = undefined;
 
@@ -204,28 +207,6 @@ export const ConfrontosDiretos = () => {
   };
 
   const filteredStats = getFilteredStats();
-
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-muted-foreground">Carregando dados...</div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (killLogs.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-muted-foreground">
-            Nenhum confronto registrado. Aguardando dados de partidas.
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card>
@@ -383,7 +364,19 @@ export const ConfrontosDiretos = () => {
         </div>
       </CardHeader>
       <CardContent>
-        {filterName && filteredStats.length === 0 ? (
+        {!hasDateFilter ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <CalendarIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p className="text-lg font-semibold mb-2">Selecione um período</p>
+            <p className="text-sm">Aplique um filtro de data acima para carregar os confrontos diretos.</p>
+          </div>
+        ) : loading ? (
+          <div className="text-center py-8 text-muted-foreground">Carregando dados...</div>
+        ) : killLogs.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            Nenhum confronto encontrado para o período selecionado.
+          </div>
+        ) : filterName && filteredStats.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             Nenhum jogador encontrado com o nome "{filterName}"
           </div>
@@ -394,21 +387,18 @@ export const ConfrontosDiretos = () => {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-bold">{stat.playerName}</h3>
                   <div className="flex gap-4 text-sm">
-                    <span className="text-green-600 dark:text-green-400 font-semibold">
+                    <span className="text-success font-semibold">
                       {stat.totalKills} Kills
                     </span>
-                    <span className="text-red-600 dark:text-red-400 font-semibold">
+                    <span className="text-destructive font-semibold">
                       {stat.totalDeaths} Mortes
                     </span>
                   </div>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-4">
-                  {/* Matou */}
                   <div>
-                    <h4 className="font-semibold mb-2 text-sm text-muted-foreground">
-                      Matou:
-                    </h4>
+                    <h4 className="font-semibold mb-2 text-sm text-muted-foreground">Matou:</h4>
                     {stat.victims.size > 0 ? (
                       <Table>
                         <TableHeader>
@@ -423,9 +413,7 @@ export const ConfrontosDiretos = () => {
                             .map(([victim, count]) => (
                               <TableRow key={victim}>
                                 <TableCell>{victim}</TableCell>
-                                <TableCell className="text-right font-semibold">
-                                  {count}x
-                                </TableCell>
+                                <TableCell className="text-right font-semibold">{count}x</TableCell>
                               </TableRow>
                             ))}
                         </TableBody>
@@ -435,11 +423,8 @@ export const ConfrontosDiretos = () => {
                     )}
                   </div>
 
-                  {/* Morreu para */}
                   <div>
-                    <h4 className="font-semibold mb-2 text-sm text-muted-foreground">
-                      Morreu para:
-                    </h4>
+                    <h4 className="font-semibold mb-2 text-sm text-muted-foreground">Morreu para:</h4>
                     {stat.killers.size > 0 ? (
                       <Table>
                         <TableHeader>
@@ -454,9 +439,7 @@ export const ConfrontosDiretos = () => {
                             .map(([killer, count]) => (
                               <TableRow key={killer}>
                                 <TableCell>{killer}</TableCell>
-                                <TableCell className="text-right font-semibold">
-                                  {count}x
-                                </TableCell>
+                                <TableCell className="text-right font-semibold">{count}x</TableCell>
                               </TableRow>
                             ))}
                         </TableBody>

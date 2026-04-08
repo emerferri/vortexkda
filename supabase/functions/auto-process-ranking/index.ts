@@ -559,7 +559,21 @@ Deno.serve(async (req) => {
       page++;
     }
 
-    console.log(`[Auto Process] Fetched ${logs?.length || 0} logs from external database`);
+    // Deduplicate external logs by their id to prevent duplicate kill entries
+    const seenLogIds = new Set<string>();
+    const dedupedLogs: ExternalLogEntry[] = [];
+    for (const log of logs) {
+      if (!seenLogIds.has(log.id)) {
+        seenLogIds.add(log.id);
+        dedupedLogs.push(log);
+      }
+    }
+    if (dedupedLogs.length < logs.length) {
+      console.log(`[Auto Process] Deduplicated external logs: ${logs.length} -> ${dedupedLogs.length}`);
+    }
+    logs = dedupedLogs;
+
+    console.log(`[Auto Process] Fetched ${logs.length} unique logs from external database`);
 
     if (!logs || logs.length === 0) {
       console.log('[Auto Process] No logs found for this time period');

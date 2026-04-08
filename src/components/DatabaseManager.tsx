@@ -37,6 +37,7 @@ export const DatabaseManager = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteDate, setDeleteDate] = useState<Date>();
   const [deleteHour, setDeleteHour] = useState<number>();
+  const [deleteEventType, setDeleteEventType] = useState<string>('');
   const [isDeleting, setIsDeleting] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -71,6 +72,10 @@ export const DatabaseManager = () => {
 
       if (deleteHour !== undefined) {
         query = query.eq('match_hour', deleteHour);
+      }
+
+      if (deleteEventType) {
+        query = query.eq('event_type', deleteEventType);
       }
 
       const { data: matches, error: fetchError } = await query;
@@ -115,6 +120,7 @@ export const DatabaseManager = () => {
       // Resetar filtros e fechar modal
       setDeleteDate(undefined);
       setDeleteHour(undefined);
+      setDeleteEventType('');
       setShowDeleteModal(false);
     } catch (error: any) {
       console.error('Erro ao deletar dados:', error);
@@ -343,6 +349,23 @@ export const DatabaseManager = () => {
                   </p>
                 </div>
 
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">Evento (opcional)</label>
+                  <select
+                    value={deleteEventType}
+                    onChange={(e) => setDeleteEventType(e.target.value)}
+                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="">Todos os eventos</option>
+                    <option value="boss_event">Boss Diário</option>
+                    <option value="throne_conquest">Throne Conquest</option>
+                    <option value="arka_war">Arka War</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Se não selecionar evento, todos os tipos serão deletados
+                  </p>
+                </div>
+
                 {deleteDate && (
                   <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
                     <p className="text-sm font-semibold text-destructive">
@@ -351,6 +374,7 @@ export const DatabaseManager = () => {
                     <p className="text-sm mt-2">
                       📅 {format(deleteDate, "dd/MM/yyyy", { locale: ptBR })}
                       {deleteHour !== undefined && ` às ${deleteHour}:00`}
+                      {deleteEventType && ` | ${deleteEventType === 'boss_event' ? 'Boss Diário' : deleteEventType === 'throne_conquest' ? 'Throne Conquest' : 'Arka War'}`}
                     </p>
                   </div>
                 )}
@@ -360,9 +384,10 @@ export const DatabaseManager = () => {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    setShowDeleteModal(false);
+                  setShowDeleteModal(false);
                     setDeleteDate(undefined);
                     setDeleteHour(undefined);
+                    setDeleteEventType('');
                   }}
                   disabled={isDeleting}
                 >
