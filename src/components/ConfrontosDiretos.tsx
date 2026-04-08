@@ -103,6 +103,7 @@ export const ConfrontosDiretos = () => {
           if (debouncedDateTo) mq = mq.lte('match_date', format(debouncedDateTo, 'yyyy-MM-dd'));
           if (debouncedHourFrom !== undefined) mq = mq.gte('match_hour', debouncedHourFrom);
           if (debouncedHourTo !== undefined) mq = mq.lte('match_hour', debouncedHourTo);
+          if (debouncedEventType && debouncedEventType !== 'all') mq = mq.eq('event_type', debouncedEventType);
           
           const { data: page, error } = await mq.range(from, from + pageSize - 1);
           if (error) throw error;
