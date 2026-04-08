@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
+import { EventTypeFilter } from '@/components/EventTypeFilter';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -34,6 +35,7 @@ interface PlayerStats {
 export const ConfrontosDiretos = () => {
   const [filterName, setFilterName] = useState('');
   const [sortBy, setSortBy] = useState<'killer' | 'victim'>('killer');
+  const [eventType, setEventType] = useState('all');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
@@ -42,27 +44,29 @@ export const ConfrontosDiretos = () => {
   const [debouncedDateTo, setDebouncedDateTo] = useState<Date>();
   const [debouncedHourFrom, setDebouncedHourFrom] = useState<number>();
   const [debouncedHourTo, setDebouncedHourTo] = useState<number>();
+  const [debouncedEventType, setDebouncedEventType] = useState('all');
 
   // Debounce filter updates
   const debouncedSetFilters = useCallback(
-    debounce((from: Date | undefined, to: Date | undefined, hFrom: number | undefined, hTo: number | undefined) => {
+    debounce((from: Date | undefined, to: Date | undefined, hFrom: number | undefined, hTo: number | undefined, evType: string) => {
       setDebouncedDateFrom(from);
       setDebouncedDateTo(to);
       setDebouncedHourFrom(hFrom);
       setDebouncedHourTo(hTo);
+      setDebouncedEventType(evType);
     }, 500),
     []
   );
 
   // Update debounced values when filters change
   useMemo(() => {
-    debouncedSetFilters(dateFrom, dateTo, hourFrom, hourTo);
-  }, [dateFrom, dateTo, hourFrom, hourTo, debouncedSetFilters]);
+    debouncedSetFilters(dateFrom, dateTo, hourFrom, hourTo, eventType);
+  }, [dateFrom, dateTo, hourFrom, hourTo, eventType, debouncedSetFilters]);
 
   const hasDateFilter = !!(debouncedDateFrom || debouncedDateTo);
 
   const { data: killLogs = [], isLoading: loading } = useQuery({
-    queryKey: ['confrontos-diretos', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    queryKey: ['confrontos-diretos', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo, debouncedEventType],
     staleTime: 30000,
     enabled: hasDateFilter,
     queryFn: async () => {
@@ -99,6 +103,7 @@ export const ConfrontosDiretos = () => {
           if (debouncedDateTo) mq = mq.lte('match_date', format(debouncedDateTo, 'yyyy-MM-dd'));
           if (debouncedHourFrom !== undefined) mq = mq.gte('match_hour', debouncedHourFrom);
           if (debouncedHourTo !== undefined) mq = mq.lte('match_hour', debouncedHourTo);
+          if (debouncedEventType && debouncedEventType !== 'all') mq = mq.eq('event_type', debouncedEventType);
           
           const { data: page, error } = await mq.range(from, from + pageSize - 1);
           if (error) throw error;
@@ -306,10 +311,11 @@ export const ConfrontosDiretos = () => {
                 ))}
               </SelectContent>
             </Select>
+            <EventTypeFilter value={eventType} onChange={setEventType} />
           </div>
 
           {/* Botão para limpar filtros */}
-          {(dateFrom || dateTo || hourFrom !== undefined || hourTo !== undefined) && (
+          {(dateFrom || dateTo || hourFrom !== undefined || hourTo !== undefined || eventType !== 'all') && (
             <Button
               variant="outline"
               size="sm"
@@ -318,10 +324,11 @@ export const ConfrontosDiretos = () => {
                 setDateTo(undefined);
                 setHourFrom(undefined);
                 setHourTo(undefined);
+                setEventType('all');
               }}
             >
               <X className="w-4 h-4 mr-2" />
-              Limpar filtros de data/hora
+              Limpar filtros
             </Button>
           )}
 
