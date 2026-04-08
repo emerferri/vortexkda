@@ -35,6 +35,7 @@ interface PlayerStats {
 export const ConfrontosDiretos = () => {
   const [filterName, setFilterName] = useState('');
   const [sortBy, setSortBy] = useState<'killer' | 'victim'>('killer');
+  const [eventType, setEventType] = useState('all');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [hourFrom, setHourFrom] = useState<number>();
@@ -43,6 +44,7 @@ export const ConfrontosDiretos = () => {
   const [debouncedDateTo, setDebouncedDateTo] = useState<Date>();
   const [debouncedHourFrom, setDebouncedHourFrom] = useState<number>();
   const [debouncedHourTo, setDebouncedHourTo] = useState<number>();
+  const [debouncedEventType, setDebouncedEventType] = useState('all');
 
   // Debounce filter updates
   const debouncedSetFilters = useCallback(
