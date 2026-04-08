@@ -66,7 +66,7 @@ export const ConfrontosDiretos = () => {
   const hasDateFilter = !!(debouncedDateFrom || debouncedDateTo);
 
   const { data: killLogs = [], isLoading: loading } = useQuery({
-    queryKey: ['confrontos-diretos', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    queryKey: ['confrontos-diretos', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo, debouncedEventType],
     staleTime: 30000,
     enabled: hasDateFilter,
     queryFn: async () => {
