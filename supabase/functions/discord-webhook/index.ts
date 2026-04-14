@@ -602,9 +602,9 @@ serve(async (req) => {
       };
       
       // Embed with player ranking table (text format)
-      const embed2 = generalBody.playerRanking && generalBody.playerRanking.length > 0
+      const embed2 = enrichedPlayerRanking.length > 0
         ? {
-            description: '```\n' + formatRankingTable(generalBody.playerRanking).substring(0, 4000) + '\n```',
+            description: '```\n' + formatRankingTable(enrichedPlayerRanking).substring(0, 4000) + '\n```',
             color: isThrone ? 0xF59E0B : 0x10B981
           }
         : null;
