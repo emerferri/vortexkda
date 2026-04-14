@@ -497,7 +497,8 @@ export const RankingThroneConquest = () => {
           kills: p.kills,
           deaths: p.deaths,
           kda: p.kda,
-          eventScore: p.eventScore
+          eventScore: p.eventScore,
+          class_short: p.class_short || ''
         })),
         killLogs: aggregatedData?.killLogs || []
       };
