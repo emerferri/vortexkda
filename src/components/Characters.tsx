@@ -679,15 +679,33 @@ export const Characters = () => {
                         disabled={submitting}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="class">Classe</Label>
-                      <Input
-                        id="class"
-                        value={formData.class}
-                        onChange={(e) => setFormData({ ...formData, class: e.target.value })}
-                        required
-                        disabled={submitting}
-                      />
+                    <div className="grid grid-cols-[1fr_auto] gap-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="class">Classe</Label>
+                        <Input
+                          id="class"
+                          value={formData.class}
+                          onChange={(e) => {
+                            const newClass = e.target.value;
+                            const autoShort = CLASS_SHORT_MAP[newClass] || formData.class_short;
+                            setFormData({ ...formData, class: newClass, class_short: autoShort });
+                          }}
+                          required
+                          disabled={submitting}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="class_short">Reduzido</Label>
+                        <Input
+                          id="class_short"
+                          value={formData.class_short}
+                          onChange={(e) => setFormData({ ...formData, class_short: e.target.value.slice(0, 3).toUpperCase() })}
+                          placeholder="Ex: DrK"
+                          maxLength={3}
+                          className="w-20"
+                          disabled={submitting}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="pilot_name">Piloto</Label>
