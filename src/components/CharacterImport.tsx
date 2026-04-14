@@ -102,6 +102,7 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
                 name: String(name).trim(),
                 guild: String(guild).trim(),
                 class: String(charClass).trim(),
+                class_short: CLASS_SHORT_MAP[String(charClass).trim()] || '',
                 pilot_name: String(pilot).trim(),
               };
             })
@@ -150,6 +151,7 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
                 name: parts[0],
                 guild: parts[1] || '',
                 class: parts[2] || '',
+                class_short: CLASS_SHORT_MAP[parts[2]?.trim() || ''] || '',
                 pilot_name: parts[3] || '',
               });
             }
