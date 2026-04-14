@@ -46,13 +46,15 @@ interface RequestBody {
 }
 
 // Format ranking as monospaced table for Discord
-function formatRankingTable(players: Array<{name: string, kills: number, deaths: number, kda: number, eventScore: number}>): string {
+function formatRankingTable(players: Array<{name: string, kills: number, deaths: number, kda: number, eventScore: number, class_short?: string}>): string {
   const maxNameLen = Math.max(7, ...players.map(p => p.name.length));
+  const hasClassShort = players.some(p => p.class_short && p.class_short.trim() !== '');
+  const classColWidth = 5;
   
   let table = '🏆 RANKING PVP\n';
-  table += '═'.repeat(52) + '\n\n';
-  table += ' Pos  ' + 'Jogador'.padEnd(maxNameLen + 2) + '  K    D    KDA     Score\n';
-  table += '─'.repeat(52) + '\n';
+  table += '═'.repeat(hasClassShort ? 57 : 52) + '\n\n';
+  table += ' Pos  ' + 'Jogador'.padEnd(maxNameLen + 2) + (hasClassShort ? 'Sigla' + ' ' : '') + '  K    D    KDA     Score\n';
+  table += '─'.repeat(hasClassShort ? 57 : 52) + '\n';
   
   players.forEach((player, index) => {
     const pos = index + 1;
@@ -64,12 +66,13 @@ function formatRankingTable(players: Array<{name: string, kills: number, deaths:
     else posStr = ` #${pos.toString().padStart(2)} `;
     
     const nameStr = player.name.padEnd(maxNameLen + 2);
+    const classStr = hasClassShort ? (player.class_short || '').padEnd(classColWidth + 1) : '';
     const killsStr = player.kills.toString().padStart(3);
     const deathsStr = player.deaths.toString().padStart(4);
     const kdaStr = player.kda.toFixed(2).padStart(7);
     const scoreStr = player.eventScore.toFixed(2).padStart(9);
     
-    table += `${posStr} ${nameStr}${killsStr}${deathsStr}${kdaStr}${scoreStr}\n`;
+    table += `${posStr} ${nameStr}${classStr}${killsStr}${deathsStr}${kdaStr}${scoreStr}\n`;
   });
   
   return table;
@@ -666,13 +669,13 @@ Deno.serve(async (req) => {
     const playerNames = Object.keys(parseResult.players);
     const { data: characters } = await internalClient
       .from('characters')
-      .select('name, guild, class, banned')
+      .select('name, guild, class, banned, class_short')
       .in('name', playerNames);
 
-    const characterMap: Record<string, { guild: string; class: string; banned: boolean }> = {};
+    const characterMap: Record<string, { guild: string; class: string; banned: boolean; class_short: string }> = {};
     if (characters) {
       for (const char of characters) {
-        characterMap[char.name] = { guild: char.guild, class: char.class, banned: char.banned || false };
+        characterMap[char.name] = { guild: char.guild, class: char.class, banned: char.banned || false, class_short: char.class_short || '' };
       }
     }
 
@@ -740,7 +743,8 @@ Deno.serve(async (req) => {
     // Build ranking table text with correct eventScore formula - excluding banned
     const playersWithScore = nonBannedPlayers.map(player => {
       const eventScore = (player.kills * 3) + (player.kda * 2) - (player.deaths * 1.5);
-      return { ...player, eventScore };
+      const charInfo = characterMap[player.name];
+      return { ...player, eventScore, class_short: charInfo?.class_short || '' };
     });
     const sortedPlayers = playersWithScore.sort((a, b) => b.eventScore - a.eventScore);
     const rankingTableText = formatRankingTable(sortedPlayers);
