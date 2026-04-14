@@ -285,6 +285,7 @@ export const RankingThroneConquest = () => {
         return {
           name: stats.displayName,
           class: charData.class,
+          class_short: charData.class_short,
           guild: charData.guild,
           kills: stats.kills,
           deaths: stats.deaths,
