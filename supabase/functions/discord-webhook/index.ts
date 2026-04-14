@@ -150,7 +150,7 @@ function formatRankingTable(players: PlayerData[]): string {
   
   let table = '🏆 RANKING PVP\n';
   table += '═'.repeat(hasClassShort ? 57 : 52) + '\n\n';
-  table += ' Pos  ' + 'Jogador'.padEnd(maxNameLen + 2) + (hasClassShort ? 'Sigla' + ' ' : '') + '  K    D    KDA     Score\n';
+  table += ' Pos  ' + 'Jogador'.padEnd(maxNameLen + 2) + (hasClassShort ? 'Sigla ' : '') + '  K    D    KDA     Score\n';
   table += '─'.repeat(hasClassShort ? 57 : 52) + '\n';
   
   players.forEach((player, index) => {
@@ -173,6 +173,48 @@ function formatRankingTable(players: PlayerData[]): string {
   });
   
   return table;
+}
+
+async function enrichPlayerRankingWithClassShort(players: PlayerData[]): Promise<PlayerData[]> {
+  if (!players || players.length === 0) return [];
+
+  const missingNames = [...new Set(
+    players
+      .filter((player) => !player.class_short || !player.class_short.trim())
+      .map((player) => player.name.trim())
+      .filter(Boolean)
+  )];
+
+  if (missingNames.length === 0) return players;
+
+  try {
+    const serviceClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { data, error } = await serviceClient
+      .from('characters')
+      .select('name, class_short')
+      .in('name', missingNames);
+
+    if (error) {
+      console.error('[Discord Webhook] Failed to enrich class_short:', error);
+      return players;
+    }
+
+    const classShortByName = new Map(
+      (data || []).map((row) => [row.name, row.class_short || ''])
+    );
+
+    return players.map((player) => ({
+      ...player,
+      class_short: player.class_short?.trim() || classShortByName.get(player.name) || '',
+    }));
+  } catch (error) {
+    console.error('[Discord Webhook] Unexpected error enriching class_short:', error);
+    return players;
+  }
 }
 
 // Format putinha ranking as monospaced table for Discord
@@ -454,12 +496,8 @@ serve(async (req) => {
       // Ranking Geral - texto apenas, sem imagens
       const generalBody = body as GeneralRankingBody;
       const isThrone = generalBody.eventType === 'throne_conquest';
-      
-      // Debug: log class_short data
-      if (generalBody.playerRanking && generalBody.playerRanking.length > 0) {
-        const sample = generalBody.playerRanking.slice(0, 3).map(p => ({ name: p.name, class_short: p.class_short }));
-        console.log('[Discord Webhook] playerRanking class_short sample:', JSON.stringify(sample));
-      }
+      const enrichedPlayerRanking = await enrichPlayerRankingWithClassShort(generalBody.playerRanking || []);
+
       
       // Títulos dinâmicos baseados no tipo de evento
       const rankingTitle = isThrone ? '📊 Ranking Throne Conquest' : '📊 Ranking BOSS Diário';
@@ -564,9 +602,9 @@ serve(async (req) => {
       };
       
       // Embed with player ranking table (text format)
-      const embed2 = generalBody.playerRanking && generalBody.playerRanking.length > 0
+      const embed2 = enrichedPlayerRanking.length > 0
         ? {
-            description: '```\n' + formatRankingTable(generalBody.playerRanking).substring(0, 4000) + '\n```',
+            description: '```\n' + formatRankingTable(enrichedPlayerRanking).substring(0, 4000) + '\n```',
             color: isThrone ? 0xF59E0B : 0x10B981
           }
         : null;
