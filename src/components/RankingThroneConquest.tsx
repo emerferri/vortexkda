@@ -162,6 +162,7 @@ export const RankingThroneConquest = () => {
         norm,
         class: (data.class || '').toString(),
         guild: (data.guild || '').toString(),
+        class_short: (data.class_short || '').toString(),
       }));
 
       const levenshtein2 = (a: string, b: string) => {
