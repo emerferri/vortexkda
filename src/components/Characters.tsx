@@ -699,7 +699,7 @@ export const Characters = () => {
                         <Input
                           id="class_short"
                           value={formData.class_short}
-                          onChange={(e) => setFormData({ ...formData, class_short: e.target.value.slice(0, 3).toUpperCase() })}
+                          onChange={(e) => setFormData({ ...formData, class_short: e.target.value.slice(0, 3) })}
                           placeholder="Ex: DrK"
                           maxLength={3}
                           className="w-20"
