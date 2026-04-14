@@ -22,6 +22,7 @@ import { useAuth } from '@/hooks/useAuth';
 interface AggregatedPlayer {
   name: string;
   class: string | null;
+  class_short: string | null;
   guild: string | null;
   kills: number;
   deaths: number;
@@ -132,7 +133,7 @@ export const RankingThroneConquest = () => {
 
       const { data: characters } = await supabase
         .from('characters')
-        .select('name, class, guild, banned')
+        .select('name, class, guild, banned, class_short')
         .eq('banned', false);
 
       const { data: bannedChars } = await supabase
@@ -147,13 +148,14 @@ export const RankingThroneConquest = () => {
         const norm = normalize(displayName);
         const clsStr = ((c.class ?? '') as string).replace(/\s+/g, ' ').trim();
         const guildStr = ((c.guild ?? '') as string).replace(/\s+/g, ' ').trim();
-        return { displayName, norm, cls: clsStr || null, guild: guildStr || null };
+        const classShort = ((c.class_short ?? '') as string).trim();
+        return { displayName, norm, cls: clsStr || null, guild: guildStr || null, class_short: classShort || null };
       });
 
-      const characterMap = new Map<string, { class: string | null; guild: string | null }>();
+      const characterMap = new Map<string, { class: string | null; guild: string | null; class_short: string | null }>();
       for (const e of entries) {
         const current = characterMap.get(e.norm);
-        if (!current || e.cls) characterMap.set(e.norm, { class: e.cls, guild: e.guild });
+        if (!current || e.cls) characterMap.set(e.norm, { class: e.cls, guild: e.guild, class_short: e.class_short });
       }
 
       const characterEntries = Array.from(characterMap.entries()).map(([norm, data]) => ({
@@ -185,14 +187,14 @@ export const RankingThroneConquest = () => {
         return dp[a.length][b.length];
       };
 
-      const findClosestCharacterData = (normName: string): { class: string | null; guild: string | null } => {
-        let best: { dist: number; class: string | null; guild: string | null } = { dist: 3, class: null, guild: null };
+      const findClosestCharacterData = (normName: string): { class: string | null; guild: string | null; class_short: string | null } => {
+        let best: { dist: number; class: string | null; guild: string | null; class_short: string | null } = { dist: 3, class: null, guild: null, class_short: null };
         for (const entry of characterEntries) {
           const d = levenshtein2(normName, entry.norm);
-          if (d < best.dist) best = { dist: d, class: entry.class, guild: entry.guild };
+          if (d < best.dist) best = { dist: d, class: entry.class, guild: entry.guild, class_short: entry.class_short };
           if (best.dist === 0) break;
         }
-        return best.dist <= 1 ? { class: best.class, guild: best.guild } : { class: null, guild: null };
+        return best.dist <= 1 ? { class: best.class, guild: best.guild, class_short: best.class_short } : { class: null, guild: null, class_short: null };
       };
 
       // Get only Throne Conquest matches (event_type = 'throne_conquest')
