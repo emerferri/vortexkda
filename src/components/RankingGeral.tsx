@@ -22,6 +22,7 @@ import { useAuth } from '@/hooks/useAuth';
 interface AggregatedPlayer {
   name: string;
   class: string | null;
+  class_short: string | null;
   guild: string | null;
   kills: number;
   deaths: number;
