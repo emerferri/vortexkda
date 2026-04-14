@@ -7,10 +7,19 @@ import { Progress } from '@/components/ui/progress';
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
+const CLASS_SHORT_MAP: Record<string, string> = {
+  'Ignition Knight': 'DrK', 'Force Emperor': 'ER', 'Infinity Rune Wizard': 'RW4',
+  'Royal Elf': 'NE', 'Creator': 'ACL', 'Darkness Wizard': 'SW', 'Bloody Fighter': 'FB',
+  'Arcane Lancer': 'SL', 'Endless Summoner': 'DS', 'Glory Wizard': 'LW',
+  'Magnus Gun Crusher': 'HGC', 'Battle Mage': 'MM', 'Rogue Slayer': 'SLT',
+  'Douple Knight': 'MK', 'Phantom Pain Knight': 'MYK', 'Templar Commander': 'TMC',
+};
+
 interface CharacterData {
   name: string;
   guild: string;
   class: string;
+  class_short: string;
   pilot_name: string;
 }
 
