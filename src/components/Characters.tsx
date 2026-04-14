@@ -744,6 +744,7 @@ export const Characters = () => {
                 <TableHead>Assassino</TableHead>
                 <TableHead>Guild</TableHead>
                 <TableHead>Classe</TableHead>
+                <TableHead>Sigla</TableHead>
                 {canEditData && <TableHead>Status</TableHead>}
                 {canEditData && <TableHead className="w-[100px]">Ações</TableHead>}
               </TableRow>
