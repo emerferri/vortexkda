@@ -7,10 +7,19 @@ import { Progress } from '@/components/ui/progress';
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
+const CLASS_SHORT_MAP: Record<string, string> = {
+  'Ignition Knight': 'DrK', 'Force Emperor': 'ER', 'Infinity Rune Wizard': 'RW4',
+  'Royal Elf': 'NE', 'Creator': 'ACL', 'Darkness Wizard': 'SW', 'Bloody Fighter': 'FB',
+  'Arcane Lancer': 'SL', 'Endless Summoner': 'DS', 'Glory Wizard': 'LW',
+  'Magnus Gun Crusher': 'HGC', 'Battle Mage': 'MM', 'Rogue Slayer': 'SLT',
+  'Douple Knight': 'MK', 'Phantom Pain Knight': 'MYK', 'Templar Commander': 'TMC',
+};
+
 interface CharacterData {
   name: string;
   guild: string;
   class: string;
+  class_short: string;
   pilot_name: string;
 }
 
@@ -93,6 +102,7 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
                 name: String(name).trim(),
                 guild: String(guild).trim(),
                 class: String(charClass).trim(),
+                class_short: CLASS_SHORT_MAP[String(charClass).trim()] || '',
                 pilot_name: String(pilot).trim(),
               };
             })
@@ -141,6 +151,7 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
                 name: parts[0],
                 guild: parts[1] || '',
                 class: parts[2] || '',
+                class_short: CLASS_SHORT_MAP[parts[2]?.trim() || ''] || '',
                 pilot_name: parts[3] || '',
               });
             }
@@ -246,14 +257,14 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
             if (existing) {
               const { error } = await supabase
                 .from('characters')
-                .update({ guild: char.guild, class: char.class, pilot_name: char.pilot_name })
+                .update({ guild: char.guild, class: char.class, class_short: char.class_short, pilot_name: char.pilot_name })
                 .eq('id', existing.id);
               
               if (error) throw error;
             } else {
               const { error } = await supabase
                 .from('characters')
-                .insert({ name: char.name, guild: char.guild, class: char.class, pilot_name: char.pilot_name });
+                .insert({ name: char.name, guild: char.guild, class: char.class, class_short: char.class_short, pilot_name: char.pilot_name });
               
               if (error) throw error;
             }
@@ -355,6 +366,7 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
                   <TableHead>Nome</TableHead>
                   <TableHead>Guild</TableHead>
                   <TableHead>Classe</TableHead>
+                  <TableHead>Sigla</TableHead>
                   <TableHead>Piloto</TableHead>
                 </TableRow>
               </TableHeader>
@@ -379,6 +391,7 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
                       <TableCell className="font-medium">{char.name}</TableCell>
                       <TableCell>{char.guild || '-'}</TableCell>
                       <TableCell>{char.class || '-'}</TableCell>
+                      <TableCell className="font-mono text-xs">{char.class_short || '-'}</TableCell>
                       <TableCell>{char.pilot_name || '-'}</TableCell>
                     </TableRow>
                   );

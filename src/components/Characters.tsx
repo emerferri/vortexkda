@@ -18,11 +18,31 @@ import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 
+const CLASS_SHORT_MAP: Record<string, string> = {
+  'Ignition Knight': 'DrK',
+  'Force Emperor': 'ER',
+  'Infinity Rune Wizard': 'RW4',
+  'Royal Elf': 'NE',
+  'Creator': 'ACL',
+  'Darkness Wizard': 'SW',
+  'Bloody Fighter': 'FB',
+  'Arcane Lancer': 'SL',
+  'Endless Summoner': 'DS',
+  'Glory Wizard': 'LW',
+  'Magnus Gun Crusher': 'HGC',
+  'Battle Mage': 'MM',
+  'Rogue Slayer': 'SLT',
+  'Douple Knight': 'MK',
+  'Phantom Pain Knight': 'MYK',
+  'Templar Commander': 'TMC',
+};
+
 interface Character {
   id: string;
   name: string;
   guild: string;
   class: string;
+  class_short?: string;
   banned: boolean;
   pilot_name?: string;
 }
@@ -35,7 +55,7 @@ export const Characters = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCharacter, setEditingCharacter] = useState<Character | null>(null);
-  const [formData, setFormData] = useState({ name: '', guild: '', class: '', pilot_name: '' });
+  const [formData, setFormData] = useState({ name: '', guild: '', class: '', class_short: '', pilot_name: '' });
   const [submitting, setSubmitting] = useState(false);
   const [showUnregisteredOnly, setShowUnregisteredOnly] = useState(false);
   const [searchParams] = useSearchParams();
@@ -59,7 +79,7 @@ export const Characters = () => {
       // Get all registered characters (explicit columns to avoid reserved-word issues)
       const { data: registeredChars, error: charsError } = await supabase
         .from('characters')
-        .select('id, name, guild, class, banned, pilot_name')
+        .select('id, name, guild, class, class_short, banned, pilot_name')
         .order('name');
 
       if (charsError) throw charsError;
@@ -167,7 +187,7 @@ export const Characters = () => {
       }
 
       setDialogOpen(false);
-      setFormData({ name: '', guild: '', class: '', pilot_name: '' });
+      setFormData({ name: '', guild: '', class: '', class_short: '', pilot_name: '' });
       setEditingCharacter(null);
       loadCharacters();
     } catch (error: any) {
@@ -275,13 +295,13 @@ export const Characters = () => {
 
   const openEditDialog = (character: Character) => {
     setEditingCharacter(character);
-    setFormData({ name: character.name, guild: character.guild, class: character.class, pilot_name: (character as any).pilot_name || '' });
+    setFormData({ name: character.name, guild: character.guild, class: character.class, class_short: character.class_short || CLASS_SHORT_MAP[character.class] || '', pilot_name: (character as any).pilot_name || '' });
     setDialogOpen(true);
   };
 
   const openAddDialog = () => {
     setEditingCharacter(null);
-    setFormData({ name: '', guild: '', class: '', pilot_name: '' });
+    setFormData({ name: '', guild: '', class: '', class_short: '', pilot_name: '' });
     setDialogOpen(true);
   };
 
@@ -659,15 +679,33 @@ export const Characters = () => {
                         disabled={submitting}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="class">Classe</Label>
-                      <Input
-                        id="class"
-                        value={formData.class}
-                        onChange={(e) => setFormData({ ...formData, class: e.target.value })}
-                        required
-                        disabled={submitting}
-                      />
+                    <div className="grid grid-cols-[1fr_auto] gap-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="class">Classe</Label>
+                        <Input
+                          id="class"
+                          value={formData.class}
+                          onChange={(e) => {
+                            const newClass = e.target.value;
+                            const autoShort = CLASS_SHORT_MAP[newClass] || formData.class_short;
+                            setFormData({ ...formData, class: newClass, class_short: autoShort });
+                          }}
+                          required
+                          disabled={submitting}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="class_short">Reduzido</Label>
+                        <Input
+                          id="class_short"
+                          value={formData.class_short}
+                          onChange={(e) => setFormData({ ...formData, class_short: e.target.value.slice(0, 3) })}
+                          placeholder="Ex: DrK"
+                          maxLength={3}
+                          className="w-20"
+                          disabled={submitting}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="pilot_name">Piloto</Label>
@@ -706,6 +744,7 @@ export const Characters = () => {
                 <TableHead>Assassino</TableHead>
                 <TableHead>Guild</TableHead>
                 <TableHead>Classe</TableHead>
+                <TableHead>Sigla</TableHead>
                 {canEditData && <TableHead>Status</TableHead>}
                 {canEditData && <TableHead className="w-[100px]">Ações</TableHead>}
               </TableRow>
@@ -713,7 +752,7 @@ export const Characters = () => {
             <TableBody>
               {filteredCharacters.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={canEditData ? 5 : 3} className="text-center text-muted-foreground">
+                  <TableCell colSpan={canEditData ? 7 : 4} className="text-center text-muted-foreground">
                     {showUnregisteredOnly ? 'Nenhum personagem sem cadastro no momento' : 'Nenhum personagem encontrado'}
                   </TableCell>
                 </TableRow>
@@ -738,6 +777,11 @@ export const Characters = () => {
                     </TableCell>
                     <TableCell>{character.guild || '-'}</TableCell>
                     <TableCell>{character.class || '-'}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="font-mono text-xs">
+                        {character.class_short || CLASS_SHORT_MAP[character.class] || '-'}
+                      </Badge>
+                    </TableCell>
                     {canEditData && (
                       <TableCell>
                         <div className="flex items-center gap-2">
