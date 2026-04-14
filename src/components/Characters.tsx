@@ -777,6 +777,11 @@ export const Characters = () => {
                     </TableCell>
                     <TableCell>{character.guild || '-'}</TableCell>
                     <TableCell>{character.class || '-'}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="font-mono text-xs">
+                        {character.class_short || CLASS_SHORT_MAP[character.class] || '-'}
+                      </Badge>
+                    </TableCell>
                     {canEditData && (
                       <TableCell>
                         <div className="flex items-center gap-2">
