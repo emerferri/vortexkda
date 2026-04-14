@@ -455,6 +455,12 @@ serve(async (req) => {
       const generalBody = body as GeneralRankingBody;
       const isThrone = generalBody.eventType === 'throne_conquest';
       
+      // Debug: log class_short data
+      if (generalBody.playerRanking && generalBody.playerRanking.length > 0) {
+        const sample = generalBody.playerRanking.slice(0, 3).map(p => ({ name: p.name, class_short: p.class_short }));
+        console.log('[Discord Webhook] playerRanking class_short sample:', JSON.stringify(sample));
+      }
+      
       // Títulos dinâmicos baseados no tipo de evento
       const rankingTitle = isThrone ? '📊 Ranking Throne Conquest' : '📊 Ranking BOSS Diário';
       const reiTitle = isThrone ? '👑 Rei do Trono!' : '👑 Rei do PVP';
