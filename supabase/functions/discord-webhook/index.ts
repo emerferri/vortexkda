@@ -41,6 +41,7 @@ interface PlayerData {
   deaths: number;
   kda: number;
   eventScore: number;
+  class_short?: string;
 }
 
 interface KillLogEntry {
@@ -144,11 +145,13 @@ function formatRankingTable(players: PlayerData[]): string {
   if (!players || players.length === 0) return '';
   
   const maxNameLen = Math.max(7, ...players.map(p => p.name.length));
+  const hasClassShort = players.some(p => p.class_short && p.class_short.trim() !== '');
+  const classColWidth = 5;
   
   let table = '🏆 RANKING PVP\n';
-  table += '═'.repeat(52) + '\n\n';
-  table += ' Pos  ' + 'Jogador'.padEnd(maxNameLen + 2) + '  K    D    KDA     Score\n';
-  table += '─'.repeat(52) + '\n';
+  table += '═'.repeat(hasClassShort ? 57 : 52) + '\n\n';
+  table += ' Pos  ' + 'Jogador'.padEnd(maxNameLen + 2) + (hasClassShort ? 'Sigla' + ' ' : '') + '  K    D    KDA     Score\n';
+  table += '─'.repeat(hasClassShort ? 57 : 52) + '\n';
   
   players.forEach((player, index) => {
     const pos = index + 1;
@@ -160,12 +163,13 @@ function formatRankingTable(players: PlayerData[]): string {
     else posStr = ` #${pos.toString().padStart(2)} `;
     
     const nameStr = player.name.padEnd(maxNameLen + 2);
+    const classStr = hasClassShort ? (player.class_short || '').padEnd(classColWidth + 1) : '';
     const killsStr = player.kills.toString().padStart(3);
     const deathsStr = player.deaths.toString().padStart(4);
     const kdaStr = player.kda.toFixed(2).padStart(7);
     const scoreStr = player.eventScore.toFixed(2).padStart(9);
     
-    table += `${posStr} ${nameStr}${killsStr}${deathsStr}${kdaStr}${scoreStr}\n`;
+    table += `${posStr} ${nameStr}${classStr}${killsStr}${deathsStr}${kdaStr}${scoreStr}\n`;
   });
   
   return table;

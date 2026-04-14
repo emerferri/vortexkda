@@ -213,6 +213,7 @@ export type Database = {
           kda: number
           matches_played: number
           player_class: string
+          player_class_short: string
           player_guild: string
           player_name: string
           single_match_max_kills: number

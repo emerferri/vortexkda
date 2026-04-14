@@ -22,6 +22,7 @@ import { useAuth } from '@/hooks/useAuth';
 interface AggregatedPlayer {
   name: string;
   class: string | null;
+  class_short: string | null;
   guild: string | null;
   kills: number;
   deaths: number;
@@ -177,6 +178,7 @@ export const RankingGeral = () => {
       const aggregated: AggregatedPlayer[] = (rpcData as any[]).map((row: any) => ({
         name: row.player_name,
         class: row.player_class || null,
+        class_short: row.player_class_short || null,
         guild: row.player_guild || null,
         kills: Number(row.total_kills),
         deaths: Number(row.total_deaths),
@@ -389,7 +391,8 @@ export const RankingGeral = () => {
           kills: p.kills,
           deaths: p.deaths,
           kda: p.kda,
-          eventScore: p.eventScore
+          eventScore: p.eventScore,
+          class_short: p.class_short || ''
         })),
         killLogs: []
       };
