@@ -257,14 +257,14 @@ export const CharacterImport = ({ onComplete, onCancel }: CharacterImportProps) 
             if (existing) {
               const { error } = await supabase
                 .from('characters')
-                .update({ guild: char.guild, class: char.class, pilot_name: char.pilot_name })
+                .update({ guild: char.guild, class: char.class, class_short: char.class_short, pilot_name: char.pilot_name })
                 .eq('id', existing.id);
               
               if (error) throw error;
             } else {
               const { error } = await supabase
                 .from('characters')
-                .insert({ name: char.name, guild: char.guild, class: char.class, pilot_name: char.pilot_name });
+                .insert({ name: char.name, guild: char.guild, class: char.class, class_short: char.class_short, pilot_name: char.pilot_name });
               
               if (error) throw error;
             }
