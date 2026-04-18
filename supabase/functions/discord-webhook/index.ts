@@ -442,6 +442,32 @@ serve(async (req) => {
           timestamp: new Date().toISOString()
         }
       ];
+    } else if (rankingType === 'fogo_amigo') {
+      const faBody = body as FogoAmigoBody;
+      const tableText = formatFogoAmigoTable(faBody.ranking);
+
+      const embed1 = {
+        title: '🔥 Ranking: Fogo Amigo',
+        description: `Kills entre membros da mesma guild\n**${faBody.totals.playerCount}** jogadores • **${faBody.totals.totalFriendlyKills}** kills aliadas`,
+        color: 0xDC2626,
+        fields: [
+          { name: '🔍 Filtros Aplicados', value: formatFilters(faBody.filters), inline: false }
+        ],
+        timestamp: new Date().toISOString()
+      };
+
+      const embed2 = {
+        description: '```\n' + tableText.substring(0, 4000) + '\n```',
+        color: 0xDC2626
+      };
+
+      const frontendUrl = 'https://rankingpvpboss.lovable.app';
+      const embed3 = {
+        description: `🔗 **[Ver ranking completo no site](${frontendUrl}/?tab=fogo-amigo)**`,
+        color: 0x9b87f5
+      };
+
+      embeds = [embed1, embed2, embed3];
     } else if (rankingType === 'putinha') {
       const putinhaBody = body as PutinhaBody;
       
