@@ -106,7 +106,60 @@ interface SorteioBody {
   totals: { participantCount: number; prizeCount: number };
 }
 
-type RequestBody = GeneralRankingBody | KillStreakBody | PutinhaBody | SorteioBody;
+interface FogoAmigoEntry {
+  name: string;
+  class_short?: string;
+  guild?: string;
+  friendly_kills: number;
+  friendly_deaths: number;
+  kda: number;
+  eventScore: number;
+}
+
+interface FogoAmigoBody {
+  type: 'fogo_amigo';
+  environment: 'homolog' | 'prod';
+  filters: Filters & { eventType?: string };
+  ranking: FogoAmigoEntry[];
+  totals: { playerCount: number; totalFriendlyKills: number };
+}
+
+type RequestBody = GeneralRankingBody | KillStreakBody | PutinhaBody | SorteioBody | FogoAmigoBody;
+
+// Format Fogo Amigo ranking as monospaced table
+function formatFogoAmigoTable(entries: FogoAmigoEntry[]): string {
+  if (!entries || entries.length === 0) return 'Nenhum caso de fogo amigo encontrado';
+
+  const maxNameLen = Math.max(7, ...entries.map(e => e.name.length));
+  const hasClass = entries.some(e => e.class_short && e.class_short.trim() !== '');
+  const classW = 5;
+
+  const width = maxNameLen + (hasClass ? classW + 1 : 0) + 32;
+  let table = '🔥 RANKING FOGO AMIGO\n';
+  table += '═'.repeat(width) + '\n\n';
+  table += ' Pos  ' + 'Jogador'.padEnd(maxNameLen + 2) + (hasClass ? 'Sigla ' : '') + '  K    D    KDA     Score\n';
+  table += '─'.repeat(width) + '\n';
+
+  entries.forEach((p, index) => {
+    const pos = index + 1;
+    let posStr: string;
+    if (pos === 1) posStr = ' 🥇  ';
+    else if (pos === 2) posStr = ' 🥈  ';
+    else if (pos === 3) posStr = ' 🥉  ';
+    else posStr = ` #${pos.toString().padStart(2)} `;
+
+    const nameStr = p.name.padEnd(maxNameLen + 2);
+    const classStr = hasClass ? (p.class_short || '').padEnd(classW + 1) : '';
+    const killsStr = p.friendly_kills.toString().padStart(3);
+    const deathsStr = p.friendly_deaths.toString().padStart(4);
+    const kdaStr = Number(p.kda).toFixed(2).padStart(7);
+    const scoreStr = Number(p.eventScore).toFixed(2).padStart(9);
+
+    table += `${posStr} ${nameStr}${classStr}${killsStr}${deathsStr}${kdaStr}${scoreStr}\n`;
+  });
+
+  return table;
+}
 
 // Format guild ranking as monospaced table for Discord (same as auto-process-ranking)
 function formatGuildRankingTable(guilds: GuildData[]): string {
