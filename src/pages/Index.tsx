@@ -12,6 +12,7 @@ import { ReisDoPVP } from '@/components/ReisDoPVP';
 import { BestPerClassRanking } from '@/components/BestPerClassRanking';
 import { ClassMatchup } from '@/components/ClassMatchup';
 import { NeverPositiveKDA } from '@/components/NeverPositiveKDA';
+import { RankingFogoAmigo } from '@/components/RankingFogoAmigo';
 import { DatabaseManager } from '@/components/DatabaseManager';
 import { PvPAnalyticsDashboard } from '@/components/analytics/PvPAnalyticsDashboard';
 import { RankingArkaWar } from '@/components/RankingArkaWar';
@@ -131,6 +132,8 @@ const Index = () => {
         return <MuralDaVergonha />;
       case 'never-positive':
         return <NeverPositiveKDA />;
+      case 'fogo-amigo':
+        return <RankingFogoAmigo />;
       case 'killstreak':
         return <KillStreakRanking />;
       case 'analytics':
