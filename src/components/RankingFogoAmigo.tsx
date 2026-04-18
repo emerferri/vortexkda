@@ -48,6 +48,54 @@ export const RankingFogoAmigo = () => {
   const [guildFilter, setGuildFilter] = useState<string>('all');
   const [classFilter, setClassFilter] = useState<string>('all');
   const [nameSearch, setNameSearch] = useState('');
+  const { isAdmin } = useUserRole();
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [environment, setEnvironment] = useState<'homolog' | 'prod'>('homolog');
+
+  const publishToDiscord = async () => {
+    setPublishing(true);
+    try {
+      const ranking = filtered.map(r => ({
+        name: r.player_name,
+        class_short: r.player_class_short,
+        guild: r.player_guild,
+        friendly_kills: r.friendly_kills,
+        friendly_deaths: r.friendly_deaths,
+        kda: Number(r.kda),
+        eventScore: Number(r.event_score),
+      }));
+
+      const totalFK = ranking.reduce((s, p) => s + p.friendly_kills, 0);
+
+      const payload = {
+        type: 'fogo_amigo' as const,
+        environment,
+        filters: {
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+          hourFrom: hourFrom === '' ? undefined : Number(hourFrom),
+          hourTo: hourTo === '' ? undefined : Number(hourTo),
+          eventType,
+        },
+        ranking,
+        totals: {
+          playerCount: ranking.length,
+          totalFriendlyKills: totalFK,
+        },
+      };
+
+      const { error } = await supabase.functions.invoke('discord-webhook', { body: payload });
+      if (error) throw error;
+      toast.success('Ranking Fogo Amigo publicado no Discord!');
+      setShowPublishDialog(false);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || 'Falha ao publicar no Discord');
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
