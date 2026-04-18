@@ -288,6 +288,42 @@ export const RankingFogoAmigo = () => {
           </Table>
         </div>
       </CardContent>
+
+      <Dialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Flame className="w-5 h-5 text-destructive" />
+              Publicar Fogo Amigo no Discord
+            </DialogTitle>
+            <DialogDescription>
+              Serão enviados {filtered.length} jogadores no formato monoespaçado, seguindo o padrão do ranking PVP.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label>Ambiente</Label>
+            <RadioGroup value={environment} onValueChange={(v) => setEnvironment(v as 'homolog' | 'prod')}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="homolog" id="fa-homolog" />
+                <Label htmlFor="fa-homolog">Homologação (teste)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="prod" id="fa-prod" />
+                <Label htmlFor="fa-prod">Produção</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPublishDialog(false)} disabled={publishing}>
+              Cancelar
+            </Button>
+            <Button onClick={publishToDiscord} disabled={publishing} className="gap-2">
+              <Send className="w-4 h-4" />
+              {publishing ? 'Publicando...' : 'Publicar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
