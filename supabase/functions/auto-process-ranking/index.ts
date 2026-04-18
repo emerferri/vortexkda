@@ -114,6 +114,40 @@ function formatGuildRankingTable(guilds: Array<{
   return table;
 }
 
+// Format Fogo Amigo ranking as monospaced table
+function formatFogoAmigoTableLocal(entries: Array<{name: string; class_short?: string; friendly_kills: number; friendly_deaths: number; kda: number; eventScore: number}>): string {
+  if (!entries || entries.length === 0) return 'Nenhum caso de fogo amigo encontrado';
+  const maxNameLen = Math.max(7, ...entries.map(e => e.name.length));
+  const hasClass = entries.some(e => e.class_short && e.class_short.trim() !== '');
+  const classW = 5;
+  const width = maxNameLen + (hasClass ? classW + 1 : 0) + 32;
+
+  let table = '🔥 RANKING FOGO AMIGO\n';
+  table += '═'.repeat(width) + '\n\n';
+  table += ' Pos  ' + 'Jogador'.padEnd(maxNameLen + 2) + (hasClass ? 'Sigla ' : '') + '  K    D    KDA     Score\n';
+  table += '─'.repeat(width) + '\n';
+
+  entries.forEach((p, index) => {
+    const pos = index + 1;
+    let posStr: string;
+    if (pos === 1) posStr = ' 🥇  ';
+    else if (pos === 2) posStr = ' 🥈  ';
+    else if (pos === 3) posStr = ' 🥉  ';
+    else posStr = ` #${pos.toString().padStart(2)} `;
+
+    const nameStr = p.name.padEnd(maxNameLen + 2);
+    const classStr = hasClass ? (p.class_short || '').padEnd(classW + 1) : '';
+    const killsStr = p.friendly_kills.toString().padStart(3);
+    const deathsStr = p.friendly_deaths.toString().padStart(4);
+    const kdaStr = Number(p.kda).toFixed(2).padStart(7);
+    const scoreStr = Number(p.eventScore).toFixed(2).padStart(9);
+
+    table += `${posStr} ${nameStr}${classStr}${killsStr}${deathsStr}${kdaStr}${scoreStr}\n`;
+  });
+
+  return table;
+}
+
 // Parser logic for Boss Event (PvP Square map)
 function parseExternalDbContentBoss(logs: ExternalLogEntry[]): ParseResult {
   const players: Record<string, PlayerStats> = {};
@@ -883,6 +917,71 @@ Deno.serve(async (req) => {
         console.error('[Auto Process] Failed to post to Discord:', await discordResponse.text());
       } else {
         console.log(`[Auto Process] Successfully posted ${eventType} to Discord`);
+      }
+
+      // ===== Fogo Amigo follow-up =====
+      try {
+        const { data: faData, error: faError } = await internalClient.rpc('get_ranking_fogo_amigo', {
+          p_date_from: matchDate,
+          p_date_to: matchDate,
+          p_hour_from: matchHour,
+          p_hour_to: matchHour,
+          p_event_type: eventType,
+        });
+
+        if (faError) {
+          console.error('[Auto Process] Fogo Amigo RPC error:', faError);
+        } else if (faData && faData.length > 0) {
+          const faRanking = (faData as any[]).map(r => ({
+            name: r.player_name,
+            class_short: r.player_class_short,
+            guild: r.player_guild,
+            friendly_kills: Number(r.friendly_kills),
+            friendly_deaths: Number(r.friendly_deaths),
+            kda: Number(r.kda),
+            eventScore: Number(r.event_score),
+          }));
+
+          const totalFK = faRanking.reduce((s, p) => s + p.friendly_kills, 0);
+          const faTable = formatFogoAmigoTableLocal(faRanking);
+
+          const faEmbed1 = {
+            title: '🔥 Ranking: Fogo Amigo',
+            description: `Kills entre membros da mesma guild neste evento\n**${faRanking.length}** jogadores • **${totalFK}** kills aliadas`,
+            color: 0xDC2626,
+            fields: [
+              {
+                name: '🔍 Filtros Aplicados',
+                value: `A partir de: **${formattedDate}**\nHora: **${matchHour}:${String(eventMinute).padStart(2, '0')}**`,
+                inline: false,
+              },
+            ],
+            timestamp: new Date().toISOString(),
+          };
+          const faEmbed2 = {
+            description: '```\n' + faTable.substring(0, 3990) + '\n```',
+            color: 0xDC2626,
+          };
+          const faEmbed3 = {
+            description: `🔗 **[Ver Fogo Amigo no site](${frontendUrl}/?tab=fogo-amigo)**`,
+            color: 0x9b87f5,
+          };
+
+          const faResp = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ embeds: [faEmbed1, faEmbed2, faEmbed3] }),
+          });
+          if (!faResp.ok) {
+            console.error('[Auto Process] Failed to post Fogo Amigo:', await faResp.text());
+          } else {
+            console.log(`[Auto Process] Successfully posted Fogo Amigo for ${eventType}`);
+          }
+        } else {
+          console.log('[Auto Process] No Fogo Amigo entries for this event, skipping follow-up');
+        }
+      } catch (faErr) {
+        console.error('[Auto Process] Fogo Amigo follow-up error:', faErr);
       }
     } else {
       console.log(`[Auto Process] No Discord webhook configured for ${eventType}`);
