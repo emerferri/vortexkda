@@ -228,6 +228,16 @@ export const RankingFogoAmigo = () => {
             <Button variant="outline" onClick={resetFilters} className="gap-2">
               <RotateCcw className="w-4 h-4" /> Limpar
             </Button>
+            {isAdmin && (
+              <Button
+                variant="default"
+                onClick={() => setShowPublishDialog(true)}
+                disabled={filtered.length === 0}
+                className="gap-2"
+              >
+                <Send className="w-4 h-4" /> Publicar no Discord
+              </Button>
+            )}
           </div>
         </div>
 
