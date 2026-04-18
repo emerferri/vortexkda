@@ -11,8 +11,13 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Flame, Search, RotateCcw } from 'lucide-react';
+import { Flame, Search, RotateCcw, Send } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface FogoAmigoRow {
   player_name: string;
