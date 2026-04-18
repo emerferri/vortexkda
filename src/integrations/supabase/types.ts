@@ -201,6 +201,25 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_ranking_fogo_amigo: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_event_type?: string
+          p_hour_from?: number
+          p_hour_to?: number
+        }
+        Returns: {
+          event_score: number
+          friendly_deaths: number
+          friendly_kills: number
+          kda: number
+          player_class: string
+          player_class_short: string
+          player_guild: string
+          player_name: string
+        }[]
+      }
       get_ranking_geral: {
         Args: {
           p_date_from?: string
