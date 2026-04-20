@@ -6,10 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Brain, Loader2, Shield, TrendingUp, TrendingDown, Minus, Star, Users, Target, AlertTriangle, ArrowUpRight, Upload, ClipboardList, CheckCircle2, XCircle, UserCheck, UserX } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import {
-  AnalyticsFilters, fetchMatchesWithType, fetchKillLogsForMatches,
-  fetchAllCharacters, buildCharacterMap, filterBanned, MatchWithType, CharacterInfo
-} from '@/hooks/useAnalyticsData';
+import { AnalyticsFilters, CharacterInfo } from '@/hooks/useAnalyticsData';
+import { useAnalyticsDataset } from '@/hooks/useAnalyticsDataset';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -100,10 +98,8 @@ const TEAM_SIZE: Record<string, number> = {
 
 export const TeamBuilder = ({ filters }: Props) => {
   const [members, setMembers] = useState<MemberStats[]>([]);
-  const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsights, setAiInsights] = useState('');
-  const [allCharacters, setAllCharacters] = useState<CharacterInfo[]>([]);
 
   // Pilot list import state
   const [pilotListText, setPilotListText] = useState('');
@@ -114,33 +110,20 @@ export const TeamBuilder = ({ filters }: Props) => {
   const eventType = filters.eventType === 'all' ? 'all' : filters.eventType;
   const guild = filters.guild || '';
 
-  // Analyze guild when selected
+  // Shared analytics dataset (cached across all tabs)
+  const { data: dataset, isLoading: datasetLoading } = useAnalyticsDataset(filters);
+  const loading = datasetLoading;
+  const allCharacters: CharacterInfo[] = dataset?.characters || [];
+
+  // Recompute members whenever the cached dataset, guild, or eventType changes.
   useEffect(() => {
-    if (!guild) { setMembers([]); setAllCharacters([]); return; }
-    analyzeGuild();
-  }, [guild, filters, eventType]);
+    if (!guild || !dataset) {
+      setMembers([]);
+      return;
+    }
 
-  const analyzeGuild = async () => {
-    setLoading(true);
-    try {
-      const [allMatches, characters] = await Promise.all([
-        fetchMatchesWithType(filters),
-        fetchAllCharacters(),
-      ]);
-      const matches = eventType === 'all' ? allMatches : allMatches.filter(m => m.event_type === eventType);
-      const charMap = buildCharacterMap(characters);
-      setAllCharacters(characters);
-      const matchIds = matches.map(m => m.id);
-      let logs = await fetchKillLogsForMatches(matchIds);
-      logs = filterBanned(logs, charMap);
-
-      // Build match->event_type map and ordered match list
-      const matchTypeMap = new Map<string, string>();
-      const matchDateMap = new Map<string, string>();
-      for (const m of matches) {
-        matchTypeMap.set(m.id, m.event_type);
-        matchDateMap.set(m.id, m.match_date);
-      }
+    const { logs, charMap, matchTypeMap, matchDateMap, matches } = dataset;
+    const characters = dataset.characters;
 
       // Get guild members (unique names from characters table)
       const guildMembers = new Set(
