@@ -125,15 +125,13 @@ export const GuildAnalytics = ({ filters }: Props) => {
         });
       }
 
-      return stats.sort((a, b) => b.kda - a.kda);
-    },
-    staleTime: 60000,
-  });
+    return stats.sort((a, b) => b.kda - a.kda);
+  }, [dataset]);
 
   const guilds = useMemo(() => (data || []).map(g => g.guild).sort(), [data]);
   const detail = useMemo(() => data?.find(g => g.guild === selectedGuild), [data, selectedGuild]);
 
-  if (isLoading) {
+  if (isLoading || !data) {
     return <div className="text-center py-8 text-muted-foreground">Carregando dados das guilds...</div>;
   }
 
