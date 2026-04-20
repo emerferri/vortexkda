@@ -1,15 +1,12 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search, Skull, Target, Trophy, Flame, Crosshair, Users } from 'lucide-react';
-import {
-  AnalyticsFilters, fetchFilteredMatchIds, fetchKillLogsForMatches,
-  fetchAllCharacters, buildCharacterMap, filterBanned, filterByGuild, filterByClass, KillLog
-} from '@/hooks/useAnalyticsData';
+import { AnalyticsFilters, filterByClass } from '@/hooks/useAnalyticsData';
+import { useAnalyticsDataset } from '@/hooks/useAnalyticsDataset';
 import { PlayerEventDevelopment } from './PlayerEventDevelopment';
 
 interface Props {
@@ -30,124 +27,139 @@ interface PlayerStat {
   maxKillStreak: number;
 }
 
-function computeKillStreak(playerName: string, logs: KillLog[], matchId: string): number {
-  const matchLogs = logs.filter(l => l.match_id === matchId);
-  let streak = 0;
-  let maxStreak = 0;
-  for (const log of matchLogs) {
-    if (log.killer_name === playerName) {
-      streak++;
-      maxStreak = Math.max(maxStreak, streak);
-    } else if (log.victim_name === playerName) {
-      streak = 0;
-    }
-  }
-  return maxStreak;
-}
-
 export const PlayerAnalytics = ({ filters }: Props) => {
   const [search, setSearch] = useState('');
+  const { data: dataset, isLoading } = useAnalyticsDataset(filters);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['analytics-players', filters],
-    queryFn: async () => {
-      const [matchIds, characters] = await Promise.all([
-        fetchFilteredMatchIds(filters),
-        fetchAllCharacters(),
-      ]);
-      const charMap = buildCharacterMap(characters);
-      let logs = await fetchKillLogsForMatches(matchIds);
-      logs = filterBanned(logs, charMap);
-      logs = filterByGuild(logs, filters.guild, charMap);
-      logs = filterByClass(logs, filters.playerClass, charMap);
+  // Heavy aggregation derived from the shared dataset cache.
+  // Optimized: kill streaks are computed in a SINGLE pass per match
+  // (O(L) instead of O(P×M×L) which previously froze the UI).
+  const data = useMemo<PlayerStat[] | null>(() => {
+    if (!dataset) return null;
 
-      // First bloods per match
-      const firstBloodMap = new Map<string, string>();
-      for (const l of logs) {
-        if (!firstBloodMap.has(l.match_id)) {
-          firstBloodMap.set(l.match_id, l.killer_name);
-        }
+    const logs = filterByClass(dataset.logs, filters.playerClass, dataset.charMap);
+    const charMap = dataset.charMap;
+
+    // ---- Pass 1: group logs by match (preserve original chronological order) ----
+    const logsByMatch = new Map<string, typeof logs>();
+    for (const l of logs) {
+      let arr = logsByMatch.get(l.match_id);
+      if (!arr) {
+        arr = [];
+        logsByMatch.set(l.match_id, arr);
+      }
+      arr.push(l);
+    }
+
+    // ---- Pass 2: per-player aggregates + per-match max streak in ONE walk ----
+    interface Agg {
+      kills: number;
+      deaths: number;
+      killsTo: Map<string, number>;
+      deathsFrom: Map<string, number>;
+      firstBloods: number;
+      victims: Set<string>;
+      maxStreak: number;
+      currentStreakInMatch: number; // reset between matches
+      currentMatchId: string | null;
+    }
+    const players = new Map<string, Agg>();
+    const getP = (name: string): Agg => {
+      let p = players.get(name);
+      if (!p) {
+        p = {
+          kills: 0,
+          deaths: 0,
+          killsTo: new Map(),
+          deathsFrom: new Map(),
+          firstBloods: 0,
+          victims: new Set(),
+          maxStreak: 0,
+          currentStreakInMatch: 0,
+          currentMatchId: null,
+        };
+        players.set(name, p);
+      }
+      return p;
+    };
+
+    for (const [matchId, matchLogs] of logsByMatch) {
+      // First blood = first killer in this match
+      if (matchLogs.length > 0) {
+        getP(matchLogs[0].killer_name).firstBloods++;
       }
 
-      // Aggregate per player
-      const playerMap = new Map<string, {
-        kills: number; deaths: number;
-        killsTo: Map<string, number>; deathsFrom: Map<string, number>;
-        firstBloods: number; matchKills: Map<string, number>;
-        victims: Set<string>;
-      }>();
+      // Reset streaks for any player active in this match (handled lazily below)
+      for (const l of matchLogs) {
+        const killer = getP(l.killer_name);
+        const victim = getP(l.victim_name);
 
-      const getPlayer = (name: string) => {
-        if (!playerMap.has(name)) {
-          playerMap.set(name, {
-            kills: 0, deaths: 0,
-            killsTo: new Map(), deathsFrom: new Map(),
-            firstBloods: 0, matchKills: new Map(),
-            victims: new Set(),
-          });
+        // Reset killer streak when entering a new match
+        if (killer.currentMatchId !== matchId) {
+          killer.currentMatchId = matchId;
+          killer.currentStreakInMatch = 0;
         }
-        return playerMap.get(name)!;
-      };
+        if (victim.currentMatchId !== matchId) {
+          victim.currentMatchId = matchId;
+          victim.currentStreakInMatch = 0;
+        }
 
-      for (const l of logs) {
-        const killer = getPlayer(l.killer_name);
-        const victim = getPlayer(l.victim_name);
+        // Aggregate
         killer.kills++;
         victim.deaths++;
         killer.killsTo.set(l.victim_name, (killer.killsTo.get(l.victim_name) || 0) + 1);
         victim.deathsFrom.set(l.killer_name, (victim.deathsFrom.get(l.killer_name) || 0) + 1);
         killer.victims.add(l.victim_name);
+
+        // Streak update: killer +1, victim resets
+        killer.currentStreakInMatch++;
+        if (killer.currentStreakInMatch > killer.maxStreak) {
+          killer.maxStreak = killer.currentStreakInMatch;
+        }
+        victim.currentStreakInMatch = 0;
+      }
+    }
+
+    // ---- Pass 3: build final stats ----
+    const stats: PlayerStat[] = [];
+    for (const [name, p] of players) {
+      const char = charMap.get(name);
+
+      let rivalKilled: PlayerStat['rivalKilled'] = null;
+      let maxKillsTo = 0;
+      for (const [vName, count] of p.killsTo) {
+        if (count > maxKillsTo) {
+          maxKillsTo = count;
+          rivalKilled = { name: vName, count };
+        }
       }
 
-      // First bloods
-      for (const [, killerName] of firstBloodMap) {
-        const p = playerMap.get(killerName);
-        if (p) p.firstBloods++;
+      let rivalDiedTo: PlayerStat['rivalDiedTo'] = null;
+      let maxDeathsFrom = 0;
+      for (const [kName, count] of p.deathsFrom) {
+        if (count > maxDeathsFrom) {
+          maxDeathsFrom = count;
+          rivalDiedTo = { name: kName, count };
+        }
       }
 
-      // Build stats with kill streaks
-      const matchIdSet = new Set(logs.map(l => l.match_id));
-      const stats: PlayerStat[] = [];
+      stats.push({
+        name,
+        kills: p.kills,
+        deaths: p.deaths,
+        kda: p.deaths === 0 ? p.kills : Math.round((p.kills / p.deaths) * 100) / 100,
+        className: char?.class || '',
+        guild: char?.guild || '',
+        uniqueVictims: p.victims.size,
+        rivalKilled,
+        rivalDiedTo,
+        firstBloods: p.firstBloods,
+        maxKillStreak: p.maxStreak,
+      });
+    }
 
-      for (const [name, p] of playerMap) {
-        const char = charMap.get(name);
-        let maxStreak = 0;
-        for (const mid of matchIdSet) {
-          const s = computeKillStreak(name, logs, mid);
-          maxStreak = Math.max(maxStreak, s);
-        }
-
-        let rivalKilled: PlayerStat['rivalKilled'] = null;
-        let maxKillsTo = 0;
-        for (const [vName, count] of p.killsTo) {
-          if (count > maxKillsTo) { maxKillsTo = count; rivalKilled = { name: vName, count }; }
-        }
-
-        let rivalDiedTo: PlayerStat['rivalDiedTo'] = null;
-        let maxDeathsFrom = 0;
-        for (const [kName, count] of p.deathsFrom) {
-          if (count > maxDeathsFrom) { maxDeathsFrom = count; rivalDiedTo = { name: kName, count }; }
-        }
-
-        stats.push({
-          name,
-          kills: p.kills,
-          deaths: p.deaths,
-          kda: p.deaths === 0 ? p.kills : Math.round((p.kills / p.deaths) * 100) / 100,
-          className: char?.class || '',
-          guild: char?.guild || '',
-          uniqueVictims: p.victims.size,
-          rivalKilled,
-          rivalDiedTo,
-          firstBloods: p.firstBloods,
-          maxKillStreak: maxStreak,
-        });
-      }
-
-      return stats;
-    },
-    staleTime: 60000,
-  });
+    return stats;
+  }, [dataset, filters.playerClass]);
 
   const filtered = useMemo(() => {
     if (!data) return [];
@@ -165,7 +177,7 @@ export const PlayerAnalytics = ({ filters }: Props) => {
   const topDeaths = useMemo(() => [...(data || [])].sort((a, b) => b.deaths - a.deaths).slice(0, 10), [data]);
   const topKDA = useMemo(() => [...(data || [])].filter(p => p.kills >= 5).sort((a, b) => b.kda - a.kda).slice(0, 10), [data]);
 
-  if (isLoading) {
+  if (isLoading || !data) {
     return <div className="text-center py-8 text-muted-foreground">Carregando dados dos jogadores...</div>;
   }
 
