@@ -97,11 +97,12 @@ export const ClassAnalytics = ({ filters }: Props) => {
         const pickRate = totalPlayers === 0 ? 0 : (players / totalPlayers) * 100;
         const killsNorm = maxKills === 0 ? 0 : (kills / maxKills) * 100;
 
-        // META score = popularity (50%) + performance KDA (30%) + raw impact (20%)
-        // KDA is capped at 5 to prevent outliers (e.g. 4 players with 0 deaths) from dominating.
+        // META score = effectiveness focused: KDA (60%) + raw impact via kills (40%).
+        // Pick rate is intentionally ignored — we want effective classes, not popular ones.
+        // KDA capped at 5 to prevent outliers (e.g. few players with 0 deaths) from dominating.
         const cappedKda = Math.min(kda, 5);
         const metaScore = Math.round(
-          (pickRate * 0.5) + (cappedKda * 20 * 0.3) + (killsNorm * 0.2)
+          (cappedKda * 20 * 0.6) + (killsNorm * 0.4)
         );
 
         stats.push({
