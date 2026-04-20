@@ -246,15 +246,10 @@ export const TeamBuilder = ({ filters }: Props) => {
         m.classification = classify(m, guildAvgKDA);
       }
 
-      // Sort by KDA desc
-      stats.sort((a, b) => b.kda - a.kda);
-      setMembers(stats);
-    } catch (err: any) {
-      toast.error('Erro ao analisar guild: ' + (err.message || 'Erro desconhecido'));
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Sort by KDA desc
+    stats.sort((a, b) => b.kda - a.kda);
+    setMembers(stats);
+  }, [dataset, guild, eventType]);
 
   // Pilot import helpers
   const normalizePilotName = (name: string) => name.trim().toLowerCase();
