@@ -162,7 +162,8 @@ export const ClassAnalytics = ({ filters }: Props) => {
               <div key={c.className} className="flex items-center gap-2 bg-card border border-border rounded-lg px-4 py-2">
                 <span className="text-lg font-bold text-muted-foreground">{i + 1}º</span>
                 <span className="font-medium text-foreground">{c.className}</span>
-                <Badge variant="outline" className="text-xs">{c.pickRate}% pick</Badge>
+                <Badge variant="outline" className="text-xs">KDA {c.kda}</Badge>
+                <Badge variant="outline" className="text-xs">{c.kills} kills</Badge>
                 <Badge variant="default" className="text-xs">META {c.metaScore}</Badge>
               </div>
             ))}
