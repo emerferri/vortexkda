@@ -139,7 +139,7 @@ export const ClassAnalytics = ({ filters }: Props) => {
     if (!data) return [];
     return [...data.stats]
       .filter(s => s.className !== 'Desconhecido' && s.players >= 2)
-      .sort((a, b) => b.dominanceScore - a.dominanceScore);
+      .sort((a, b) => b.metaScore - a.metaScore);
   }, [data]);
 
   if (isLoading || !data) {
