@@ -139,7 +139,7 @@ export const ClassAnalytics = ({ filters }: Props) => {
   const meta = useMemo(() => {
     if (!data) return [];
     return [...data.stats]
-      .filter(s => s.className !== 'Desconhecido' && s.players >= 2)
+      .filter(s => s.className !== 'Desconhecido' && s.players >= 1)
       .sort((a, b) => b.dominanceScore - a.dominanceScore);
   }, [data]);
 
