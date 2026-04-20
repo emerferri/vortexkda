@@ -1,13 +1,10 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Brain, Loader2, AlertTriangle } from 'lucide-react';
+import { Brain, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import {
-  AnalyticsFilters, fetchFilteredMatchIds, fetchKillLogsForMatches,
-  fetchAllCharacters, buildCharacterMap, filterBanned, filterByGuild
-} from '@/hooks/useAnalyticsData';
+import { AnalyticsFilters } from '@/hooks/useAnalyticsData';
+import { useAnalyticsDataset } from '@/hooks/useAnalyticsDataset';
 import { toast } from 'sonner';
 
 interface Props {
@@ -17,21 +14,19 @@ interface Props {
 export const AIInsights = ({ filters }: Props) => {
   const [insights, setInsights] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  // Reuses the shared dataset cache — instant if the user visited any other tab first.
+  const { data: dataset, isLoading: datasetLoading } = useAnalyticsDataset(filters);
 
   const generateInsights = async () => {
+    if (!dataset) {
+      toast.error('Dados ainda carregando, aguarde...');
+      return;
+    }
     setLoading(true);
     setInsights('');
 
     try {
-      // Gather aggregated data
-      const [matchIds, characters] = await Promise.all([
-        fetchFilteredMatchIds(filters),
-        fetchAllCharacters(),
-      ]);
-      const charMap = buildCharacterMap(characters);
-      let logs = await fetchKillLogsForMatches(matchIds);
-      logs = filterBanned(logs, charMap);
-      logs = filterByGuild(logs, filters.guild, charMap);
+      const { logs, charMap, matchIds } = dataset;
 
       // Aggregate top players
       const playerKills = new Map<string, number>();
