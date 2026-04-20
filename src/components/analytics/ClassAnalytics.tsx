@@ -82,20 +82,38 @@ export const ClassAnalytics = ({ filters }: Props) => {
       const stats: ClassStat[] = [];
       const allClasses = new Set([...classPlayers.keys(), ...classKills.keys(), ...classDeaths.keys()]);
 
+      // Pre-compute max kills (for normalization in metaScore)
+      let maxKills = 0;
+      for (const cls of allClasses) {
+        const k = classKills.get(cls) || 0;
+        if (k > maxKills) maxKills = k;
+      }
+
       for (const cls of allClasses) {
         const players = classPlayers.get(cls)?.size || 0;
         const kills = classKills.get(cls) || 0;
         const deaths = classDeaths.get(cls) || 0;
+        const kda = deaths === 0 ? kills : kills / deaths;
+        const pickRate = totalPlayers === 0 ? 0 : (players / totalPlayers) * 100;
+        const killsNorm = maxKills === 0 ? 0 : (kills / maxKills) * 100;
+
+        // META score = popularity (50%) + performance KDA (30%) + raw impact (20%)
+        // KDA is capped at 5 to prevent outliers (e.g. 4 players with 0 deaths) from dominating.
+        const cappedKda = Math.min(kda, 5);
+        const metaScore = Math.round(
+          (pickRate * 0.5) + (cappedKda * 20 * 0.3) + (killsNorm * 0.2)
+        );
 
         stats.push({
           className: cls,
           players,
           kills,
           deaths,
-          kda: deaths === 0 ? kills : Math.round((kills / deaths) * 100) / 100,
+          kda: Math.round(kda * 100) / 100,
           efficiency: players === 0 ? 0 : Math.round((kills / players) * 100) / 100,
           dominanceScore: players === 0 ? 0 : Math.round(((kills - deaths) / players) * 100) / 100,
-          pickRate: totalPlayers === 0 ? 0 : Math.round((players / totalPlayers) * 100),
+          pickRate: Math.round(pickRate),
+          metaScore,
         });
       }
 
