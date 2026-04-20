@@ -1,16 +1,13 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Swords, Users, Shield } from 'lucide-react';
-import {
-  AnalyticsFilters, fetchFilteredMatchIds, fetchKillLogsForMatches,
-  fetchAllCharacters, buildCharacterMap, filterBanned, filterByGuild
-} from '@/hooks/useAnalyticsData';
+import { Swords, Shield } from 'lucide-react';
+import { AnalyticsFilters } from '@/hooks/useAnalyticsData';
+import { useAnalyticsDataset } from '@/hooks/useAnalyticsDataset';
 
 interface Props {
   filters: AnalyticsFilters;
@@ -22,21 +19,11 @@ export const DirectCombat = ({ filters }: Props) => {
   const [guildA, setGuildA] = useState('');
   const [guildB, setGuildB] = useState('');
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['analytics-direct', filters],
-    queryFn: async () => {
-      const [matchIds, characters] = await Promise.all([
-        fetchFilteredMatchIds(filters),
-        fetchAllCharacters(),
-      ]);
-      const charMap = buildCharacterMap(characters);
-      let logs = await fetchKillLogsForMatches(matchIds);
-      logs = filterBanned(logs, charMap);
-      logs = filterByGuild(logs, filters.guild, charMap);
-      return { logs, charMap, characters };
-    },
-    staleTime: 60000,
-  });
+  const { data: dataset, isLoading } = useAnalyticsDataset(filters);
+  const data = useMemo(() => {
+    if (!dataset) return null;
+    return { logs: dataset.logs, charMap: dataset.charMap, characters: dataset.characters };
+  }, [dataset]);
 
   // Player vs Player
   const pvpResult = useMemo(() => {
