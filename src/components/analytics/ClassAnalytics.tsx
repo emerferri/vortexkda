@@ -113,10 +113,8 @@ export const ClassAnalytics = ({ filters }: Props) => {
         }
       }
 
-      return { stats: stats.sort((a, b) => b.dominanceScore - a.dominanceScore), classVsClass, matrix, classes };
-    },
-    staleTime: 60000,
-  });
+    return { stats: stats.sort((a, b) => b.dominanceScore - a.dominanceScore), classVsClass, matrix, classes };
+  }, [dataset]);
 
   const meta = useMemo(() => {
     if (!data) return [];
@@ -125,11 +123,9 @@ export const ClassAnalytics = ({ filters }: Props) => {
       .sort((a, b) => b.dominanceScore - a.dominanceScore);
   }, [data]);
 
-  if (isLoading) {
+  if (isLoading || !data) {
     return <div className="text-center py-8 text-muted-foreground">Carregando dados das classes...</div>;
   }
-
-  if (!data) return null;
 
   return (
     <div className="space-y-6">
