@@ -140,7 +140,7 @@ export const ClassAnalytics = ({ filters }: Props) => {
     if (!data) return [];
     return [...data.stats]
       .filter(s => s.className !== 'Desconhecido' && s.players >= 2)
-      .sort((a, b) => b.metaScore - a.metaScore);
+      .sort((a, b) => b.dominanceScore - a.dominanceScore);
   }, [data]);
 
   if (isLoading || !data) {
@@ -163,8 +163,10 @@ export const ClassAnalytics = ({ filters }: Props) => {
                 <span className="text-lg font-bold text-muted-foreground">{i + 1}º</span>
                 <span className="font-medium text-foreground">{c.className}</span>
                 <Badge variant="outline" className="text-xs">KDA {c.kda}</Badge>
-                <Badge variant="outline" className="text-xs">{c.kills} kills</Badge>
-                <Badge variant="default" className="text-xs">META {c.metaScore}</Badge>
+                <Badge variant="outline" className="text-xs">Efic. {c.efficiency}</Badge>
+                <Badge variant={c.dominanceScore > 0 ? 'default' : 'destructive'} className="text-xs">
+                  Score {c.dominanceScore > 0 ? '+' : ''}{c.dominanceScore}
+                </Badge>
               </div>
             ))}
           </div>
