@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AnalyticsFiltersBar } from './AnalyticsFilters';
 import { PlayerAnalytics } from './PlayerAnalytics';
 import { GuildAnalytics } from './GuildAnalytics';
@@ -13,6 +13,7 @@ import { BarChart3, Users, Swords, Shield, LineChart, Brain, Target } from 'luci
 
 export const PvPAnalyticsDashboard = () => {
   const [filters, setFilters] = useState<AnalyticsFilters>(defaultFilters);
+  const [activeTab, setActiveTab] = useState('players');
 
   return (
     <div className="space-y-6">
@@ -28,7 +29,7 @@ export const PvPAnalyticsDashboard = () => {
 
       <AnalyticsFiltersBar filters={filters} onChange={setFilters} />
 
-      <Tabs defaultValue="players" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid grid-cols-4 md:grid-cols-7 w-full">
           <TabsTrigger value="players" className="gap-1 text-xs">
             <Users className="w-3 h-3" /> Players
@@ -53,27 +54,21 @@ export const PvPAnalyticsDashboard = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="players">
-          <PlayerAnalytics filters={filters} />
-        </TabsContent>
-        <TabsContent value="guilds">
-          <GuildAnalytics filters={filters} />
-        </TabsContent>
-        <TabsContent value="pvp">
-          <DirectCombat filters={filters} />
-        </TabsContent>
-        <TabsContent value="classes">
-          <ClassAnalytics filters={filters} />
-        </TabsContent>
-        <TabsContent value="charts">
-          <AnalyticsCharts filters={filters} />
-        </TabsContent>
-        <TabsContent value="team">
-          <TeamBuilder filters={filters} />
-        </TabsContent>
-        <TabsContent value="insights">
-          <AIInsights filters={filters} />
-        </TabsContent>
+        {/*
+          Lazy-mount: render ONLY the active tab. This avoids 7 simultaneous
+          queries / heavy aggregations when the dashboard opens. The shared
+          useAnalyticsDataset cache means switching tabs is instant after the
+          first load.
+        */}
+        <div className="mt-4">
+          {activeTab === 'players' && <PlayerAnalytics filters={filters} />}
+          {activeTab === 'guilds' && <GuildAnalytics filters={filters} />}
+          {activeTab === 'pvp' && <DirectCombat filters={filters} />}
+          {activeTab === 'classes' && <ClassAnalytics filters={filters} />}
+          {activeTab === 'charts' && <AnalyticsCharts filters={filters} />}
+          {activeTab === 'team' && <TeamBuilder filters={filters} />}
+          {activeTab === 'insights' && <AIInsights filters={filters} />}
+        </div>
       </Tabs>
     </div>
   );

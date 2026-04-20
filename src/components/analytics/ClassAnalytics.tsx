@@ -1,14 +1,11 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Crown, Zap, BarChart3, Target } from 'lucide-react';
-import {
-  AnalyticsFilters, fetchFilteredMatchIds, fetchKillLogsForMatches,
-  fetchAllCharacters, buildCharacterMap, filterBanned, filterByGuild
-} from '@/hooks/useAnalyticsData';
+import { Crown, Target } from 'lucide-react';
+import { AnalyticsFilters } from '@/hooks/useAnalyticsData';
+import { useAnalyticsDataset } from '@/hooks/useAnalyticsDataset';
 
 interface Props {
   filters: AnalyticsFilters;
@@ -32,17 +29,11 @@ interface ClassVsClass {
 }
 
 export const ClassAnalytics = ({ filters }: Props) => {
-  const { data, isLoading } = useQuery({
-    queryKey: ['analytics-classes', filters],
-    queryFn: async () => {
-      const [matchIds, characters] = await Promise.all([
-        fetchFilteredMatchIds(filters),
-        fetchAllCharacters(),
-      ]);
-      const charMap = buildCharacterMap(characters);
-      let logs = await fetchKillLogsForMatches(matchIds);
-      logs = filterBanned(logs, charMap);
-      logs = filterByGuild(logs, filters.guild, charMap);
+  const { data: dataset, isLoading } = useAnalyticsDataset(filters);
+
+  const data = useMemo(() => {
+    if (!dataset) return null;
+    const { logs, charMap } = dataset;
 
       // Count players per class
       const classPlayers = new Map<string, Set<string>>();
@@ -122,10 +113,8 @@ export const ClassAnalytics = ({ filters }: Props) => {
         }
       }
 
-      return { stats: stats.sort((a, b) => b.dominanceScore - a.dominanceScore), classVsClass, matrix, classes };
-    },
-    staleTime: 60000,
-  });
+    return { stats: stats.sort((a, b) => b.dominanceScore - a.dominanceScore), classVsClass, matrix, classes };
+  }, [dataset]);
 
   const meta = useMemo(() => {
     if (!data) return [];
@@ -134,11 +123,9 @@ export const ClassAnalytics = ({ filters }: Props) => {
       .sort((a, b) => b.dominanceScore - a.dominanceScore);
   }, [data]);
 
-  if (isLoading) {
+  if (isLoading || !data) {
     return <div className="text-center py-8 text-muted-foreground">Carregando dados das classes...</div>;
   }
-
-  if (!data) return null;
 
   return (
     <div className="space-y-6">

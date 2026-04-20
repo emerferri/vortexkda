@@ -1,13 +1,10 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Brain, Loader2, AlertTriangle } from 'lucide-react';
+import { Brain, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import {
-  AnalyticsFilters, fetchFilteredMatchIds, fetchKillLogsForMatches,
-  fetchAllCharacters, buildCharacterMap, filterBanned, filterByGuild
-} from '@/hooks/useAnalyticsData';
+import { AnalyticsFilters } from '@/hooks/useAnalyticsData';
+import { useAnalyticsDataset } from '@/hooks/useAnalyticsDataset';
 import { toast } from 'sonner';
 
 interface Props {
@@ -17,21 +14,19 @@ interface Props {
 export const AIInsights = ({ filters }: Props) => {
   const [insights, setInsights] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  // Reuses the shared dataset cache — instant if the user visited any other tab first.
+  const { data: dataset, isLoading: datasetLoading } = useAnalyticsDataset(filters);
 
   const generateInsights = async () => {
+    if (!dataset) {
+      toast.error('Dados ainda carregando, aguarde...');
+      return;
+    }
     setLoading(true);
     setInsights('');
 
     try {
-      // Gather aggregated data
-      const [matchIds, characters] = await Promise.all([
-        fetchFilteredMatchIds(filters),
-        fetchAllCharacters(),
-      ]);
-      const charMap = buildCharacterMap(characters);
-      let logs = await fetchKillLogsForMatches(matchIds);
-      logs = filterBanned(logs, charMap);
-      logs = filterByGuild(logs, filters.guild, charMap);
+      const { logs, charMap, matchIds } = dataset;
 
       // Aggregate top players
       const playerKills = new Map<string, number>();
@@ -132,9 +127,9 @@ export const AIInsights = ({ filters }: Props) => {
           <p className="text-sm text-muted-foreground">
             A IA analisa os dados de PvP e gera insights sobre dominâncias, rivalidades, tendências e a META do servidor.
           </p>
-          <Button onClick={generateInsights} disabled={loading} className="gap-2">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
-            {loading ? 'Analisando...' : 'Gerar Insights'}
+          <Button onClick={generateInsights} disabled={loading || datasetLoading} className="gap-2">
+            {(loading || datasetLoading) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
+            {datasetLoading ? 'Carregando dados...' : loading ? 'Analisando...' : 'Gerar Insights'}
           </Button>
 
           {insights && (

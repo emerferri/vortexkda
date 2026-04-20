@@ -1,14 +1,11 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Shield, Trophy, Skull, Target, Users } from 'lucide-react';
-import {
-  AnalyticsFilters, fetchFilteredMatchIds, fetchKillLogsForMatches,
-  fetchAllCharacters, buildCharacterMap, filterBanned, filterByGuild
-} from '@/hooks/useAnalyticsData';
+import { AnalyticsFilters } from '@/hooks/useAnalyticsData';
+import { useAnalyticsDataset } from '@/hooks/useAnalyticsDataset';
 
 interface Props {
   filters: AnalyticsFilters;
@@ -29,19 +26,13 @@ interface GuildStat {
 export const GuildAnalytics = ({ filters }: Props) => {
   const [selectedGuild, setSelectedGuild] = useState<string>('');
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['analytics-guilds', filters],
-    queryFn: async () => {
-      const [matchIds, characters] = await Promise.all([
-        fetchFilteredMatchIds(filters),
-        fetchAllCharacters(),
-      ]);
-      const charMap = buildCharacterMap(characters);
-      let logs = await fetchKillLogsForMatches(matchIds);
-      logs = filterBanned(logs, charMap);
-      logs = filterByGuild(logs, filters.guild, charMap);
+  const { data: dataset, isLoading } = useAnalyticsDataset(filters);
 
-      // Track unique active players per guild (only those who appear in logs)
+  const data = useMemo<GuildStat[] | null>(() => {
+    if (!dataset) return null;
+    const { logs, charMap } = dataset;
+
+    // Track unique active players per guild (only those who appear in logs)
       const guildActiveMembers = new Map<string, Set<string>>();
       const guildKills = new Map<string, number>();
       const guildDeaths = new Map<string, number>();
@@ -134,15 +125,13 @@ export const GuildAnalytics = ({ filters }: Props) => {
         });
       }
 
-      return stats.sort((a, b) => b.kda - a.kda);
-    },
-    staleTime: 60000,
-  });
+    return stats.sort((a, b) => b.kda - a.kda);
+  }, [dataset]);
 
   const guilds = useMemo(() => (data || []).map(g => g.guild).sort(), [data]);
   const detail = useMemo(() => data?.find(g => g.guild === selectedGuild), [data, selectedGuild]);
 
-  if (isLoading) {
+  if (isLoading || !data) {
     return <div className="text-center py-8 text-muted-foreground">Carregando dados das guilds...</div>;
   }
 

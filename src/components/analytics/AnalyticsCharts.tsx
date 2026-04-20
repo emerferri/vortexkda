@@ -1,14 +1,10 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { supabase } from '@/integrations/supabase/client';
-import {
-  AnalyticsFilters, fetchFilteredMatchIds, fetchKillLogsForMatches,
-  fetchAllCharacters, buildCharacterMap, filterBanned, filterByGuild
-} from '@/hooks/useAnalyticsData';
+import { AnalyticsFilters } from '@/hooks/useAnalyticsData';
+import { useAnalyticsDataset } from '@/hooks/useAnalyticsDataset';
 
 interface Props {
   filters: AnalyticsFilters;
@@ -19,35 +15,16 @@ const COLORS = ['hsl(190, 95%, 55%)', 'hsl(0, 85%, 60%)', 'hsl(142, 76%, 45%)', 
 export const AnalyticsCharts = ({ filters }: Props) => {
   const [chartPlayer, setChartPlayer] = useState('');
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['analytics-charts', filters],
-    queryFn: async () => {
-      const [matchIds, characters] = await Promise.all([
-        fetchFilteredMatchIds(filters),
-        fetchAllCharacters(),
-      ]);
-      const charMap = buildCharacterMap(characters);
-
-      // Get matches with dates
-      let matchQuery = supabase.from('pvp_matches').select('id, match_date');
-      if (filters.eventType !== 'all') matchQuery = matchQuery.eq('event_type', filters.eventType);
-      if (filters.dateFrom) matchQuery = matchQuery.gte('match_date', filters.dateFrom);
-      if (filters.dateTo) matchQuery = matchQuery.lte('match_date', filters.dateTo);
-
-      const { data: matches } = await matchQuery;
-      const matchDateMap = new Map<string, string>();
-      for (const m of matches || []) {
-        matchDateMap.set(m.id, m.match_date);
-      }
-
-      let logs = await fetchKillLogsForMatches(matchIds);
-      logs = filterBanned(logs, charMap);
-      logs = filterByGuild(logs, filters.guild, charMap);
-
-      return { logs, charMap, matchDateMap, characters };
-    },
-    staleTime: 60000,
-  });
+  const { data: dataset, isLoading } = useAnalyticsDataset(filters);
+  const data = useMemo(() => {
+    if (!dataset) return null;
+    return {
+      logs: dataset.logs,
+      charMap: dataset.charMap,
+      matchDateMap: dataset.matchDateMap,
+      characters: dataset.characters,
+    };
+  }, [dataset]);
 
   // Player kills/deaths per day
   const playerDailyData = useMemo(() => {
