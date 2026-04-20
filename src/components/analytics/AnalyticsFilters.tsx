@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Filter, RotateCcw } from 'lucide-react';
+import { Filter, RotateCcw, Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { AnalyticsFilters as FiltersType, defaultFilters } from '@/hooks/useAnalyticsData';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 
 interface AnalyticsFiltersProps {
   filters: FiltersType;
@@ -99,23 +102,67 @@ export const AnalyticsFiltersBar = ({ filters, onChange }: AnalyticsFiltersProps
     <div className="flex flex-wrap items-center gap-3 p-4 bg-card/50 rounded-lg border border-border">
       <Filter className="w-4 h-4 text-muted-foreground" />
 
-      <Input
-        placeholder="Data início (dd/mm/aaaa)"
-        value={dateFromInput}
-        onChange={(e) => setDateFromInput(e.target.value)}
-        onBlur={handleDateFromBlur}
-        onKeyDown={(e) => handleDateKeyDown(e, 'from')}
-        className="w-[170px] h-8 text-xs"
-      />
+      <div className="flex items-center gap-1">
+        <Input
+          placeholder="Data início (dd/mm/aaaa)"
+          value={dateFromInput}
+          onChange={(e) => setDateFromInput(e.target.value)}
+          onBlur={handleDateFromBlur}
+          onKeyDown={(e) => handleDateKeyDown(e, 'from')}
+          className="w-[170px] h-8 text-xs"
+        />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="icon" className="h-8 w-8 shrink-0">
+              <CalendarIcon className="h-3.5 w-3.5" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={filters.dateFrom ? new Date(filters.dateFrom + 'T00:00:00') : undefined}
+              onSelect={(d) => {
+                if (!d) return;
+                const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                onChange({ ...filters, dateFrom: iso });
+              }}
+              initialFocus
+              className={cn('p-3 pointer-events-auto')}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
 
-      <Input
-        placeholder="Data fim (dd/mm/aaaa)"
-        value={dateToInput}
-        onChange={(e) => setDateToInput(e.target.value)}
-        onBlur={handleDateToBlur}
-        onKeyDown={(e) => handleDateKeyDown(e, 'to')}
-        className="w-[170px] h-8 text-xs"
-      />
+      <div className="flex items-center gap-1">
+        <Input
+          placeholder="Data fim (dd/mm/aaaa)"
+          value={dateToInput}
+          onChange={(e) => setDateToInput(e.target.value)}
+          onBlur={handleDateToBlur}
+          onKeyDown={(e) => handleDateKeyDown(e, 'to')}
+          className="w-[170px] h-8 text-xs"
+        />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="icon" className="h-8 w-8 shrink-0">
+              <CalendarIcon className="h-3.5 w-3.5" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={filters.dateTo ? new Date(filters.dateTo + 'T00:00:00') : undefined}
+              onSelect={(d) => {
+                if (!d) return;
+                const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                onChange({ ...filters, dateTo: iso });
+              }}
+              initialFocus
+              className={cn('p-3 pointer-events-auto')}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
 
       <Select
         value={filters.hourFrom !== null ? String(filters.hourFrom) : 'all'}
