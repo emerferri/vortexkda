@@ -127,9 +127,9 @@ export const AIInsights = ({ filters }: Props) => {
           <p className="text-sm text-muted-foreground">
             A IA analisa os dados de PvP e gera insights sobre dominâncias, rivalidades, tendências e a META do servidor.
           </p>
-          <Button onClick={generateInsights} disabled={loading} className="gap-2">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
-            {loading ? 'Analisando...' : 'Gerar Insights'}
+          <Button onClick={generateInsights} disabled={loading || datasetLoading} className="gap-2">
+            {(loading || datasetLoading) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
+            {datasetLoading ? 'Carregando dados...' : loading ? 'Analisando...' : 'Gerar Insights'}
           </Button>
 
           {insights && (
