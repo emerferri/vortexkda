@@ -20,6 +20,7 @@ interface ClassStat {
   efficiency: number; // kills/players
   dominanceScore: number; // (kills-deaths)/players
   pickRate: number;
+  metaScore: number; // pick rate + performance combined
 }
 
 interface ClassVsClass {
