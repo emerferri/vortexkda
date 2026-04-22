@@ -18,24 +18,7 @@ import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 
-const CLASS_SHORT_MAP: Record<string, string> = {
-  'Ignition Knight': 'DrK',
-  'Force Emperor': 'ER',
-  'Infinity Rune Wizard': 'RW4',
-  'Royal Elf': 'NE',
-  'Creator': 'ACL',
-  'Darkness Wizard': 'SW',
-  'Bloody Fighter': 'FB',
-  'Arcane Lancer': 'SL',
-  'Endless Summoner': 'DS',
-  'Glory Wizard': 'LW',
-  'Magnus Gun Crusher': 'HGC',
-  'Battle Mage': 'MM',
-  'Rogue Slayer': 'SLT',
-  'Douple Knight': 'MK',
-  'Phantom Pain Knight': 'MYK',
-  'Templar Commander': 'TMC',
-};
+import { CLASS_SHORT_MAP } from '@/lib/classShortMap';
 
 interface Character {
   id: string;
