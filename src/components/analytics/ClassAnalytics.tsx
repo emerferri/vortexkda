@@ -157,11 +157,20 @@ export const ClassAnalytics = ({ filters }: Props) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <p className="text-xs text-muted-foreground mb-3">
+            Classes ordenadas por Score de Dominância. Inclui todas as classes ativas no período (mesmo com apenas 1 jogador).
+          </p>
           <div className="flex flex-wrap gap-3">
             {meta.map((c, i) => (
-              <div key={c.className} className="flex items-center gap-2 bg-card border border-border rounded-lg px-4 py-2">
+              <div
+                key={c.className}
+                className={`flex items-center gap-2 bg-card border rounded-lg px-4 py-2 ${
+                  c.players === 1 ? 'border-warning/60' : 'border-border'
+                }`}
+              >
                 <span className="text-lg font-bold text-muted-foreground">{i + 1}º</span>
                 <span className="font-medium text-foreground">{c.className}</span>
+                <Badge variant="secondary" className="text-xs">{c.players} {c.players === 1 ? 'player' : 'players'}</Badge>
                 <Badge variant="outline" className="text-xs">KDA {c.kda}</Badge>
                 <Badge variant="outline" className="text-xs">Efic. {c.efficiency}</Badge>
                 <Badge variant={c.dominanceScore > 0 ? 'default' : 'destructive'} className="text-xs">
