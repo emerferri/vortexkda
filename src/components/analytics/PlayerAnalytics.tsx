@@ -125,6 +125,14 @@ export const PlayerAnalytics = ({ filters }: Props) => {
     for (const [name, p] of players) {
       const char = charMap.get(name);
 
+      // When a class filter is active, only include players whose OWN class
+      // matches it. The shared `filterByClass` keeps logs where killer OR
+      // victim matches (needed for matchup analytics), but in the Players
+      // tab that leaks players of other classes into the rankings.
+      if (filters.playerClass && char?.class !== filters.playerClass) {
+        continue;
+      }
+
       let rivalKilled: PlayerStat['rivalKilled'] = null;
       let maxKillsTo = 0;
       for (const [vName, count] of p.killsTo) {
