@@ -107,7 +107,8 @@ export const Characters = () => {
       for (const p of allPlayers || []) {
         const display = (p.player_name || '').replace(/\s+/g, ' ').trim();
         const key = normalize(display);
-        if (key) playersByNorm.set(key, display);
+        const isLikelyGarbageName = !/[a-z]/i.test(display);
+        if (key && !isLikelyGarbageName) playersByNorm.set(key, display);
       }
       console.log('[Characters] allPlayers unique (normalized) count:', playersByNorm.size);
       console.log('[Characters] allPlayers sample (first 20):', Array.from(playersByNorm.values()).slice(0, 20));
