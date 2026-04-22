@@ -59,14 +59,23 @@ export const Characters = () => {
 
   const loadCharacters = async () => {
     try {
-      // Get all registered characters (explicit columns to avoid reserved-word issues)
-      const { data: registeredChars, error: charsError } = await supabase
-        .from('characters')
-        .select('id, name, guild, class, class_short, banned, pilot_name')
-        .order('name');
-
-      if (charsError) throw charsError;
-      console.log('[Characters] registeredChars count:', registeredChars?.length ?? 0);
+      // Get all registered characters with pagination (Supabase default limit is 1000)
+      const CHAR_PAGE_SIZE = 1000;
+      let charFrom = 0;
+      let registeredChars: any[] = [];
+      while (true) {
+        const { data, error: charsError } = await supabase
+          .from('characters')
+          .select('id, name, guild, class, class_short, banned, pilot_name')
+          .order('name')
+          .range(charFrom, charFrom + CHAR_PAGE_SIZE - 1);
+        if (charsError) throw charsError;
+        const batch = data || [];
+        registeredChars = registeredChars.concat(batch);
+        if (batch.length < CHAR_PAGE_SIZE) break;
+        charFrom += CHAR_PAGE_SIZE;
+      }
+      console.log('[Characters] registeredChars count:', registeredChars.length);
 
       // Get all player names from matches with pagination (default limit is 1000)
       const PAGE_SIZE = 1000;
