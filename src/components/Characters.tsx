@@ -548,6 +548,30 @@ export const Characters = () => {
               aria-label="Buscar por nome, guild ou classe"
             />
           </div>
+          <Select value={classFilter} onValueChange={setClassFilter}>
+            <SelectTrigger className="w-[180px]" aria-label="Filtrar por classe">
+              <SelectValue placeholder="Classe" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[300px]">
+              <SelectItem value="all">Todas as classes</SelectItem>
+              <SelectItem value="__empty__">Sem classe</SelectItem>
+              {uniqueClasses.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={guildFilter} onValueChange={setGuildFilter}>
+            <SelectTrigger className="w-[180px]" aria-label="Filtrar por guild">
+              <SelectValue placeholder="Guild" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[300px]">
+              <SelectItem value="all">Todas as guilds</SelectItem>
+              <SelectItem value="__empty__">Sem guild</SelectItem>
+              {uniqueGuilds.map((g) => (
+                <SelectItem key={g} value={g}>{g}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             variant={showUnregisteredOnly ? "default" : "outline"}
             onClick={() => setShowUnregisteredOnly(!showUnregisteredOnly)}
