@@ -362,63 +362,6 @@ export const RankingArkaWar = () => {
         </div>
       ) : (
         <>
-          <div className="bg-card/50 p-6 rounded-xl border border-border space-y-4">
-            <div className="flex flex-wrap gap-4 justify-center items-center">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-muted-foreground">Classe:</span>
-                <Select value={classFilter} onValueChange={setClassFilter}>
-                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Todas as classes" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {classOptions?.map(opt => <SelectItem key={opt.key} value={opt.key}>{opt.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-muted-foreground">Guild:</span>
-                <Select value={guildFilter} onValueChange={setGuildFilter}>
-                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Todas as guilds" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {guildOptions.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-muted-foreground">De:</span>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("w-[200px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateFrom ? format(dateFrom, "PPP", { locale: ptBR }) : "Selecione"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-muted-foreground">Até:</span>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("w-[200px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateTo ? format(dateTo, "PPP", { locale: ptBR }) : "Selecione"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <Button variant="ghost" onClick={() => { setDateFrom(undefined); setDateTo(undefined); setClassFilter('all'); setGuildFilter('all'); }} className="text-sm">
-                Limpar Filtros
-              </Button>
-            </div>
-          </div>
-
-          {/* Special Cards */}
           <div ref={specialCardsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-success/10 border-2 border-success rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
               <Trophy className="w-10 h-10 text-success mx-auto mb-3 animate-pulse" />
