@@ -436,22 +436,7 @@ export const RankingGeral = () => {
     </button>
   );
 
-  if (isLoading) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        <p>Carregando dados...</p>
-      </div>
-    );
-  }
-
-  if (!sortedPlayers || sortedPlayers.length === 0) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        <Crosshair className="w-16 h-16 mx-auto mb-4 opacity-50" />
-        <p>Nenhum dado encontrado para o período selecionado.</p>
-      </div>
-    );
-  }
+  const hasNoData = !isLoading && (!sortedPlayers || sortedPlayers.length === 0);
 
   return (
     <div className="space-y-6">
@@ -593,6 +578,18 @@ export const RankingGeral = () => {
         </div>
       </div>
 
+      {isLoading ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <p>Carregando dados...</p>
+        </div>
+      ) : hasNoData ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <Crosshair className="w-16 h-16 mx-auto mb-4 opacity-50" />
+          <p>Nenhum dado encontrado para o período selecionado.</p>
+          <p className="text-sm mt-2">Ajuste os filtros acima para ver outros resultados.</p>
+        </div>
+      ) : (
+      <>
       {/* Classificações Especiais */}
       <div ref={specialCardsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-success/10 border-2 border-success rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
@@ -940,6 +937,8 @@ export const RankingGeral = () => {
           })()}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };
