@@ -143,13 +143,23 @@ export const ClassGuildRanking = () => {
         });
       });
 
-      // Fetch all characters (excluding banned)
-      const { data: characters, error: charError } = await supabase
-        .from('characters')
-        .select('name, class, guild, banned')
-        .eq('banned', false);
-
-      if (charError) throw charError;
+      // Fetch all characters (excluding banned) with pagination
+      // Supabase default limit is 1000 per query — without paging, characters > 1000 are silently dropped
+      const CHAR_PAGE_SIZE = 1000;
+      let charFrom = 0;
+      let characters: { name: string; class: string | null; guild: string | null; banned: boolean }[] = [];
+      while (true) {
+        const { data, error: charError } = await supabase
+          .from('characters')
+          .select('name, class, guild, banned')
+          .eq('banned', false)
+          .range(charFrom, charFrom + CHAR_PAGE_SIZE - 1);
+        if (charError) throw charError;
+        const batch = data || [];
+        characters = characters.concat(batch);
+        if (batch.length < CHAR_PAGE_SIZE) break;
+        charFrom += CHAR_PAGE_SIZE;
+      }
 
       // Build character map
       const characterMap = new Map(
