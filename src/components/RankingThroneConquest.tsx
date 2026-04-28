@@ -542,23 +542,7 @@ export const RankingThroneConquest = () => {
     </button>
   );
 
-  if (isLoading) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        <p>Carregando dados do Throne Conquest...</p>
-      </div>
-    );
-  }
-
-  if (!sortedPlayers || sortedPlayers.length === 0) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        <Crown className="w-16 h-16 mx-auto mb-4 opacity-50" />
-        <p>Nenhum dado encontrado para o Throne Conquest.</p>
-        <p className="text-sm mt-2">O evento ocorre toda terça-feira das 21:36 às 22:36.</p>
-      </div>
-    );
-  }
+  const hasNoData = !isLoading && (!sortedPlayers || sortedPlayers.length === 0);
 
   return (
     <div className="space-y-6">
