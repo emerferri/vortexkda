@@ -937,6 +937,8 @@ export const RankingGeral = () => {
           })()}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };
