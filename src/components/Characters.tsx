@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toast } from '@/hooks/use-toast';
 import { Loader2, Plus, Search, Trash2, Pencil, Filter, FilterX, FileUp, RefreshCw, ChevronDown, Ban, ShieldCheck } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +42,8 @@ export const Characters = () => {
   const [formData, setFormData] = useState({ name: '', guild: '', class: '', class_short: '', pilot_name: '' });
   const [submitting, setSubmitting] = useState(false);
   const [showUnregisteredOnly, setShowUnregisteredOnly] = useState(false);
+  const [classFilter, setClassFilter] = useState<string>('all');
+  const [guildFilter, setGuildFilter] = useState<string>('all');
   const [searchParams] = useSearchParams();
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -468,6 +471,15 @@ export const Characters = () => {
   const unregisteredCount = characters.filter(isIncomplete).length;
 
   const normalizedSearch = searchTerm.toLowerCase();
+
+  // Build unique sorted lists for class and guild filters (from registered + unregistered)
+  const uniqueClasses = Array.from(
+    new Set(characters.map(c => (c.class ?? '').trim()).filter(v => v !== ''))
+  ).sort((a, b) => a.localeCompare(b));
+  const uniqueGuilds = Array.from(
+    new Set(characters.map(c => (c.guild ?? '').trim()).filter(v => v !== ''))
+  ).sort((a, b) => a.localeCompare(b));
+
   const filteredCharacters = characters.filter((char) => {
     const nameMatch = (char.name ?? '').toLowerCase().includes(normalizedSearch);
     const guildMatch = (char.guild ?? '').toLowerCase().includes(normalizedSearch);
@@ -475,9 +487,18 @@ export const Characters = () => {
     const matchesSearch = nameMatch || guildMatch || classMatch;
 
     const isUnregistered = isIncomplete(char);
-    const matchesFilter = showUnregisteredOnly ? isUnregistered : true;
+    const matchesUnregistered = showUnregisteredOnly ? isUnregistered : true;
 
-    return matchesSearch && matchesFilter;
+    const charClass = (char.class ?? '').trim();
+    const charGuild = (char.guild ?? '').trim();
+    const matchesClass =
+      classFilter === 'all' ||
+      (classFilter === '__empty__' ? charClass === '' : charClass === classFilter);
+    const matchesGuild =
+      guildFilter === 'all' ||
+      (guildFilter === '__empty__' ? charGuild === '' : charGuild === guildFilter);
+
+    return matchesSearch && matchesUnregistered && matchesClass && matchesGuild;
   });
 
 
@@ -527,6 +548,30 @@ export const Characters = () => {
               aria-label="Buscar por nome, guild ou classe"
             />
           </div>
+          <Select value={classFilter} onValueChange={setClassFilter}>
+            <SelectTrigger className="w-[180px]" aria-label="Filtrar por classe">
+              <SelectValue placeholder="Classe" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[300px]">
+              <SelectItem value="all">Todas as classes</SelectItem>
+              <SelectItem value="__empty__">Sem classe</SelectItem>
+              {uniqueClasses.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={guildFilter} onValueChange={setGuildFilter}>
+            <SelectTrigger className="w-[180px]" aria-label="Filtrar por guild">
+              <SelectValue placeholder="Guild" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[300px]">
+              <SelectItem value="all">Todas as guilds</SelectItem>
+              <SelectItem value="__empty__">Sem guild</SelectItem>
+              {uniqueGuilds.map((g) => (
+                <SelectItem key={g} value={g}>{g}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             variant={showUnregisteredOnly ? "default" : "outline"}
             onClick={() => setShowUnregisteredOnly(!showUnregisteredOnly)}
