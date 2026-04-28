@@ -1019,6 +1019,8 @@ export const RankingThroneConquest = () => {
           })()}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };
