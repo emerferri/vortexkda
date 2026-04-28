@@ -42,6 +42,8 @@ export const Characters = () => {
   const [formData, setFormData] = useState({ name: '', guild: '', class: '', class_short: '', pilot_name: '' });
   const [submitting, setSubmitting] = useState(false);
   const [showUnregisteredOnly, setShowUnregisteredOnly] = useState(false);
+  const [classFilter, setClassFilter] = useState<string>('all');
+  const [guildFilter, setGuildFilter] = useState<string>('all');
   const [searchParams] = useSearchParams();
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
