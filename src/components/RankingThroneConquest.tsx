@@ -663,6 +663,18 @@ export const RankingThroneConquest = () => {
         </div>
       </div>
 
+      {isLoading ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <p>Carregando dados do Throne Conquest...</p>
+        </div>
+      ) : hasNoData ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <Crown className="w-16 h-16 mx-auto mb-4 opacity-50" />
+          <p>Nenhum dado encontrado para o Throne Conquest com os filtros aplicados.</p>
+          <p className="text-sm mt-2">Ajuste os filtros acima ou clique em "Limpar Filtros".</p>
+        </div>
+      ) : (
+      <>
       {/* Classificações Especiais */}
       <div ref={specialCardsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-success/10 border-2 border-success rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
