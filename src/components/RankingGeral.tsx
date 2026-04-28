@@ -436,22 +436,7 @@ export const RankingGeral = () => {
     </button>
   );
 
-  if (isLoading) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        <p>Carregando dados...</p>
-      </div>
-    );
-  }
-
-  if (!sortedPlayers || sortedPlayers.length === 0) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        <Crosshair className="w-16 h-16 mx-auto mb-4 opacity-50" />
-        <p>Nenhum dado encontrado para o período selecionado.</p>
-      </div>
-    );
-  }
+  const hasNoData = !isLoading && (!sortedPlayers || sortedPlayers.length === 0);
 
   return (
     <div className="space-y-6">
