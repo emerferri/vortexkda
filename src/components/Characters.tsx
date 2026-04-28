@@ -471,6 +471,15 @@ export const Characters = () => {
   const unregisteredCount = characters.filter(isIncomplete).length;
 
   const normalizedSearch = searchTerm.toLowerCase();
+
+  // Build unique sorted lists for class and guild filters (from registered + unregistered)
+  const uniqueClasses = Array.from(
+    new Set(characters.map(c => (c.class ?? '').trim()).filter(v => v !== ''))
+  ).sort((a, b) => a.localeCompare(b));
+  const uniqueGuilds = Array.from(
+    new Set(characters.map(c => (c.guild ?? '').trim()).filter(v => v !== ''))
+  ).sort((a, b) => a.localeCompare(b));
+
   const filteredCharacters = characters.filter((char) => {
     const nameMatch = (char.name ?? '').toLowerCase().includes(normalizedSearch);
     const guildMatch = (char.guild ?? '').toLowerCase().includes(normalizedSearch);
@@ -478,9 +487,18 @@ export const Characters = () => {
     const matchesSearch = nameMatch || guildMatch || classMatch;
 
     const isUnregistered = isIncomplete(char);
-    const matchesFilter = showUnregisteredOnly ? isUnregistered : true;
+    const matchesUnregistered = showUnregisteredOnly ? isUnregistered : true;
 
-    return matchesSearch && matchesFilter;
+    const charClass = (char.class ?? '').trim();
+    const charGuild = (char.guild ?? '').trim();
+    const matchesClass =
+      classFilter === 'all' ||
+      (classFilter === '__empty__' ? charClass === '' : charClass === classFilter);
+    const matchesGuild =
+      guildFilter === 'all' ||
+      (guildFilter === '__empty__' ? charGuild === '' : charGuild === guildFilter);
+
+    return matchesSearch && matchesUnregistered && matchesClass && matchesGuild;
   });
 
 
