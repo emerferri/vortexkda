@@ -131,15 +131,40 @@ export const RankingThroneConquest = () => {
           .replace(/[^a-zA-Z0-9]/g, '')
           .toLowerCase();
 
-      const { data: characters } = await supabase
-        .from('characters')
-        .select('name, class, guild, banned, class_short')
-        .eq('banned', false);
+      const CHAR_PAGE = 1000;
+      const characters: any[] = [];
+      {
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from('characters')
+            .select('name, class, guild, banned, class_short')
+            .eq('banned', false)
+            .range(from, from + CHAR_PAGE - 1);
+          if (error) break;
+          if (!data || data.length === 0) break;
+          characters.push(...data);
+          if (data.length < CHAR_PAGE) break;
+          from += CHAR_PAGE;
+        }
+      }
 
-      const { data: bannedChars } = await supabase
-        .from('characters')
-        .select('name')
-        .eq('banned', true);
+      const bannedChars: any[] = [];
+      {
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from('characters')
+            .select('name')
+            .eq('banned', true)
+            .range(from, from + CHAR_PAGE - 1);
+          if (error) break;
+          if (!data || data.length === 0) break;
+          bannedChars.push(...data);
+          if (data.length < CHAR_PAGE) break;
+          from += CHAR_PAGE;
+        }
+      }
       
       const bannedNames = new Set((bannedChars || []).map(c => normalize((c.name || '').trim())));
 
