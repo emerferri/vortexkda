@@ -79,7 +79,9 @@ export const Conquistas = () => {
     const entries = Object.entries(playerBadges);
     const s = search.trim().toLowerCase();
     const filtered = s ? entries.filter(([name]) => name.toLowerCase().includes(s)) : entries;
-    return filtered.sort((a, b) => b[1].length - a[1].length).slice(0, 60);
+    const sorted = filtered.sort((a, b) => b[1].length - a[1].length);
+    // Quando há busca: mostra todos os resultados; sem busca: limita a 200
+    return s ? sorted : sorted.slice(0, 200);
   }, [playerBadges, search]);
 
   const runCheck = async () => {
