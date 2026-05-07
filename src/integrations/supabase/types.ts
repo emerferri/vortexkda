@@ -168,6 +168,89 @@ export type Database = {
         }
         Relationships: []
       }
+      season_snapshots: {
+        Row: {
+          created_at: string
+          extra_data: Json | null
+          id: string
+          player_class: string | null
+          player_guild: string | null
+          player_name: string
+          position: number
+          ranking_type: string
+          score: number
+          season_id: string
+        }
+        Insert: {
+          created_at?: string
+          extra_data?: Json | null
+          id?: string
+          player_class?: string | null
+          player_guild?: string | null
+          player_name: string
+          position: number
+          ranking_type: string
+          score?: number
+          season_id: string
+        }
+        Update: {
+          created_at?: string
+          extra_data?: Json | null
+          id?: string
+          player_class?: string | null
+          player_guild?: string | null
+          player_name?: string
+          position?: number
+          ranking_type?: string
+          score?: number
+          season_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "season_snapshots_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seasons: {
+        Row: {
+          closed_at: string | null
+          created_at: string
+          ended_at: string | null
+          id: string
+          month: number
+          name: string
+          started_at: string
+          status: string
+          year: number
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          month: number
+          name: string
+          started_at: string
+          status?: string
+          year: number
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          month?: number
+          name?: string
+          started_at?: string
+          status?: string
+          year?: number
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -200,6 +283,24 @@ export type Database = {
           _user_id: string
         }
         Returns: undefined
+      }
+      close_current_season: {
+        Args: never
+        Returns: {
+          closed_season_id: string
+          new_season_id: string
+          snapshots_created: number
+        }[]
+      }
+      get_active_season: {
+        Args: never
+        Returns: {
+          id: string
+          month: number
+          name: string
+          started_at: string
+          year: number
+        }[]
       }
       get_analytics_kill_logs: {
         Args: {
