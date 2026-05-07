@@ -135,22 +135,28 @@ export const MarcosConquistas = () => {
 
       {/* Recent achievements */}
       <Card className="gaming-card">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-primary" />
-            Conquistas Recentes
+            Conquistas {search ? `— "${search}"` : 'Recentes'}
           </CardTitle>
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar jogador..."
+            className="max-w-xs"
+          />
         </CardHeader>
         <CardContent>
           {loadingA ? (
             <Skeleton className="h-40 w-full" />
-          ) : !achievements || achievements.length === 0 ? (
+          ) : !filteredAchievements || filteredAchievements.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              Nenhuma conquista registrada ainda.
+              Nenhuma conquista encontrada.
             </p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-96 overflow-y-auto">
-              {achievements.map((a: any) => (
+              {filteredAchievements.map((a: any) => (
                 <div
                   key={a.id}
                   className="flex items-center gap-3 p-3 bg-muted/30 rounded border border-border/40"
