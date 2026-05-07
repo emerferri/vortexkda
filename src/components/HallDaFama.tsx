@@ -140,7 +140,7 @@ export const HallDaFama = () => {
         </Card>
       ) : (
         <>
-          <div className="flex justify-center">
+          <div className="flex flex-wrap items-center justify-center gap-3">
             <Select value={currentId} onValueChange={setSelectedSeason}>
               <SelectTrigger className="w-64">
                 <SelectValue placeholder="Selecione uma temporada" />
@@ -153,6 +153,11 @@ export const HallDaFama = () => {
                 ))}
               </SelectContent>
             </Select>
+            {isAdmin && currentId && (
+              <Button onClick={() => handleReopenSeason(currentId)} variant="outline" size="sm">
+                <Unlock className="w-4 h-4 mr-1" /> Reabrir temporada
+              </Button>
+            )}
           </div>
 
           {currentSeason && (
