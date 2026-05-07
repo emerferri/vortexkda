@@ -142,6 +142,8 @@ const Index = () => {
         return <KillStreakRanking />;
       case 'analytics':
         return <PvPAnalyticsDashboard />;
+      case 'hall-fama':
+        return <HallDaFama />;
       case 'sorteio':
         return <LegendsSorteio />;
       case 'admin':
