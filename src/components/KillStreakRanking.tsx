@@ -59,110 +59,30 @@ export const KillStreakRanking = () => {
   const [environment, setEnvironment] = useState<'homolog' | 'prod'>('homolog');
   const rankingRef = useRef<HTMLDivElement>(null);
 
-  const { data: killLogs = [], isLoading } = useQuery({
-    queryKey: ['kill-streak-logs', dateFrom, dateTo, hourFrom, hourTo, eventType],
-    staleTime: 30000,
+  const { data: streakRankings = [], isLoading } = useQuery({
+    queryKey: ['kill-streak-ranking', dateFrom, dateTo, hourFrom, hourTo, eventType],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      // First fetch match IDs with filters
-      let matchQuery = supabase.from('pvp_matches').select('id');
-      if (eventType !== 'all') matchQuery = matchQuery.eq('event_type', eventType);
-      if (dateFrom) matchQuery = matchQuery.gte('match_date', format(dateFrom, 'yyyy-MM-dd'));
-      if (dateTo) matchQuery = matchQuery.lte('match_date', format(dateTo, 'yyyy-MM-dd'));
-      if (hourFrom !== undefined) matchQuery = matchQuery.gte('match_hour', hourFrom);
-      if (hourTo !== undefined) matchQuery = matchQuery.lte('match_hour', hourTo);
-
-      const { data: matches, error: matchError } = await matchQuery;
-      if (matchError) throw matchError;
-      const matchIds = matches?.map(m => m.id) || [];
-      if (matchIds.length === 0) return [];
-
-      // Fetch kill logs with pagination
-      const pageSize = 1000;
-      const BATCH_SIZE = 100;
-      let allLogs: KillLog[] = [];
-
-      for (let b = 0; b < matchIds.length; b += BATCH_SIZE) {
-        const batchIds = matchIds.slice(b, b + BATCH_SIZE);
-        let from = 0;
-        while (true) {
-          const { data, error } = await supabase
-            .from('pvp_kill_logs')
-            .select('killer_name, victim_name, created_at, match_id')
-            .in('match_id', batchIds)
-            .order('created_at', { ascending: true })
-            .range(from, from + pageSize - 1);
-
-          if (error) throw error;
-          if (data && data.length > 0) allLogs = allLogs.concat(data as KillLog[]);
-          if (!data || data.length < pageSize) break;
-          from += pageSize;
-        }
-      }
-
-      return allLogs;
-    },
-  });
-
-  const streakRankings = useMemo(() => {
-    if (!killLogs.length) return [];
-
-    // Agrupar logs por match_id
-    const matchGroups = new Map<string, KillLog[]>();
-    killLogs.forEach(log => {
-      if (!matchGroups.has(log.match_id)) {
-        matchGroups.set(log.match_id, []);
-      }
-      matchGroups.get(log.match_id)!.push(log);
-    });
-
-    // Calcular max streak de cada jogador considerando cada partida separadamente
-    const playerMaxStreaks = new Map<string, number>();
-    
-    // Processar cada partida individualmente
-    matchGroups.forEach((logs) => {
-      // Ordenar logs da partida por tempo
-      const sortedLogs = [...logs].sort((a, b) => 
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      );
-
-      // Calcular streaks dentro desta partida
-      const playerStreaks = new Map<string, number>();
-
-      sortedLogs.forEach(log => {
-        const killer = log.killer_name;
-        const victim = log.victim_name;
-
-        // Incrementar streak do killer
-        const currentKillerStreak = (playerStreaks.get(killer) || 0) + 1;
-        playerStreaks.set(killer, currentKillerStreak);
-
-        // Atualizar max streak global do killer
-        const globalMax = playerMaxStreaks.get(killer) || 0;
-        if (currentKillerStreak > globalMax) {
-          playerMaxStreaks.set(killer, currentKillerStreak);
-        }
-
-        // Resetar streak da vítima
-        playerStreaks.set(victim, 0);
+      const { data, error } = await (supabase.rpc as any)('get_ranking_kill_streak', {
+        p_date_from: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : null,
+        p_date_to: dateTo ? format(dateTo, 'yyyy-MM-dd') : null,
+        p_hour_from: hourFrom ?? null,
+        p_hour_to: hourTo ?? null,
+        p_event_type: eventType,
       });
-    });
-
-    // Converter para array e ordenar
-    const rankings: StreakData[] = Array.from(playerMaxStreaks.entries())
-      .filter(([_, streak]) => streak >= 2) // Apenas streaks de 2+
-      .map(([player, maxStreak]) => {
-        const level = getStreakLevel(maxStreak);
+      if (error) throw error;
+      const rankings: StreakData[] = (data || []).map((r: any) => {
+        const level = getStreakLevel(Number(r.max_streak));
         return {
-          player,
-          maxStreak,
+          player: r.player_name,
+          maxStreak: Number(r.max_streak),
           streakType: level.name,
           emoji: level.emoji,
         };
-      })
-      .sort((a, b) => b.maxStreak - a.maxStreak);
-
-    return rankings;
-  }, [killLogs]);
+      });
+      return rankings;
+    },
+  });
 
   const clearFilters = () => {
     setDateFrom(undefined);
