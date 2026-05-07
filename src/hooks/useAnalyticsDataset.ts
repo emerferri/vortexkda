@@ -1,45 +1,25 @@
 import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import {
   AnalyticsFilters,
-  fetchFilteredMatchIds,
-  fetchKillLogsForMatches,
   fetchAllCharacters,
   fetchMatchesWithType,
   buildCharacterMap,
-  filterBanned,
-  filterByGuild,
   KillLog,
   CharacterInfo,
   MatchWithType,
 } from './useAnalyticsData';
 
 export interface AnalyticsDataset {
-  /** All matches matching the filters (id + event_type + match_date). */
   matches: MatchWithType[];
-  /** Match ids only (subset of matches.map(m=>m.id)). */
   matchIds: string[];
-  /** Map matchId -> match_date (ISO). */
   matchDateMap: Map<string, string>;
-  /** Map matchId -> event_type. */
   matchTypeMap: Map<string, string>;
-  /** All characters in the DB (cache). */
   characters: CharacterInfo[];
-  /** name -> CharacterInfo. */
   charMap: Map<string, CharacterInfo>;
-  /**
-   * Kill logs already filtered by:
-   *  - banned characters removed (killer or victim)
-   *  - guild filter applied
-   * Class filter is intentionally NOT applied here so consumers (e.g. ClassAnalytics)
-   * can still see cross-class data; apply filterByClass downstream when needed.
-   */
   logs: KillLog[];
 }
 
-/**
- * Stable, normalized cache key — avoids React Query refetching when an
- * equivalent filters object is recreated by a parent re-render.
- */
 function filtersKey(f: AnalyticsFilters): string {
   return JSON.stringify({
     d1: f.dateFrom,
@@ -49,30 +29,37 @@ function filtersKey(f: AnalyticsFilters): string {
     e: f.eventType,
     g: f.guild,
     c: f.playerClass,
-    // playerName is a UI-only filter (search inside Players tab), do not
-    // include it here — otherwise typing in the search box would refetch
-    // the entire dataset.
   });
 }
 
 /**
- * Single source of truth for the analytics dashboard. All tabs (Players,
- * Guilds, Classes, PvP, Charts, AI Insights, Team Builder) share this cache,
- * so switching tabs is instant and we only fetch each underlying table once.
+ * Single source of truth for the analytics dashboard. Now uses an RPC
+ * (`get_analytics_kill_logs`) which performs the heavy joins/filters in
+ * Postgres in a single round-trip — replacing the old client-side fetch
+ * that paginated through tens of thousands of kill logs.
  */
 export function useAnalyticsDataset(filters: AnalyticsFilters) {
   return useQuery<AnalyticsDataset>({
     queryKey: ['analytics-dataset', filtersKey(filters)],
-    staleTime: 5 * 60 * 1000, // 5 min — analytics data is not edited live
+    staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     queryFn: async () => {
-      // Fetch matches (with type+date) and characters in parallel.
-      const [matches, characters] = await Promise.all([
+      const [matches, characters, logsResp] = await Promise.all([
         fetchMatchesWithType(filters),
         fetchAllCharacters(),
+        (supabase.rpc as any)('get_analytics_kill_logs', {
+          p_date_from: filters.dateFrom || null,
+          p_date_to: filters.dateTo || null,
+          p_hour_from: filters.hourFrom,
+          p_hour_to: filters.hourTo,
+          p_event_type: filters.eventType,
+          p_guild: filters.guild,
+        }),
       ]);
+
+      if (logsResp.error) throw logsResp.error;
 
       const charMap = buildCharacterMap(characters);
       const matchIds = matches.map((m) => m.id);
@@ -84,9 +71,7 @@ export function useAnalyticsDataset(filters: AnalyticsFilters) {
         matchTypeMap.set(m.id, m.event_type);
       }
 
-      let logs = await fetchKillLogsForMatches(matchIds);
-      logs = filterBanned(logs, charMap);
-      logs = filterByGuild(logs, filters.guild, charMap);
+      const logs: KillLog[] = (logsResp.data || []) as KillLog[];
 
       return {
         matches,
