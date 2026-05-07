@@ -148,6 +148,8 @@ const Index = () => {
         return <HallDaFama />;
       case 'marcos':
         return <MarcosConquistas />;
+      case 'conquistas':
+        return <Conquistas />;
       case 'sorteio':
         return <LegendsSorteio />;
       case 'admin':
