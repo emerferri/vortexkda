@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      badge_definitions: {
+        Row: {
+          code: string
+          created_at: string
+          criteria_type: string
+          criteria_value: number
+          description: string
+          emoji: string
+          enabled: boolean
+          id: string
+          name: string
+          rarity: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          criteria_type: string
+          criteria_value: number
+          description: string
+          emoji?: string
+          enabled?: boolean
+          id?: string
+          name: string
+          rarity?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          criteria_type?: string
+          criteria_value?: number
+          description?: string
+          emoji?: string
+          enabled?: boolean
+          id?: string
+          name?: string
+          rarity?: string
+        }
+        Relationships: []
+      }
       characters: {
         Row: {
           banned: boolean
@@ -98,6 +137,33 @@ export type Database = {
           label?: string
           metric?: string
           threshold?: number
+        }
+        Relationships: []
+      }
+      player_badges: {
+        Row: {
+          achieved_at: string
+          badge_code: string
+          id: string
+          match_id: string | null
+          notified: boolean
+          player_name: string
+        }
+        Insert: {
+          achieved_at?: string
+          badge_code: string
+          id?: string
+          match_id?: string | null
+          notified?: boolean
+          player_name: string
+        }
+        Update: {
+          achieved_at?: string
+          badge_code?: string
+          id?: string
+          match_id?: string | null
+          notified?: boolean
+          player_name?: string
         }
         Relationships: []
       }
@@ -346,6 +412,16 @@ export type Database = {
           _user_id: string
         }
         Returns: undefined
+      }
+      check_player_badges: {
+        Args: never
+        Returns: {
+          p_badge_code: string
+          p_emoji: string
+          p_label: string
+          p_name: string
+          p_rarity: string
+        }[]
       }
       check_player_milestones: {
         Args: never
