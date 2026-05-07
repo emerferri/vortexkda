@@ -175,12 +175,11 @@ export const DatabaseManager = () => {
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-6 mb-6">
+      <TabsList className="grid w-full grid-cols-5 mb-6">
         <TabsTrigger value="monitoramento">Monitoramento</TabsTrigger>
         <TabsTrigger value="management">Gerenciamento</TabsTrigger>
         <TabsTrigger value="frases">Frases Discord</TabsTrigger>
         <TabsTrigger value="usuarios">Usuários</TabsTrigger>
-        <TabsTrigger value="confrontos">Confrontos Diretos</TabsTrigger>
         <TabsTrigger value="personagens">Personagens</TabsTrigger>
       </TabsList>
 
@@ -412,10 +411,6 @@ export const DatabaseManager = () => {
 
       <TabsContent value="usuarios">
         <UserManagement />
-      </TabsContent>
-
-      <TabsContent value="confrontos">
-        <ConfrontosDiretos />
       </TabsContent>
 
       <TabsContent value="personagens">
