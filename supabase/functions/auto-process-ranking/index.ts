@@ -943,6 +943,21 @@ Deno.serve(async (req) => {
       console.error('[Auto Process] check-milestones setup error:', e);
     }
 
+    // Fire-and-forget badges check (non-blocking)
+    try {
+      const badgesUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/check-badges`;
+      fetch(badgesUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({}),
+      }).catch((e) => console.error('[Auto Process] check-badges invoke failed:', e));
+    } catch (e) {
+      console.error('[Auto Process] check-badges setup error:', e);
+    }
+
 
     return {
       success: true,
