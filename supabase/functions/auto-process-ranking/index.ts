@@ -928,6 +928,22 @@ Deno.serve(async (req) => {
 
     console.log(`[Auto Process] Completed ${eventType} successfully`);
 
+    // Fire-and-forget milestones check (non-blocking)
+    try {
+      const milestonesUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/check-milestones`;
+      fetch(milestonesUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({}),
+      }).catch((e) => console.error('[Auto Process] check-milestones invoke failed:', e));
+    } catch (e) {
+      console.error('[Auto Process] check-milestones setup error:', e);
+    }
+
+
     return {
       success: true,
       status: 'processed',

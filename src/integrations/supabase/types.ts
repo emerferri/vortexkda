@@ -71,6 +71,69 @@ export type Database = {
         }
         Relationships: []
       }
+      milestone_thresholds: {
+        Row: {
+          created_at: string
+          emoji: string
+          enabled: boolean
+          id: string
+          label: string
+          metric: string
+          threshold: number
+        }
+        Insert: {
+          created_at?: string
+          emoji?: string
+          enabled?: boolean
+          id?: string
+          label: string
+          metric: string
+          threshold: number
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          enabled?: boolean
+          id?: string
+          label?: string
+          metric?: string
+          threshold?: number
+        }
+        Relationships: []
+      }
+      player_milestones: {
+        Row: {
+          achieved_at: string
+          emoji: string
+          id: string
+          label: string
+          metric: string
+          notified: boolean
+          player_name: string
+          threshold: number
+        }
+        Insert: {
+          achieved_at?: string
+          emoji?: string
+          id?: string
+          label: string
+          metric: string
+          notified?: boolean
+          player_name: string
+          threshold: number
+        }
+        Update: {
+          achieved_at?: string
+          emoji?: string
+          id?: string
+          label?: string
+          metric?: string
+          notified?: boolean
+          player_name?: string
+          threshold?: number
+        }
+        Relationships: []
+      }
       pvp_kill_logs: {
         Row: {
           created_at: string
@@ -283,6 +346,16 @@ export type Database = {
           _user_id: string
         }
         Returns: undefined
+      }
+      check_player_milestones: {
+        Args: never
+        Returns: {
+          p_emoji: string
+          p_label: string
+          p_metric: string
+          p_name: string
+          p_threshold: number
+        }[]
       }
       close_current_season: {
         Args: never
