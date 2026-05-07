@@ -33,180 +33,75 @@ export const ReisDoPVP = () => {
 
   const { data: rankingData, isLoading } = useQuery({
     queryKey: ['reis-cone-pvp', startDate, endDate, eventType],
-    staleTime: 30000,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      console.log('[ReisDoPVP] Starting query...');
-      let query = supabase
-        .from('pvp_matches')
-        .select('id, match_date, match_hour');
+      const { data, error } = await (supabase.rpc as any)('get_ranking_reis_pvp', {
+        p_date_from: startDate || null,
+        p_date_to: endDate || null,
+        p_event_type: eventType,
+      });
+      if (error) throw error;
 
-      if (eventType !== 'all') {
-        query = query.eq('event_type', eventType);
-      }
+      const reisAgg: PlayerStats[] = [];
+      const conesAgg: PlayerStats[] = [];
+      let reiBest: { player_name: string; score: number; date: string; hour: number } | null = null;
+      let coneWorst: { player_name: string; score: number; date: string; hour: number } | null = null;
 
-      if (startDate) query = query.gte('match_date', startDate);
-      if (endDate) query = query.lte('match_date', endDate);
-
-      const { data: matches, error: matchesError } = await query;
-
-      if (matchesError) throw matchesError;
-      console.log('[ReisDoPVP] Fetched matches:', matches?.length);
-
-      // Fetch ALL players - need to paginate since Supabase has 1000 row limit
-      let allPlayers: any[] = [];
-      let from = 0;
-      const pageSize = 1000;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data: playersPage, error: playersError } = await supabase
-          .from('pvp_match_players')
-          .select('match_id, player_name, kills, deaths, kda')
-          .range(from, from + pageSize - 1);
-
-        if (playersError) throw playersError;
-        
-        if (playersPage && playersPage.length > 0) {
-          allPlayers = [...allPlayers, ...playersPage];
-          from += pageSize;
-          hasMore = playersPage.length === pageSize;
+      (data || []).forEach((r: any) => {
+        const stats: PlayerStats = {
+          player_name: r.player_name,
+          vezes: Number(r.vezes),
+          melhor_score: Number(r.melhor_score),
+          pior_score: Number(r.pior_score),
+          media_score: Number(r.media_score),
+        };
+        if (r.is_rei) {
+          reisAgg.push(stats);
+          const reiScore = Number(r.melhor_score);
+          if (!reiBest || reiScore > reiBest.score) {
+            reiBest = { player_name: r.player_name, score: reiScore, date: r.extreme_match_date, hour: Number(r.extreme_match_hour) };
+          }
         } else {
-          hasMore = false;
-        }
-      }
-
-      const players = allPlayers;
-      console.log('[ReisDoPVP] Fetched players:', players?.length);
-
-      // Calculate Rei (highest score) and Cone (lowest score) for each match
-      const reiPerMatch: { player_name: string; score: number; date: string; hour: number }[] = [];
-      const conePerMatch: { player_name: string; score: number; date: string; hour: number }[] = [];
-
-      matches?.forEach(match => {
-        const matchPlayers = players?.filter(p => p.match_id === match.id) || [];
-        if (matchPlayers.length === 0) return;
-
-        const playersWithScore = matchPlayers.map(p => {
-          // Ensure numeric types for calculation
-          const kills = Number(p.kills) || 0;
-          const deaths = Number(p.deaths) || 0;
-          const kda = Number(p.kda) || 0;
-          return {
-            ...p,
-            eventScore: (kills * 3) + (kda * 2) - (deaths * 1.5)
-          };
-        });
-
-        // Find Rei (highest score)
-        const rei = playersWithScore.reduce((best, current) => 
-          current.eventScore > best.eventScore ? current : best
-        );
-
-        // Find Cone (lowest score)
-        const cone = playersWithScore.reduce((worst, current) => 
-          current.eventScore < worst.eventScore ? current : worst
-        );
-
-        reiPerMatch.push({
-          player_name: rei.player_name,
-          score: Number(rei.eventScore.toFixed(2)),
-          date: match.match_date,
-          hour: match.match_hour
-        });
-
-        conePerMatch.push({
-          player_name: cone.player_name,
-          score: Number(cone.eventScore.toFixed(2)),
-          date: match.match_date,
-          hour: match.match_hour
-        });
-      });
-
-      console.log('[ReisDoPVP] Reis per match:', reiPerMatch.length);
-      console.log('[ReisDoPVP] Sample reis:', reiPerMatch.slice(0, 5));
-
-      // Aggregate Reis
-      const reiStats: Record<string, { vezes: number; scores: number[]; melhorScore: number }> = {};
-      reiPerMatch.forEach(rei => {
-        if (!reiStats[rei.player_name]) {
-          reiStats[rei.player_name] = { vezes: 0, scores: [], melhorScore: 0 };
-        }
-        reiStats[rei.player_name].vezes++;
-        reiStats[rei.player_name].scores.push(rei.score);
-        if (rei.score > reiStats[rei.player_name].melhorScore) {
-          reiStats[rei.player_name].melhorScore = rei.score;
+          conesAgg.push(stats);
+          const coneScore = Number(r.pior_score);
+          if (!coneWorst || coneScore < coneWorst.score) {
+            coneWorst = { player_name: r.player_name, score: coneScore, date: r.extreme_match_date, hour: Number(r.extreme_match_hour) };
+          }
         }
       });
 
-      const reiRanking: PlayerStats[] = Object.entries(reiStats).map(([name, stats]) => ({
-        player_name: name,
-        vezes: stats.vezes,
-        melhor_score: stats.melhorScore,
-        pior_score: Math.min(...stats.scores),
-        media_score: Number((stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length).toFixed(2))
-      })).sort((a, b) => b.vezes - a.vezes || b.melhor_score - a.melhor_score);
+      const reiRanking = reisAgg.sort((a, b) => b.vezes - a.vezes || b.melhor_score - a.melhor_score);
+      const coneRanking = conesAgg.sort((a, b) => b.vezes - a.vezes || a.pior_score - b.pior_score);
 
-      console.log('[ReisDoPVP] Rei ranking top 5:', reiRanking.slice(0, 5));
-
-
-      // Aggregate Cones
-      const coneStats: Record<string, { vezes: number; scores: number[]; piorScore: number }> = {};
-      conePerMatch.forEach(cone => {
-        if (!coneStats[cone.player_name]) {
-          coneStats[cone.player_name] = { vezes: 0, scores: [], piorScore: Infinity };
-        }
-        coneStats[cone.player_name].vezes++;
-        coneStats[cone.player_name].scores.push(cone.score);
-        if (cone.score < coneStats[cone.player_name].piorScore) {
-          coneStats[cone.player_name].piorScore = cone.score;
-        }
-      });
-
-      const coneRanking: PlayerStats[] = Object.entries(coneStats).map(([name, stats]) => ({
-        player_name: name,
-        vezes: stats.vezes,
-        melhor_score: Math.max(...stats.scores),
-        pior_score: stats.piorScore,
-        media_score: Number((stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length).toFixed(2))
-      })).sort((a, b) => b.vezes - a.vezes || a.pior_score - b.pior_score);
-
-      // Highlights for Rei
       const reiMaisVezes = reiRanking[0] || null;
-      const reiMelhorMedia = reiRanking.reduce((best, current) => 
+      const reiMelhorMedia = reiRanking.reduce((best, current) =>
         current.media_score > (best?.media_score || 0) ? current : best
       , null as PlayerStats | null);
-      const reiMelhorScore = reiPerMatch.reduce((best, current) => 
-        current.score > (best?.score || 0) ? current : best
-      , null as typeof reiPerMatch[0] | null);
 
-      // Highlights for Cone
       const coneMaisVezes = coneRanking[0] || null;
-      const conePiorMedia = coneRanking.reduce((worst, current) => 
-        current.media_score < (worst?.media_score || Infinity) ? current : worst
+      const conePiorMedia = coneRanking.reduce((worst, current) =>
+        current.media_score < (worst?.media_score ?? Infinity) ? current : worst
       , null as PlayerStats | null);
-      const conePiorScore = conePerMatch.reduce((worst, current) => 
-        current.score < (worst?.score || Infinity) ? current : worst
-      , null as typeof conePerMatch[0] | null);
 
       return {
         rei: {
           ranking: reiRanking,
           highlights: {
             maisVezes: reiMaisVezes,
-            extremeScore: reiMelhorScore,
-            extremeMedia: reiMelhorMedia
-          }
+            extremeScore: reiBest,
+            extremeMedia: reiMelhorMedia,
+          },
         },
         cone: {
           ranking: coneRanking,
           highlights: {
             maisVezes: coneMaisVezes,
-            extremeScore: conePiorScore,
-            extremeMedia: conePiorMedia
-          }
-        }
+            extremeScore: coneWorst,
+            extremeMedia: conePiorMedia,
+          },
+        },
       };
-    }
+    },
   });
 
   if (isLoading) {
