@@ -201,6 +201,21 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_analytics_kill_logs: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_event_type?: string
+          p_guild?: string
+          p_hour_from?: number
+          p_hour_to?: number
+        }
+        Returns: {
+          killer_name: string
+          match_id: string
+          victim_name: string
+        }[]
+      }
       get_class_guild_ranking: {
         Args: {
           p_date_from?: string
