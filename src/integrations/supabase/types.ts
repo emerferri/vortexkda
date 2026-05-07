@@ -201,6 +201,51 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_class_guild_ranking: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_event_type?: string
+          p_hour_from?: number
+          p_hour_to?: number
+        }
+        Returns: {
+          deaths: number
+          kills: number
+          player_class: string
+          player_guild: string
+          player_name: string
+        }[]
+      }
+      get_class_matchup_matrix: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_event_type?: string
+        }
+        Returns: {
+          attacker_class: string
+          kills: number
+          victim_class: string
+        }[]
+      }
+      get_ranking_best_per_class: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_event_type?: string
+        }
+        Returns: {
+          class_name: string
+          event_score: number
+          is_best: boolean
+          match_count: number
+          player_name: string
+          total_deaths: number
+          total_kda: number
+          total_kills: number
+        }[]
+      }
       get_ranking_fogo_amigo: {
         Args: {
           p_date_from?: string
@@ -239,6 +284,93 @@ export type Database = {
           total_deaths: number
           total_kills: number
           weighted_kda: number
+        }[]
+      }
+      get_ranking_kill_streak: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_event_type?: string
+          p_hour_from?: number
+          p_hour_to?: number
+        }
+        Returns: {
+          max_streak: number
+          player_class: string
+          player_class_short: string
+          player_guild: string
+          player_name: string
+        }[]
+      }
+      get_ranking_mural_vergonha: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_event_type?: string
+          p_hour_from?: number
+          p_hour_to?: number
+        }
+        Returns: {
+          avg_deaths_per_match: number
+          matches_played: number
+          player_class: string
+          player_guild: string
+          player_name: string
+          total_deaths: number
+          total_kills: number
+        }[]
+      }
+      get_ranking_nunca_positivo: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_event_type?: string
+          p_hour_from?: number
+          p_hour_to?: number
+        }
+        Returns: {
+          best_kda: number
+          best_score: number
+          matches_played: number
+          negative_count: number
+          player_class: string
+          player_guild: string
+          player_name: string
+          total_deaths: number
+          total_kills: number
+        }[]
+      }
+      get_ranking_putinha: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_event_type?: string
+          p_hour_from?: number
+          p_hour_to?: number
+        }
+        Returns: {
+          deaths: number
+          killer_guild: string
+          killer_name: string
+          victim_guild: string
+          victim_name: string
+        }[]
+      }
+      get_ranking_reis_pvp: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_event_type?: string
+        }
+        Returns: {
+          extreme_match_date: string
+          extreme_match_hour: number
+          is_rei: boolean
+          media_score: number
+          melhor_score: number
+          pior_score: number
+          player_name: string
+          vezes: number
         }[]
       }
       has_role: {

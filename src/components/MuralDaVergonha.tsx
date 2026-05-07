@@ -55,98 +55,27 @@ export const MuralDaVergonha = () => {
 
   const { data: deathStats = [], isLoading: loading } = useQuery({
     queryKey: ['mural-vergonha', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
-    staleTime: 30000,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-
-      // Build match query with filters
-      let matchQuery = supabase.from('pvp_matches').select('id');
-
-      if (debouncedDateFrom) {
-        matchQuery = matchQuery.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
-      }
-      if (debouncedDateTo) {
-        matchQuery = matchQuery.lte('match_date', format(debouncedDateTo, 'yyyy-MM-dd'));
-      }
-      if (debouncedHourFrom !== undefined) {
-        matchQuery = matchQuery.gte('match_hour', debouncedHourFrom);
-      }
-      if (debouncedHourTo !== undefined) {
-        matchQuery = matchQuery.lte('match_hour', debouncedHourTo);
-      }
-
-      const { data: matches, error: matchError } = await matchQuery;
-      if (matchError) throw matchError;
-
-      const matchIds = matches?.map(m => m.id) || [];
-      if (matchIds.length === 0) {
-        return [];
-      }
-
-      // Fetch player data filtered by match IDs with pagination
-      const pageSize = 1000;
-      const BATCH_SIZE = 100;
-      let allMatchPlayers: { player_name: string; kills: number; deaths: number; match_id: string }[] = [];
-
-      for (let b = 0; b < matchIds.length; b += BATCH_SIZE) {
-        const batchIds = matchIds.slice(b, b + BATCH_SIZE);
-        let from = 0;
-        while (true) {
-          const { data, error } = await supabase
-            .from('pvp_match_players')
-            .select('player_name, kills, deaths, match_id')
-            .in('match_id', batchIds)
-            .range(from, from + pageSize - 1);
-          if (error) throw error;
-          if (data && data.length > 0) allMatchPlayers = allMatchPlayers.concat(data);
-          if (!data || data.length < pageSize) break;
-          from += pageSize;
-        }
-      }
-
-      const matchPlayers = allMatchPlayers;
-
-      // Buscar informações de guild e classe dos personagens
-      const { data: characters } = await supabase
-        .from('characters')
-        .select('name, guild, class');
-
-      const characterMap = new Map(
-        characters?.map(char => [char.name.toLowerCase(), { guild: char.guild, class: char.class }]) || []
-      );
-
-      // Agregar dados por jogador
-      const statsMap = new Map<string, PlayerDeathStats>();
-
-      matchPlayers?.forEach(player => {
-        const charInfo = characterMap.get(player.player_name.toLowerCase());
-        const existing = statsMap.get(player.player_name) || {
-          playerName: player.player_name,
-          totalDeaths: 0,
-          totalKills: 0,
-          matchesPlayed: 0,
-          avgDeathsPerMatch: 0,
-          guild: charInfo?.guild,
-          class: charInfo?.class,
-        };
-
-        statsMap.set(player.player_name, {
-          ...existing,
-          totalDeaths: existing.totalDeaths + player.deaths,
-          totalKills: existing.totalKills + player.kills,
-          matchesPlayed: existing.matchesPlayed + 1,
-        });
+      const { data, error } = await (supabase.rpc as any)('get_ranking_mural_vergonha', {
+        p_date_from: debouncedDateFrom ? format(debouncedDateFrom, 'yyyy-MM-dd') : null,
+        p_date_to: debouncedDateTo ? format(debouncedDateTo, 'yyyy-MM-dd') : null,
+        p_hour_from: debouncedHourFrom ?? null,
+        p_hour_to: debouncedHourTo ?? null,
+        p_event_type: null,
       });
-
-      // Calcular média e ordenar por mais mortes
-      const stats = Array.from(statsMap.values())
-        .map(stat => ({
-          ...stat,
-          avgDeathsPerMatch: stat.totalDeaths / stat.matchesPlayed,
-        }))
-        .sort((a, b) => b.totalDeaths - a.totalDeaths);
-
+      if (error) throw error;
+      const stats: PlayerDeathStats[] = (data || []).map((r: any) => ({
+        playerName: r.player_name,
+        totalDeaths: Number(r.total_deaths),
+        totalKills: Number(r.total_kills),
+        matchesPlayed: Number(r.matches_played),
+        avgDeathsPerMatch: Number(r.avg_deaths_per_match),
+        guild: r.player_guild || undefined,
+        class: r.player_class || undefined,
+      }));
       return stats;
-    }
+    },
   });
 
   const exportToExcel = () => {

@@ -38,102 +38,50 @@ export const ClassMatchup = () => {
   const [dateTo, setDateTo] = useState<Date>();
   const chartRef = useRef<HTMLDivElement>(null);
 
-  // Fetch characters
-  const { data: characters } = useQuery({
-    queryKey: ['characters-for-matchup'],
+  // Fetch precomputed matchup matrix from RPC
+  const { data: matrixRows = [], isLoading } = useQuery({
+    queryKey: ['class-matchup-matrix', dateFrom, dateTo, eventType],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('characters')
-        .select('name, class')
-        .eq('banned', false);
+      const { data, error } = await (supabase.rpc as any)('get_class_matchup_matrix', {
+        p_date_from: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : null,
+        p_date_to: dateTo ? format(dateTo, 'yyyy-MM-dd') : null,
+        p_event_type: eventType,
+      });
       if (error) throw error;
-      return data || [];
+      return (data || []) as { attacker_class: string; victim_class: string; kills: number }[];
     },
   });
 
-  // Fetch all kill logs with pagination
-  const { data: killLogs, isLoading } = useQuery({
-    queryKey: ['kill-logs-matchup', dateFrom, dateTo, eventType],
-    staleTime: 30000,
-    queryFn: async () => {
-      // First get match IDs filtered by date if needed
-      let matchQuery = supabase.from('pvp_matches').select('id');
-      if (eventType !== 'all') matchQuery = matchQuery.eq('event_type', eventType);
-      if (dateFrom) matchQuery = matchQuery.gte('match_date', format(dateFrom, 'yyyy-MM-dd'));
-      if (dateTo) matchQuery = matchQuery.lte('match_date', format(dateTo, 'yyyy-MM-dd'));
-
-      const { data: matches, error: matchError } = await matchQuery;
-      if (matchError) throw matchError;
-      if (!matches || matches.length === 0) return [];
-
-      const matchIds = matches.map(m => m.id);
-
-      // Paginate kill logs
-      const allLogs: { killer_name: string; victim_name: string }[] = [];
-      const pageSize = 1000;
-      let offset = 0;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('pvp_kill_logs')
-          .select('killer_name, victim_name')
-          .in('match_id', matchIds)
-          .range(offset, offset + pageSize - 1);
-
-        if (error) throw error;
-        if (data && data.length > 0) {
-          allLogs.push(...data);
-          offset += pageSize;
-          hasMore = data.length === pageSize;
-        } else {
-          hasMore = false;
-        }
-      }
-
-      return allLogs;
-    },
-  });
-
-  // Build character class map and matchup matrix
+  // Build matchup matrix from RPC rows
   const { classNames, matchupData } = useMemo(() => {
-    if (!characters || !killLogs) return { classNames: [], matchupData: new Map() };
-
-    const charMap = new Map<string, string>();
-    characters.forEach(c => {
-      charMap.set(normalize(c.name), c.class);
-    });
-
-    // Matrix: attackerClass -> targetClass -> { kills, deaths }
     const matrix = new Map<string, Map<string, MatchupEntry>>();
     const classSet = new Set<string>();
 
-    killLogs.forEach(log => {
-      const killerClass = charMap.get(normalize(log.killer_name));
-      const victimClass = charMap.get(normalize(log.victim_name));
-      if (!killerClass || !victimClass) return;
-
-      classSet.add(killerClass);
-      classSet.add(victimClass);
+    matrixRows.forEach(row => {
+      const a = row.attacker_class;
+      const v = row.victim_class;
+      const k = Number(row.kills);
+      classSet.add(a); classSet.add(v);
 
       // Killer side
-      if (!matrix.has(killerClass)) matrix.set(killerClass, new Map());
-      const killerRow = matrix.get(killerClass)!;
-      const existing = killerRow.get(victimClass) || { kills: 0, deaths: 0 };
-      killerRow.set(victimClass, { kills: existing.kills + 1, deaths: existing.deaths });
+      if (!matrix.has(a)) matrix.set(a, new Map());
+      const arow = matrix.get(a)!;
+      const ex = arow.get(v) || { kills: 0, deaths: 0 };
+      arow.set(v, { kills: ex.kills + k, deaths: ex.deaths });
 
-      // Victim side (mirror)
-      if (!matrix.has(victimClass)) matrix.set(victimClass, new Map());
-      const victimRow = matrix.get(victimClass)!;
-      const existingV = victimRow.get(killerClass) || { kills: 0, deaths: 0 };
-      victimRow.set(killerClass, { kills: existingV.kills, deaths: existingV.deaths + 1 });
+      // Victim side mirror
+      if (!matrix.has(v)) matrix.set(v, new Map());
+      const vrow = matrix.get(v)!;
+      const ex2 = vrow.get(a) || { kills: 0, deaths: 0 };
+      vrow.set(a, { kills: ex2.kills, deaths: ex2.deaths + k });
     });
 
     return {
       classNames: Array.from(classSet).sort(),
       matchupData: matrix,
     };
-  }, [characters, killLogs]);
+  }, [matrixRows]);
 
   // Prepare display data for selected class
   const displayData = useMemo(() => {

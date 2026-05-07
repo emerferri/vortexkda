@@ -61,115 +61,27 @@ export const PutinhaRanking = () => {
 
   const { data: relations = [], isLoading: loading } = useQuery({
     queryKey: ['putinha-ranking', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo, eventType],
-    staleTime: 30000,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-
-      // 1) Fetch match IDs based on date/hour filters
-      let matchQuery = supabase.from('pvp_matches').select('id');
-
-      if (eventType !== 'all') {
-        matchQuery = matchQuery.eq('event_type', eventType);
-      }
-
-      if (debouncedDateFrom) {
-        matchQuery = matchQuery.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
-      }
-      if (debouncedDateTo) {
-        matchQuery = matchQuery.lte('match_date', format(debouncedDateTo, 'yyyy-MM-dd'));
-      }
-      if (debouncedHourFrom !== undefined) {
-        matchQuery = matchQuery.gte('match_hour', debouncedHourFrom);
-      }
-      if (debouncedHourTo !== undefined) {
-        matchQuery = matchQuery.lte('match_hour', debouncedHourTo);
-      }
-
-      const { data: matches, error: matchError } = await matchQuery;
-      if (matchError) throw matchError;
-
-      const matchIds = matches?.map(m => m.id) || [];
-      if (matchIds.length === 0) {
-        return [];
-      }
-
-      // 2) Fetch kill logs filtered by match IDs with pagination
-      const pageSize = 1000;
-      let from = 0;
-      let allKillLogs: { killer_name: string; victim_name: string }[] = [];
-
-      while (true) {
-        const { data, error } = await supabase
-          .from('pvp_kill_logs')
-          .select('killer_name, victim_name, match_id')
-          .in('match_id', matchIds)
-          .order('created_at', { ascending: false })
-          .range(from, from + pageSize - 1);
-
-        if (error) throw error;
-        if (data && data.length > 0) allKillLogs = allKillLogs.concat(data);
-        if (!data || data.length < pageSize) break;
-        from += pageSize;
-      }
-
-      // 3) Fetch character guild info
-      const { data: characters, error: charsError } = await supabase
-        .from('characters')
-        .select('name, guild');
-
-      if (charsError) throw charsError;
-
-      const characterMap = new Map(
-        (characters || []).map((c) => [c.name, c.guild])
-      );
-
-      // 4) Count deaths per exact killer->victim pair
-      const deathCount = new Map<string, { killer: string; victim: string; count: number }>();
-
-      for (const log of allKillLogs) {
-        const key = `${log.victim_name}->${log.killer_name}`;
-        const existing = deathCount.get(key);
-        if (existing) {
-          existing.count += 1;
-        } else {
-          deathCount.set(key, {
-            victim: log.victim_name,
-            killer: log.killer_name,
-            count: 1,
-          });
-        }
-      }
-
-      // 5) Filter out mutual domination (both are putinhas of each other)
-      const filteredRelations = Array.from(deathCount.values()).filter((r) => {
-        if (r.count < 10) return false;
-        
-        // Check if reverse relation also exists with 10+ deaths
-        const reverseKey = `${r.killer}->${r.victim}`;
-        const reverseRelation = deathCount.get(reverseKey);
-        
-        // If both kill each other 10+ times, exclude this relation
-        if (reverseRelation && reverseRelation.count >= 10) {
-          return false;
-        }
-        
-        return true;
+      const { data, error } = await (supabase.rpc as any)('get_ranking_putinha', {
+        p_date_from: debouncedDateFrom ? format(debouncedDateFrom, 'yyyy-MM-dd') : null,
+        p_date_to: debouncedDateTo ? format(debouncedDateTo, 'yyyy-MM-dd') : null,
+        p_hour_from: debouncedHourFrom ?? null,
+        p_hour_to: debouncedHourTo ?? null,
+        p_event_type: eventType,
       });
-
-      // 6) Map to final format and sort by deaths (level)
-
-      const putinhaRelations: PutinhaRelation[] = filteredRelations
-        .map((r) => ({
-          victim: r.victim,
-          killer: r.killer,
-          deaths: r.count,
-          victimGuild: characterMap.get(r.victim),
-          killerGuild: characterMap.get(r.killer),
-        }))
-        .sort((a, b) => b.deaths - a.deaths);
-
-      return putinhaRelations;
-    }
+      if (error) throw error;
+      const relations: PutinhaRelation[] = (data || []).map((r: any) => ({
+        victim: r.victim_name,
+        killer: r.killer_name,
+        deaths: Number(r.deaths),
+        victimGuild: r.victim_guild || undefined,
+        killerGuild: r.killer_guild || undefined,
+      }));
+      return relations;
+    },
   });
+
 
   const exportAsImage = async () => {
     if (!cardRef.current) return;
