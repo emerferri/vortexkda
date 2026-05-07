@@ -59,100 +59,29 @@ export const NeverPositiveKDA = () => {
 
   const { data: allPlayers = [], isLoading: loading } = useQuery({
     queryKey: ['never-positive-kda', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo, eventType],
-    staleTime: 30000,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      let matchQuery = supabase.from('pvp_matches').select('id');
-      if (eventType !== 'all') matchQuery = matchQuery.eq('event_type', eventType);
-
-      if (debouncedDateFrom) {
-        matchQuery = matchQuery.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
-      }
-      if (debouncedDateTo) {
-        matchQuery = matchQuery.lte('match_date', format(debouncedDateTo, 'yyyy-MM-dd'));
-      }
-      if (debouncedHourFrom !== undefined) {
-        matchQuery = matchQuery.gte('match_hour', debouncedHourFrom);
-      }
-      if (debouncedHourTo !== undefined) {
-        matchQuery = matchQuery.lte('match_hour', debouncedHourTo);
-      }
-
-      const { data: matches, error: matchError } = await matchQuery;
-      if (matchError) throw matchError;
-
-      const matchIds = matches?.map(m => m.id) || [];
-      if (matchIds.length === 0) return [];
-
-      let allMatchPlayers: { player_name: string; kills: number; deaths: number; kda: number; match_id: string }[] = [];
-      const pageSize = 1000;
-      let page = 0;
-      while (true) {
-        const { data: batch, error } = await supabase
-          .from('pvp_match_players')
-          .select('player_name, kills, deaths, kda, match_id')
-          .in('match_id', matchIds)
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-
-        if (error) throw error;
-        if (!batch || batch.length === 0) break;
-        allMatchPlayers = allMatchPlayers.concat(batch);
-        if (batch.length < pageSize) break;
-        page++;
-      }
-
-      const { data: characters } = await supabase.from('characters').select('name, guild, class');
-      const characterMap = new Map(
-        characters?.map(char => [char.name.toLowerCase(), { guild: char.guild, class: char.class }]) || []
-      );
-
-      // Aggregate by player: track max KDA, total kills/deaths, match count, negative count
-      const statsMap = new Map<string, { bestKda: number; totalKills: number; totalDeaths: number; matchesPlayed: number; negativeCount: number; bestScore: number }>();
-
-      allMatchPlayers.forEach(p => {
-        const kda = Number(p.kda);
-        const score = (p.kills * 3) + (kda * 2) - (p.deaths * 1.5);
-        const isNegative = kda < 1;
-        const existing = statsMap.get(p.player_name);
-        if (existing) {
-          existing.bestKda = Math.max(existing.bestKda, kda);
-          existing.totalKills += p.kills;
-          existing.totalDeaths += p.deaths;
-          existing.matchesPlayed += 1;
-          if (isNegative) existing.negativeCount += 1;
-          existing.bestScore = Math.max(existing.bestScore, score);
-        } else {
-          statsMap.set(p.player_name, {
-            bestKda: kda,
-            totalKills: p.kills,
-            totalDeaths: p.deaths,
-            matchesPlayed: 1,
-            negativeCount: isNegative ? 1 : 0,
-            bestScore: score,
-          });
-        }
+      const { data, error } = await (supabase.rpc as any)('get_ranking_nunca_positivo', {
+        p_date_from: debouncedDateFrom ? format(debouncedDateFrom, 'yyyy-MM-dd') : null,
+        p_date_to: debouncedDateTo ? format(debouncedDateTo, 'yyyy-MM-dd') : null,
+        p_hour_from: debouncedHourFrom ?? null,
+        p_hour_to: debouncedHourTo ?? null,
+        p_event_type: eventType,
       });
-
-      const result: NeverPositivePlayer[] = [];
-      statsMap.forEach((stats, playerName) => {
-        const charInfo = characterMap.get(playerName.toLowerCase());
-        // Include all players that have at least 1 negative match
-        if (stats.negativeCount > 0) {
-          result.push({
-            playerName,
-            matchesPlayed: stats.matchesPlayed,
-            bestKda: stats.bestKda,
-            totalKills: stats.totalKills,
-            totalDeaths: stats.totalDeaths,
-            guild: charInfo?.guild,
-            class: charInfo?.class,
-            negativeCount: stats.negativeCount,
-            bestScore: parseFloat(stats.bestScore.toFixed(2)),
-          });
-        }
-      });
-
+      if (error) throw error;
+      const result: NeverPositivePlayer[] = (data || []).map((r: any) => ({
+        playerName: r.player_name,
+        matchesPlayed: Number(r.matches_played),
+        bestKda: Number(r.best_kda),
+        totalKills: Number(r.total_kills),
+        totalDeaths: Number(r.total_deaths),
+        guild: r.player_guild || undefined,
+        class: r.player_class || undefined,
+        negativeCount: Number(r.negative_count),
+        bestScore: Number(r.best_score),
+      }));
       return result;
-    }
+    },
   });
 
   // Filter for "never positive" tab: players whose best KDA across ALL matches is < 1
