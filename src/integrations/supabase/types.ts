@@ -655,6 +655,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      reopen_season: { Args: { _season_id: string }; Returns: Json }
     }
     Enums: {
       app_role: "admin" | "user" | "moderator"
