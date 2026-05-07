@@ -16,13 +16,6 @@ import html2canvas from 'html2canvas';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 
-interface KillLog {
-  killer_name: string;
-  victim_name: string;
-  created_at: string;
-  match_id: string;
-}
-
 interface StreakData {
   player: string;
   maxStreak: number;
