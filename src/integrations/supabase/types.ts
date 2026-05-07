@@ -350,11 +350,11 @@ export type Database = {
       check_player_milestones: {
         Args: never
         Returns: {
-          emoji: string
-          label: string
-          metric: string
-          player_name: string
-          threshold: number
+          p_emoji: string
+          p_label: string
+          p_metric: string
+          p_name: string
+          p_threshold: number
         }[]
       }
       close_current_season: {
