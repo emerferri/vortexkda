@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Trophy, Crown, Skull, Flame, Swords, Award, Heart, Lock } from 'lucide-react';
+import { Trophy, Crown, Skull, Flame, Swords, Award, Heart, Lock, Unlock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useUserRole } from '@/hooks/useUserRole';
 
@@ -76,6 +76,23 @@ export const HallDaFama = () => {
     }
   };
 
+  const handleReopenSeason = async (seasonId: string) => {
+    if (!confirm('Reabrir esta temporada? A próxima temporada criada automaticamente será removida (se vazia) e os snapshots desta temporada serão apagados.')) return;
+    try {
+      const { data, error } = await supabase.rpc('reopen_season', { _season_id: seasonId });
+      if (error) throw error;
+      toast({
+        title: 'Temporada reaberta!',
+        description: `Snapshots removidos: ${(data as any)?.snapshots_deleted ?? 0}.`,
+      });
+      setSelectedSeason('');
+      await queryClient.invalidateQueries({ queryKey: ['seasons-list'] });
+      await queryClient.invalidateQueries({ queryKey: ['season-snapshots'] });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e?.message ?? String(e), variant: 'destructive' });
+    }
+  };
+
   const grouped: Record<string, any[]> = {};
   for (const s of snapshots || []) {
     (grouped[s.ranking_type] ||= []).push(s);
@@ -123,7 +140,7 @@ export const HallDaFama = () => {
         </Card>
       ) : (
         <>
-          <div className="flex justify-center">
+          <div className="flex flex-wrap items-center justify-center gap-3">
             <Select value={currentId} onValueChange={setSelectedSeason}>
               <SelectTrigger className="w-64">
                 <SelectValue placeholder="Selecione uma temporada" />
@@ -136,6 +153,11 @@ export const HallDaFama = () => {
                 ))}
               </SelectContent>
             </Select>
+            {isAdmin && currentId && (
+              <Button onClick={() => handleReopenSeason(currentId)} variant="outline" size="sm">
+                <Unlock className="w-4 h-4 mr-1" /> Reabrir temporada
+              </Button>
+            )}
           </div>
 
           {currentSeason && (
