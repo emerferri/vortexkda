@@ -27,6 +27,7 @@ export const MarcosConquistas = () => {
   const [newThreshold, setNewThreshold] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [newEmoji, setNewEmoji] = useState('🏅');
+  const [search, setSearch] = useState('');
 
   const { data: thresholds, isLoading: loadingT } = useQuery({
     queryKey: ['milestone-thresholds'],
@@ -48,11 +49,18 @@ export const MarcosConquistas = () => {
         .from('player_milestones')
         .select('*')
         .order('achieved_at', { ascending: false })
-        .limit(100);
+        .range(0, 4999);
       if (error) throw error;
       return data || [];
     },
   });
+
+  const filteredAchievements = (() => {
+    const s = search.trim().toLowerCase();
+    const list = achievements || [];
+    const filtered = s ? list.filter((a: any) => a.player_name.toLowerCase().includes(s)) : list;
+    return s ? filtered : filtered.slice(0, 200);
+  })();
 
   const runCheck = async () => {
     setRunning(true);
