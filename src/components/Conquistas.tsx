@@ -51,7 +51,7 @@ export const Conquistas = () => {
         .from('player_badges')
         .select('*')
         .order('achieved_at', { ascending: false })
-        .limit(2000);
+        .range(0, 9999);
       if (error) throw error;
       return data || [];
     },
