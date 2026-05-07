@@ -28,105 +28,31 @@ export const BestPerClassRanking = () => {
   const [eventType, setEventType] = useState<string>('boss_event');
   const { data: bestPerClass, isLoading } = useQuery({
     queryKey: ['best-per-class', startDate, endDate, eventType],
-    staleTime: 30000,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      // 1. Fetch matches (with optional date filter)
-      let matchQuery = supabase.from('pvp_matches').select('id, match_date');
-      if (eventType !== 'all') matchQuery = matchQuery.eq('event_type', eventType);
-      if (startDate) matchQuery = matchQuery.gte('match_date', startDate);
-      if (endDate) matchQuery = matchQuery.lte('match_date', endDate);
-      const { data: matches, error: mErr } = await matchQuery;
-      if (mErr) throw mErr;
-      if (!matches?.length) return { best: [], worst: [] };
-
-      const matchIds = matches.map(m => m.id);
-
-      // 2. Fetch all match_players with pagination
-      const PAGE = 1000;
-      let allPlayers: any[] = [];
-      let page = 0;
-      while (true) {
-        const { data, error } = await supabase
-          .from('pvp_match_players')
-          .select('player_name, kills, deaths, kda, match_id')
-          .in('match_id', matchIds)
-          .range(page * PAGE, (page + 1) * PAGE - 1);
-        if (error) throw error;
-        if (!data?.length) break;
-        allPlayers = allPlayers.concat(data);
-        if (data.length < PAGE) break;
-        page++;
-      }
-
-      // 3. Fetch characters (non-banned, with class)
-      const { data: characters, error: cErr } = await supabase
-        .from('characters')
-        .select('name, class')
-        .eq('banned', false);
-      if (cErr) throw cErr;
-
-      const normalize = (s: string) =>
-        (s ?? '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
-
-      const charMap = new Map(
-        (characters || [])
-          .filter(c => c.class && c.class.trim())
-          .map(c => [normalize(c.name), c.class])
-      );
-
-      // 4. Aggregate per player
-      const playerAgg = new Map<string, {
-        displayName: string;
-        kills: number;
-        deaths: number;
-        matches: number;
-      }>();
-
-      for (const p of allPlayers) {
-        const key = normalize(p.player_name);
-        if (!key) continue;
-        const ex = playerAgg.get(key) || { displayName: p.player_name, kills: 0, deaths: 0, matches: 0 };
-        ex.kills += Number(p.kills);
-        ex.deaths += Number(p.deaths);
-        ex.matches += 1;
-        ex.displayName = p.player_name;
-        playerAgg.set(key, ex);
-      }
-
-      // 5. Build per-class best AND worst
-      const classBest = new Map<string, PlayerClassStats>();
-      const classWorst = new Map<string, PlayerClassStats>();
-
-      for (const [key, stats] of playerAgg) {
-        const cls = charMap.get(key);
-        if (!cls) continue;
-
-        const kda = stats.deaths === 0 ? stats.kills : Math.round((stats.kills / stats.deaths) * 100) / 100;
-        const eventScore = stats.kills * 3 + kda * 2 - stats.deaths * 1.5;
+      const { data, error } = await (supabase.rpc as any)('get_ranking_best_per_class', {
+        p_date_from: startDate || null,
+        p_date_to: endDate || null,
+        p_event_type: eventType,
+      });
+      if (error) throw error;
+      const best: PlayerClassStats[] = [];
+      const worst: PlayerClassStats[] = [];
+      (data || []).forEach((r: any) => {
         const entry: PlayerClassStats = {
-          player_name: stats.displayName,
-          className: cls,
-          totalKills: stats.kills,
-          totalDeaths: stats.deaths,
-          totalKda: kda,
-          matchCount: stats.matches,
-          eventScore,
+          player_name: r.player_name,
+          className: r.class_name,
+          totalKills: Number(r.total_kills),
+          totalDeaths: Number(r.total_deaths),
+          totalKda: Number(r.total_kda),
+          matchCount: Number(r.match_count),
+          eventScore: Number(r.event_score),
         };
-
-        const currentBest = classBest.get(cls);
-        if (!currentBest || eventScore > currentBest.eventScore) {
-          classBest.set(cls, entry);
-        }
-
-        const currentWorst = classWorst.get(cls);
-        if (!currentWorst || eventScore < currentWorst.eventScore) {
-          classWorst.set(cls, entry);
-        }
-      }
-
+        if (r.is_best) best.push(entry); else worst.push(entry);
+      });
       return {
-        best: Array.from(classBest.values()).sort((a, b) => b.eventScore - a.eventScore),
-        worst: Array.from(classWorst.values()).sort((a, b) => a.eventScore - b.eventScore),
+        best: best.sort((a, b) => b.eventScore - a.eventScore),
+        worst: worst.sort((a, b) => a.eventScore - b.eventScore),
       };
     },
   });
