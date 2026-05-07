@@ -145,6 +145,8 @@ const Index = () => {
         return <PvPAnalyticsDashboard />;
       case 'hall-fama':
         return <HallDaFama />;
+      case 'marcos':
+        return <MarcosConquistas />;
       case 'sorteio':
         return <LegendsSorteio />;
       case 'admin':
