@@ -37,6 +37,7 @@ const navItems: NavItem[] = [
   { id: 'killstreak', label: 'Kill Streak', icon: Swords },
   { id: 'hall-fama', label: 'Hall da Fama', icon: Star },
   { id: 'marcos', label: 'Marcos', icon: Award },
+  { id: 'conquistas', label: 'Conquistas', icon: Award },
   { id: 'analytics', label: 'Análise PvP', icon: BarChart3, requiresAuth: true },
   { id: 'sorteio', label: 'Sorteio', icon: Gift, requiresEdit: true },
   { id: 'placar', label: 'Incluir Dados', icon: Swords, requiresAdmin: true },
