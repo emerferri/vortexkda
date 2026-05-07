@@ -16,6 +16,7 @@ import { RankingFogoAmigo } from '@/components/RankingFogoAmigo';
 import { ConfrontosDiretos } from '@/components/ConfrontosDiretos';
 import { DatabaseManager } from '@/components/DatabaseManager';
 import { PvPAnalyticsDashboard } from '@/components/analytics/PvPAnalyticsDashboard';
+import { HallDaFama } from '@/components/HallDaFama';
 import { RankingArkaWar } from '@/components/RankingArkaWar';
 import { LegendsSorteio } from '@/components/LegendsSorteio';
 import { DatabaseImport } from '@/components/DatabaseImport';
