@@ -81,28 +81,7 @@ export const PutinhaRanking = () => {
       return relations;
     },
   });
-        if (reverseRelation && reverseRelation.count >= 10) {
-          return false;
-        }
-        
-        return true;
-      });
 
-      // 6) Map to final format and sort by deaths (level)
-
-      const putinhaRelations: PutinhaRelation[] = filteredRelations
-        .map((r) => ({
-          victim: r.victim,
-          killer: r.killer,
-          deaths: r.count,
-          victimGuild: characterMap.get(r.victim),
-          killerGuild: characterMap.get(r.killer),
-        }))
-        .sort((a, b) => b.deaths - a.deaths);
-
-      return putinhaRelations;
-    }
-  });
 
   const exportAsImage = async () => {
     if (!cardRef.current) return;
