@@ -30,6 +30,8 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { AppSidebar } from '@/components/AppSidebar';
+import { LiveIndicator } from '@/components/LiveIndicator';
+import { useRealtimeRankings } from '@/hooks/useRealtimeRankings';
 
 const Index = () => {
   const [players, setPlayers] = useState<PlayerStats[]>([]);
@@ -40,6 +42,7 @@ const Index = () => {
   const { canEditData, isAdmin, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { lastEventAt } = useRealtimeRankings();
 
   const [activeTab, setActiveTab] = useState(() => {
     const tab = searchParams.get('tab');
@@ -166,7 +169,10 @@ const Index = () => {
 
       <div className="flex-1 flex flex-col min-h-screen">
         <div className="container mx-auto px-4 py-8 max-w-6xl flex-1">
-          <header className="text-center mb-8">
+          <header className="text-center mb-8 relative">
+            <div className="absolute right-0 top-0">
+              <LiveIndicator lastEventAt={lastEventAt} />
+            </div>
             <h1 className="text-3xl md:text-5xl font-bold text-foreground text-glow flex items-center justify-center gap-3">
               <Swords className="w-8 h-8 md:w-12 md:h-12 text-primary animate-pulse" />
               Ranking de Kill - PVP BOSS
