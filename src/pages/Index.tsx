@@ -18,6 +18,7 @@ import { DatabaseManager } from '@/components/DatabaseManager';
 import { PvPAnalyticsDashboard } from '@/components/analytics/PvPAnalyticsDashboard';
 import { HallDaFama } from '@/components/HallDaFama';
 import { MarcosConquistas } from '@/components/MarcosConquistas';
+import { Conquistas } from '@/components/Conquistas';
 import { RankingArkaWar } from '@/components/RankingArkaWar';
 import { LegendsSorteio } from '@/components/LegendsSorteio';
 import { DatabaseImport } from '@/components/DatabaseImport';
@@ -147,6 +148,8 @@ const Index = () => {
         return <HallDaFama />;
       case 'marcos':
         return <MarcosConquistas />;
+      case 'conquistas':
+        return <Conquistas />;
       case 'sorteio':
         return <LegendsSorteio />;
       case 'admin':
