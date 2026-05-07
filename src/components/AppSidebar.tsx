@@ -33,6 +33,7 @@ const navItems: NavItem[] = [
   { id: 'vergonha', label: 'Mural da Vergonha', icon: Skull },
   { id: 'never-positive', label: 'Nunca Positivo', icon: TrendingDown },
   { id: 'fogo-amigo', label: 'Fogo Amigo', icon: Flame },
+  { id: 'confrontos', label: 'Confrontos Diretos', icon: Swords },
   { id: 'killstreak', label: 'Kill Streak', icon: Swords },
   { id: 'analytics', label: 'Análise PvP', icon: BarChart3, requiresAuth: true },
   { id: 'sorteio', label: 'Sorteio', icon: Gift, requiresEdit: true },
