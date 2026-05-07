@@ -5,7 +5,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import {
   Swords, LogIn, LogOut, User, Crown, Skull, Users,
   Trophy, Target, Flame, Award, Menu, X, Shield,
-  ChevronsLeft, ChevronsRight, Crosshair, TrendingDown, BarChart3, Gift,
+  ChevronsLeft, ChevronsRight, Crosshair, TrendingDown, BarChart3, Gift, Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
