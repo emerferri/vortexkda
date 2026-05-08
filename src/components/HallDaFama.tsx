@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Trophy, Crown, Skull, Flame, Swords, Award, Heart, Lock, Unlock } from 'lucide-react';
+import { Trophy, Crown, Skull, Flame, Swords, Award, Heart, Lock, Unlock, FileDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useUserRole } from '@/hooks/useUserRole';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const RANKING_META: Record<string, { label: string; icon: any; color: string }> = {
   geral: { label: 'Ranking Geral', icon: Trophy, color: 'text-yellow-400' },
