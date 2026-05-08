@@ -8,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const INACTIVITY_MIN = 5;       // minutos sem kill = "evento encerrado" (conservador)
+const INACTIVITY_MIN = 3;       // minutos sem kill = "evento encerrado"
 const MIN_ELAPSED_MIN = 7;      // só dispara após X min do início (evita falso positivo no início)
 const MAX_WINDOW_MIN = 90;      // só considera eventos que começaram nas últimas 90 min
 
