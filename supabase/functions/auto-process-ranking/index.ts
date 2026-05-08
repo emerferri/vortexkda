@@ -822,31 +822,35 @@ Deno.serve(async (req) => {
     const sortedPlayers = playersWithScore.sort((a, b) => b.eventScore - a.eventScore);
     const rankingTableText = formatRankingTable(sortedPlayers);
 
-    // Post to Discord - select webhook based on event type
+    // Post to Discord - select webhook based on event type (or homolog when testing)
     const isPostingPaused = Deno.env.get('AUTO_POST_PAUSED') === 'true';
     let webhookUrl: string | undefined;
-    if (eventType === 'throne_conquest') {
+    if (body.testHomolog) {
+      webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL'); // homolog
+    } else if (eventType === 'throne_conquest') {
       webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_THRONE');
     } else {
       webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_PROD') || Deno.env.get('DISCORD_WEBHOOK_URL');
     }
 
-    if (isPostingPaused) {
+    if (isPostingPaused && !body.testHomolog) {
       console.log(`[Auto Process] ⏸️ Discord posting is PAUSED. Skipping webhook for ${eventType} (${matchDate} ${matchHour}H). Data was saved successfully.`);
     } else if (webhookUrl) {
       const [year, month, day] = matchDate.split('-');
       const formattedDate = `${day}/${month}/${year}`;
+      const formattedHour = `${String(matchHour).padStart(2, '0')}:${String(eventMinute).padStart(2, '0')}`;
 
-      // Dynamic titles based on event type
       const isThrone = eventType === 'throne_conquest';
-      const rankingTitle = isThrone ? '📊 Ranking Throne Conquest' : '📊 Ranking BOSS Diário';
-      const reiTitle = isThrone ? '👑 Rei do Trono!' : '👑 Rei do PVP';
-      const embedColor = isThrone ? 0xF59E0B : 0x10B981; // Yellow for throne, green for boss
+      const rankingTitle = isThrone ? '🏆 Ranking Throne Conquest' : '🏆 Ranking BOSS Diário';
+      const reiTitle = isThrone ? '👑 REI DO TRONO' : '👑 REI DO PvP';
+      const embedColor = isThrone ? 0xF59E0B : 0x10B981;
       const eventLabel = isThrone ? 'Throne Conquest' : 'Boss/evento';
-      // Fetch and select phrases with rotation (no repeats until all used)
+
+      const SEP = '━━━━━━━━━━━━━━━━━━';
+
+      // Frases dinâmicas (rotação)
       const selectPhrase = async (category: string, name: string, value: string, fallback: string): Promise<string> => {
         try {
-          // Get the least recently used phrase (NULLs first = never used)
           const { data, error } = await internalClient
             .from('discord_highlight_phrases')
             .select('id, phrase_template')
@@ -854,104 +858,111 @@ Deno.serve(async (req) => {
             .order('last_used_at', { ascending: true, nullsFirst: true })
             .limit(1)
             .single();
-
-          if (error || !data) {
-            console.log(`[Auto Process] No phrase found for category ${category}, using fallback`);
-            return fallback;
-          }
-
-          // Mark this phrase as used now
+          if (error || !data) return fallback;
           await internalClient
             .from('discord_highlight_phrases')
             .update({ last_used_at: new Date().toISOString() })
             .eq('id', data.id);
-
-          console.log(`[Auto Process] Selected phrase ${data.id} for category ${category}`);
           return data.phrase_template.replace(/\{name\}/g, name).replace(/\{value\}/g, value);
-        } catch (e) {
-          console.log(`[Auto Process] Failed to fetch phrase for ${category}, using fallback`);
+        } catch {
           return fallback;
         }
       };
 
       const footerLines: string[] = [`**Destaques ${eventLabel}:**`];
       if (bestKillStreak) {
-        footerLines.push(`1 - ${await selectPhrase('kill_streak', `**${bestKillStreak.name}**`, String(bestKillStreak.streak), `**${bestKillStreak.name}** matou ${bestKillStreak.streak} vezes sem morrer! é um monstro do PVP.`)}`);
+        footerLines.push(`1 - ${await selectPhrase('kill_streak', `**${bestKillStreak.name}**`, String(bestKillStreak.streak), `**${bestKillStreak.name}** matou ${bestKillStreak.streak} vezes sem morrer!`)}`);
       }
       if (brabissimo) {
-        footerLines.push(`2 - ${await selectPhrase('best_kda', `**${brabissimo.name}**`, brabissimo.kda.toFixed(2), `**${brabissimo.name}** esse manja de posicionamento, KDA implacável ${brabissimo.kda.toFixed(2)}`)}`);
+        footerLines.push(`2 - ${await selectPhrase('best_kda', `**${brabissimo.name}**`, brabissimo.kda.toFixed(2), `**${brabissimo.name}** KDA implacável ${brabissimo.kda.toFixed(2)}`)}`);
       }
       if (coneMonodedo) {
-        footerLines.push(`3 - ${await selectPhrase('cone', `**${coneMonodedo.name}**`, String(coneMonodedo.deaths), `**${coneMonodedo.name}** Esse deve estar jogando sem mouse! morreu ${coneMonodedo.deaths} vezes!`)}`);
+        footerLines.push(`3 - ${await selectPhrase('cone', `**${coneMonodedo.name}**`, String(coneMonodedo.deaths), `**${coneMonodedo.name}** morreu ${coneMonodedo.deaths} vezes!`)}`);
       }
       const footerMessage = footerLines.join('\n');
 
-      // Embed 1: Main info
+      // === Embed 1 — Resumo principal estruturado ===
+      const lines: string[] = [];
+      lines.push(`📅 ${formattedDate}  •  ⏰ ${formattedHour}`);
+      lines.push(`🎯 Ordenação: Event Score`);
+      lines.push(SEP);
+
+      // Pódio principal
+      if (reiDoPVP) {
+        lines.push(`${isThrone ? '👑 **REI DO TRONO**' : '🥇 **REI DO PvP**'}`);
+        lines.push(`👑 **${reiDoPVP.name}**`);
+        lines.push(`⚔️ ${reiDoPVP.eventScore.toFixed(2)} Score • ${reiDoPVP.kills}K / ${reiDoPVP.deaths}D`);
+        lines.push('');
+      }
+      if (brabissimo) {
+        lines.push(`🥈 **BRABÍSSIMO**`);
+        lines.push(`⚡ **${brabissimo.name}**`);
+        lines.push(`⚔️ KDA ${brabissimo.kda.toFixed(2)} • ${brabissimo.kills}K / ${brabissimo.deaths}D`);
+        lines.push('');
+      }
+      if (coneMonodedo) {
+        lines.push(`🥉 **CONE MONODEDO**`);
+        lines.push(`🍦 **${coneMonodedo.name}**`);
+        lines.push(`💀 ${coneMonodedo.eventScore.toFixed(2)} Score • ${coneMonodedo.kills}K / ${coneMonodedo.deaths}D`);
+      }
+
+      lines.push(SEP);
+      lines.push(`😂 **TROFÉUS ESPECIAIS**`);
+      lines.push('');
+      if (agenteDuplo) {
+        lines.push(`🕵️ **Agente Duplo**`);
+        lines.push(`📛 **${agenteDuplo.name}**${agenteDuplo.guild ? ` • ${agenteDuplo.guild}` : ''}`);
+        lines.push(`☠️ ${agenteDuplo.friendlyKills} aliado(s) eliminado(s)`);
+        lines.push('');
+      } else {
+        lines.push(`🕵️ **Agente Duplo** — _nenhum traidor hoje_`);
+        lines.push('');
+      }
+      if (putinhaNoite) {
+        lines.push(`💔 **Putinha da Noite**`);
+        lines.push(`📛 **${putinhaNoite.dominador}** → **${putinhaNoite.putinha}**`);
+        lines.push(`⚰️ ${putinhaNoite.kills} morte(s) sofrida(s)`);
+      } else {
+        lines.push(`💔 **Putinha da Noite** — _sem dominância clara_`);
+      }
+
+      lines.push(SEP);
+      lines.push(`📊 **ESTATÍSTICAS**`);
+      lines.push(`👥 Jogadores: **${totals.playerCount}**`);
+      lines.push(`⚔️ Kills: **${totals.kills}**`);
+      lines.push(`💀 Deaths: **${totals.deaths}**`);
+
       const embed1 = {
         title: rankingTitle,
+        description: lines.join('\n'),
         color: embedColor,
-        fields: [
-          {
-            name: '🔍 Filtros Aplicados',
-            value: `A partir de: **${formattedDate}**\nHora inicial: **${matchHour}:${String(eventMinute).padStart(2, '0')}**\nOrdenação: **eventScore**`,
-            inline: false,
-          },
-          {
-            name: reiTitle,
-            value: reiDoPVP ? `**${reiDoPVP.name}**\nScore: ${reiDoPVP.eventScore.toFixed(2)} • ${reiDoPVP.kills}K/${reiDoPVP.deaths}D` : 'N/A',
-            inline: true,
-          },
-          {
-            name: '⚡ Brabissimo',
-            value: brabissimo ? `**${brabissimo.name}**\nKDA: ${brabissimo.kda} • ${brabissimo.kills}K/${brabissimo.deaths}D` : 'N/A',
-            inline: true,
-          },
-          {
-            name: '🍦 Cone Monodedo',
-            value: coneMonodedo ? `**${coneMonodedo.name}**\nScore: ${coneMonodedo.eventScore.toFixed(2)} • ${coneMonodedo.kills}K/${coneMonodedo.deaths}D` : 'N/A',
-            inline: true,
-          },
-          ...(agenteDuplo ? [{
-            name: '🕵️ Agente Duplo',
-            value: `**${agenteDuplo.name}**\n${agenteDuplo.friendlyKills} kills em aliados${agenteDuplo.guild ? ` • ${agenteDuplo.guild}` : ''}`,
-            inline: true,
-          }] : []),
-          ...(putinhaNoite ? [{
-            name: '💔 Putinha da Noite',
-            value: `**${putinhaNoite.dominador}** → **${putinhaNoite.putinha}**\n${putinhaNoite.kills} mortes`,
-            inline: true,
-          }] : []),
-          {
-            name: '📈 Totais',
-            value: `${totals.playerCount} jogadores • ${totals.kills} kills • ${totals.deaths} deaths`,
-            inline: false,
-          },
-          {
-            name: '⚔️ Ranking por Guild',
-            value: '```\n' + guildRankingText.substring(0, 1000) + '\n```',
-            inline: false,
-          },
-        ],
         footer: {
-          text: `Hoje às ${String(matchHour).padStart(2, '0')}:${String(eventMinute).padStart(2, '0')} • Tentativa ${attempt}${forceProcess ? ' (forçado)' : ''}`,
+          text: `Tentativa ${attempt}${forceProcess ? ' (forçado)' : ''}${body.testHomolog ? ' • TESTE HOMOLOG' : ''}`,
         },
         timestamp: new Date().toISOString(),
       };
 
-      // Embed 2: Ranking table (monospaced code block)
+      // === Embed 2 — Ranking por Guild (tabela) ===
       const embed2 = {
+        title: '⚔️ Ranking por Guild',
+        description: '```\n' + guildRankingText.substring(0, 3990) + '\n```',
+        color: embedColor,
+      };
+
+      // === Embed 3 — Ranking completo (tabela) ===
+      const embed3 = {
         title: '🏆 Ranking Completo',
         description: '```\n' + rankingTableText.substring(0, 3990) + '\n```',
         color: embedColor,
       };
 
-      // Embed 3: Closing message with link
+      // === Embed 4 — Destaques + link ===
       const frontendUrlRaw = Deno.env.get('FRONTEND_URL') || 'https://rankingpvpboss.lovable.app';
-      const frontendUrl = frontendUrlRaw.replace(/\/+$/, ''); // Remove trailing slashes
+      const frontendUrl = frontendUrlRaw.replace(/\/+$/, '');
       const tabParam = isThrone ? 'throne' : 'ranking';
       const rankingLink = `${frontendUrl}/?tab=${tabParam}&date=${matchDate}&hour=${matchHour}`;
-      
-      const embed3 = {
+
+      const embed4 = {
         description: `${footerMessage}\n\n🔗 **[Ver ranking completo no site](${rankingLink})**`,
         color: 0x9b87f5,
       };
@@ -959,18 +970,14 @@ Deno.serve(async (req) => {
       const discordResponse = await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ embeds: [embed1, embed2, embed3] }),
+        body: JSON.stringify({ embeds: [embed1, embed2, embed3, embed4] }),
       });
 
       if (!discordResponse.ok) {
         console.error('[Auto Process] Failed to post to Discord:', await discordResponse.text());
       } else {
-        console.log(`[Auto Process] Successfully posted ${eventType} to Discord`);
+        console.log(`[Auto Process] Successfully posted ${eventType} to Discord${body.testHomolog ? ' (HOMOLOG TEST)' : ''}`);
       }
-
-      // ===== Fogo Amigo follow-up DESATIVADO =====
-      // Postagem automática do ranking Fogo Amigo foi desabilitada.
-      // O ranking continua disponível no site e pode ser publicado manualmente via botão "Publicar no Discord".
     } else {
       console.log(`[Auto Process] No Discord webhook configured for ${eventType}`);
     }
