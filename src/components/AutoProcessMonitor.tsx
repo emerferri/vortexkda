@@ -70,7 +70,7 @@ export const AutoProcessMonitor = () => {
     setRefreshing(false);
   };
 
-  const handleManualProcess = async (event: ExpectedEvent, reprocess = false) => {
+  const handleManualProcess = async (event: ExpectedEvent, reprocess = false, testHomolog = false) => {
     const eventKey = `${event.date}-${event.hour}-${event.eventType}`;
     setProcessingEvent(eventKey);
 
@@ -80,9 +80,11 @@ export const AutoProcessMonitor = () => {
           attempt: 3,
           forceProcess: true,
           forceReprocess: reprocess,
+          testHomolog,
           eventHour: event.hour,
           eventMinute: event.minute,
           eventType: event.eventType,
+          eventDate: event.date,
         }
       });
 
@@ -90,7 +92,7 @@ export const AutoProcessMonitor = () => {
 
       if (data?.success) {
         toast({
-          title: reprocess ? "Reprocessamento concluído!" : "Processamento concluído!",
+          title: testHomolog ? "Teste em homologação enviado!" : reprocess ? "Reprocessamento concluído!" : "Processamento concluído!",
           description: `Ranking de ${event.date} ${event.hour}:${String(event.minute).padStart(2, '0')} processado com ${data.playersCount || data.playerCount || 0} jogadores.`,
         });
         await fetchRecentMatches();
@@ -308,6 +310,16 @@ export const AutoProcessMonitor = () => {
                 <div className="flex items-center gap-2">
                   {isProcessed ? (
                     <>
+                      <Button
+                        variant="outline" size="sm"
+                        onClick={() => handleManualProcess(event, true, true)}
+                        disabled={isProcessing}
+                        className="gap-1 h-7 text-xs bg-blue-500/10 border-blue-500/30 hover:bg-blue-500/20"
+                        title="Reprocessar e postar APENAS no webhook de homologação"
+                      >
+                        {isProcessing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                        Testar Homolog
+                      </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button
@@ -323,7 +335,7 @@ export const AutoProcessMonitor = () => {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Reprocessar evento?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Isso vai apagar os dados atuais deste evento ({getDateLabel(event.date)} {formatEventTime(event)}) e buscar novamente no banco externo, postando o resultado no Discord.
+                              Isso vai apagar os dados atuais deste evento ({getDateLabel(event.date)} {formatEventTime(event)}) e buscar novamente no banco externo, postando o resultado no Discord (PROD).
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
