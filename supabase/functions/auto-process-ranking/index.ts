@@ -38,13 +38,14 @@ interface GuildStats {
 
 interface RequestBody {
   trigger?: string;
-  attempt?: number;        // 1, 2, or 3
-  forceProcess?: boolean;  // true on 3rd attempt
-  forceReprocess?: boolean; // delete existing match and reprocess
-  eventHour?: number;      // boss hour (20, 21, 22)
-  eventMinute?: number;    // boss minute (0 or 30)
-  eventType?: 'boss_event' | 'throne_conquest'; // Type of event
-  testHomolog?: boolean;   // force posting to homolog webhook for testing
+  attempt?: number;
+  forceProcess?: boolean;
+  forceReprocess?: boolean;
+  eventHour?: number;
+  eventMinute?: number;
+  eventType?: 'boss_event' | 'throne_conquest';
+  testHomolog?: boolean;
+  eventDate?: string; // 'YYYY-MM-DD' force a specific date (for homolog testing)
 }
 
 // Format ranking as monospaced table for Discord
