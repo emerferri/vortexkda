@@ -138,7 +138,7 @@ export const Conquistas = () => {
 
       {activeSeason && (
         <div className="text-center text-xs text-muted-foreground">
-          Exibindo conquistas da <span className="text-primary font-semibold">{activeSeason.name}</span> (desde {new Date(activeSeason.started_at).toLocaleDateString('pt-BR')})
+          Exibindo conquistas da <span className="text-primary font-semibold">{activeSeason.name}</span> (desde {(() => { const [y,m,d] = String(activeSeason.started_at).split('-'); return `${d}/${m}/${y}`; })()})
         </div>
       )}
 
