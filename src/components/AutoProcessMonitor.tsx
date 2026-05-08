@@ -84,6 +84,7 @@ export const AutoProcessMonitor = () => {
           eventHour: event.hour,
           eventMinute: event.minute,
           eventType: event.eventType,
+          eventDate: event.date,
         }
       });
 
