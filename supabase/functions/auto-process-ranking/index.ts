@@ -44,6 +44,7 @@ interface RequestBody {
   eventHour?: number;      // boss hour (20, 21, 22)
   eventMinute?: number;    // boss minute (0 or 30)
   eventType?: 'boss_event' | 'throne_conquest'; // Type of event
+  testHomolog?: boolean;   // force posting to homolog webhook for testing
 }
 
 // Format ranking as monospaced table for Discord
