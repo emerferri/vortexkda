@@ -534,7 +534,26 @@ Deno.serve(async (req) => {
     const internalServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const internalClient = createClient(internalSupabaseUrl, internalServiceKey);
 
-    const { startDate, endDate, matchDate, matchHour, localStartDate, localEndDate } = getEventTimeRange(eventHour, eventMinute, eventType);
+    let { startDate, endDate, matchDate, matchHour, localStartDate, localEndDate } = getEventTimeRange(eventHour, eventMinute, eventType);
+
+    // Override matchDate if eventDate provided (homolog testing for past events)
+    if (body.eventDate && /^\d{4}-\d{2}-\d{2}$/.test(body.eventDate)) {
+      const overrideDate = body.eventDate;
+      // Recompute UTC startDate/endDate from overrideDate + matchHour/eventMinute (BRT = UTC-3)
+      const sUtc = new Date(`${overrideDate}T${String(matchHour).padStart(2,'0')}:${String(eventMinute).padStart(2,'0')}:00-03:00`);
+      const offsetMs = eventType === 'throne_conquest' ? 4500000 : (matchHour === 22 ? 5400000 : 3600000);
+      startDate = sUtc.toISOString();
+      endDate = new Date(sUtc.getTime() + offsetMs).toISOString();
+      matchDate = overrideDate;
+      // Recompute localStartDate/localEndDate
+      let lEndH = matchHour, lEndM = 59;
+      if (eventType === 'throne_conquest') { lEndH = 22; lEndM = 40; }
+      else if (matchHour === 22) { lEndH = 23; lEndM = 29; }
+      localStartDate = `${overrideDate}T${String(matchHour).padStart(2,'0')}:${String(eventMinute).padStart(2,'0')}`;
+      localEndDate = `${overrideDate}T${String(lEndH).padStart(2,'0')}:${String(lEndM).padStart(2,'0')}`;
+      console.log(`[Auto Process] OVERRIDE eventDate=${overrideDate} → ${startDate} to ${endDate}`);
+    }
+
     console.log(`[Auto Process] Fetching logs for ${matchDate} ${matchHour}:${String(eventMinute).padStart(2, '0')} (${eventType})`);
 
     // Check if this match already exists - filter by event_type to allow same hour different event types
