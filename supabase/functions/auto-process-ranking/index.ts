@@ -910,6 +910,16 @@ Deno.serve(async (req) => {
             value: coneMonodedo ? `**${coneMonodedo.name}**\nScore: ${coneMonodedo.eventScore.toFixed(2)} • ${coneMonodedo.kills}K/${coneMonodedo.deaths}D` : 'N/A',
             inline: true,
           },
+          ...(agenteDuplo ? [{
+            name: '🕵️ Agente Duplo',
+            value: `**${agenteDuplo.name}**\n${agenteDuplo.friendlyKills} kills em aliados${agenteDuplo.guild ? ` • ${agenteDuplo.guild}` : ''}`,
+            inline: true,
+          }] : []),
+          ...(putinhaNoite ? [{
+            name: '💔 Putinha da Noite',
+            value: `**${putinhaNoite.dominador}** → **${putinhaNoite.putinha}**\n${putinhaNoite.kills} mortes`,
+            inline: true,
+          }] : []),
           {
             name: '📈 Totais',
             value: `${totals.playerCount} jogadores • ${totals.kills} kills • ${totals.deaths} deaths`,
