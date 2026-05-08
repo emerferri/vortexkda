@@ -269,6 +269,74 @@ export const RankingGeral = () => {
     return [...sortedPlayers].sort((a, b) => b.weightedKda - a.weightedKda)[0];
   }, [sortedPlayers]);
 
+  // Agente Duplo: jogador que mais matou amigos (fogo amigo)
+  const { data: agenteDuploData } = useQuery({
+    queryKey: ['agente-duplo', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    staleTime: 30000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_ranking_fogo_amigo', {
+        p_date_from: debouncedDateFrom ? format(debouncedDateFrom, 'yyyy-MM-dd') : null,
+        p_date_to: debouncedDateTo ? format(debouncedDateTo, 'yyyy-MM-dd') : null,
+        p_hour_from: debouncedHourFrom ?? null,
+        p_hour_to: debouncedHourTo ?? null,
+        p_event_type: 'boss_event',
+      });
+      if (error) throw error;
+      const list = (data as any[]) || [];
+      const sorted = [...list].sort((a, b) => Number(b.friendly_kills) - Number(a.friendly_kills));
+      return sorted[0] ? {
+        name: sorted[0].player_name as string,
+        guild: (sorted[0].player_guild as string) || '',
+        friendlyKills: Number(sorted[0].friendly_kills),
+        friendlyDeaths: Number(sorted[0].friendly_deaths),
+      } : null;
+    },
+  });
+
+  // Putinha da Noite: par dominador → vítima com mais mortes no período
+  const { data: putinhaNoiteData } = useQuery({
+    queryKey: ['putinha-noite', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    staleTime: 30000,
+    queryFn: async () => {
+      let mq = supabase.from('pvp_matches').select('id').eq('event_type', 'boss_event');
+      if (debouncedDateFrom) mq = mq.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
+      if (debouncedDateTo) mq = mq.lte('match_date', format(debouncedDateTo, 'yyyy-MM-dd'));
+      if (debouncedHourFrom !== undefined) mq = mq.gte('match_hour', debouncedHourFrom);
+      if (debouncedHourTo !== undefined) mq = mq.lte('match_hour', debouncedHourTo);
+      const { data: matches, error: me } = await mq;
+      if (me) throw me;
+      const matchIds = (matches || []).map((m: any) => m.id);
+      if (matchIds.length === 0) return null;
+
+      const counts = new Map<string, { killer: string; victim: string; n: number }>();
+      const PAGE = 1000;
+      for (let i = 0; i < matchIds.length; i += 200) {
+        const slice = matchIds.slice(i, i + 200);
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from('pvp_kill_logs')
+            .select('killer_name,victim_name')
+            .in('match_id', slice)
+            .range(from, from + PAGE - 1);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          for (const r of data as any[]) {
+            if (r.killer_name === r.victim_name) continue;
+            const k = `${r.killer_name}→${r.victim_name}`;
+            const ex = counts.get(k);
+            if (ex) ex.n++;
+            else counts.set(k, { killer: r.killer_name, victim: r.victim_name, n: 1 });
+          }
+          if (data.length < PAGE) break;
+          from += PAGE;
+        }
+      }
+      const arr = Array.from(counts.values()).sort((a, b) => b.n - a.n);
+      return arr[0] ? { dominador: arr[0].killer, putinha: arr[0].victim, kills: arr[0].n } : null;
+    },
+  });
+
   const exportToExcel = () => {
     const worksheetData = [
       ['Ranking Geral - PVP'],
@@ -349,6 +417,16 @@ export const RankingGeral = () => {
             name: coneMonodedo?.name || '',
             deaths: coneMonodedo?.deaths || 0,
             matches: coneMonodedo?.matches || 0
+          },
+          agenteDuplo: {
+            name: agenteDuploData?.name || '',
+            friendlyKills: agenteDuploData?.friendlyKills || 0,
+            guild: agenteDuploData?.guild || ''
+          },
+          putinhaNoite: {
+            dominador: putinhaNoiteData?.dominador || '',
+            putinha: putinhaNoiteData?.putinha || '',
+            kills: putinhaNoiteData?.kills || 0
           }
         },
         totals: {
@@ -591,7 +669,7 @@ export const RankingGeral = () => {
       ) : (
       <>
       {/* Classificações Especiais */}
-      <div ref={specialCardsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div ref={specialCardsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="bg-success/10 border-2 border-success rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
           <Trophy className="w-10 h-10 text-success mx-auto mb-3 animate-pulse" />
           <h3 className="text-lg font-bold text-success mb-2">👑 Rei do PVP</h3>
@@ -630,6 +708,27 @@ export const RankingGeral = () => {
             <span className="text-destructive font-bold">{coneMonodedo?.deaths}</span> deaths
           </p>
           <p className="text-xs text-muted-foreground mt-1">{coneMonodedo?.matches} boss(es)</p>
+        </div>
+
+        <div className="bg-orange-500/10 border-2 border-orange-500 rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
+          <Skull className="w-10 h-10 text-orange-500 mx-auto mb-3 animate-pulse" />
+          <h3 className="text-lg font-bold text-orange-500 mb-2">🕵️ Agente Duplo</h3>
+          <p className="text-2xl font-bold text-foreground text-glow mb-1">{agenteDuploData?.name || '—'}</p>
+          <p className="text-sm text-muted-foreground">
+            <span className="text-orange-500 font-bold">{agenteDuploData?.friendlyKills ?? 0}</span> kills em aliados
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">{agenteDuploData?.guild || '—'}</p>
+        </div>
+
+        <div className="bg-pink-500/10 border-2 border-pink-500 rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
+          <Skull className="w-10 h-10 text-pink-500 mx-auto mb-3 animate-pulse" />
+          <h3 className="text-lg font-bold text-pink-500 mb-2">💔 Putinha da Noite</h3>
+          <p className="text-base font-bold text-foreground text-glow mb-1">
+            {putinhaNoiteData?.dominador || '—'} → {putinhaNoiteData?.putinha || '—'}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            <span className="text-pink-500 font-bold">{putinhaNoiteData?.kills ?? 0}</span> mortes
+          </p>
         </div>
       </div>
 

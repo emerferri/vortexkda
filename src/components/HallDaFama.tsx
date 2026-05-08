@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Trophy, Crown, Skull, Flame, Swords, Award, Heart, Lock, Unlock } from 'lucide-react';
+import { Trophy, Crown, Skull, Flame, Swords, Award, Heart, Lock, Unlock, FileDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useUserRole } from '@/hooks/useUserRole';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const RANKING_META: Record<string, { label: string; icon: any; color: string }> = {
   geral: { label: 'Ranking Geral', icon: Trophy, color: 'text-yellow-400' },
@@ -74,6 +76,72 @@ export const HallDaFama = () => {
     } finally {
       setClosing(false);
     }
+  };
+
+  const exportPDF = () => {
+    if (!currentSeason || !snapshots || snapshots.length === 0) {
+      toast({ title: 'Sem dados', description: 'Selecione uma temporada com snapshots.', variant: 'destructive' });
+      return;
+    }
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFillColor(15, 23, 42);
+    doc.rect(0, 0, pageWidth, 80, 'F');
+    doc.setTextColor(250, 204, 21);
+    doc.setFontSize(22);
+    doc.text('🏆 HALL DA FAMA', pageWidth / 2, 35, { align: 'center' });
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.text(currentSeason.name, pageWidth / 2, 60, { align: 'center' });
+
+    let cursorY = 110;
+
+    Object.entries(RANKING_META).forEach(([type, meta]) => {
+      const list = grouped[type];
+      if (!list || list.length === 0) return;
+
+      if (cursorY > 700) {
+        doc.addPage();
+        cursorY = 60;
+      }
+
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text(meta.label, 40, cursorY);
+      cursorY += 8;
+
+      autoTable(doc, {
+        startY: cursorY,
+        head: [['#', 'Jogador', 'Classe', 'Guild', 'Pontuação']],
+        body: list.slice(0, 10).map((s: any) => [
+          s.position,
+          s.player_name,
+          s.player_class || '-',
+          s.player_guild || '-',
+          Number(s.score).toFixed(2),
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontSize: 10 },
+        bodyStyles: { fontSize: 9 },
+        margin: { left: 40, right: 40 },
+      });
+      cursorY = (doc as any).lastAutoTable.finalY + 25;
+    });
+
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(120);
+      doc.text(`Página ${i} / ${pageCount} • Gerado em ${new Date().toLocaleString('pt-BR')}`,
+        pageWidth / 2, doc.internal.pageSize.getHeight() - 20, { align: 'center' });
+    }
+
+    const safeName = currentSeason.name.replace(/[^a-z0-9]+/gi, '_');
+    doc.save(`hall-da-fama-${safeName}.pdf`);
+    toast({ title: 'PDF gerado!', description: 'Download iniciado.' });
   };
 
   const handleReopenSeason = async (seasonId: string) => {
@@ -153,6 +221,11 @@ export const HallDaFama = () => {
                 ))}
               </SelectContent>
             </Select>
+            {currentId && (
+              <Button onClick={exportPDF} variant="secondary" size="sm">
+                <FileDown className="w-4 h-4 mr-1" /> Exportar PDF
+              </Button>
+            )}
             {isAdmin && currentId && (
               <Button onClick={() => handleReopenSeason(currentId)} variant="outline" size="sm">
                 <Unlock className="w-4 h-4 mr-1" /> Reabrir temporada
