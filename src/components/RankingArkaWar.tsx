@@ -272,6 +272,68 @@ export const RankingArkaWar = () => {
     return [...sortedPlayers].sort((a, b) => b.weightedKda - a.weightedKda)[0];
   }, [sortedPlayers]);
 
+  // Agente Duplo: jogador que mais matou amigos (Arka War)
+  const { data: agenteDuploData } = useQuery({
+    queryKey: ['agente-duplo-arka', debouncedDateFrom, debouncedDateTo],
+    staleTime: 30000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_ranking_fogo_amigo', {
+        p_date_from: debouncedDateFrom ? format(debouncedDateFrom, 'yyyy-MM-dd') : null,
+        p_date_to: debouncedDateTo ? format(debouncedDateTo, 'yyyy-MM-dd') : null,
+        p_event_type: 'arka_war',
+      });
+      if (error) throw error;
+      const list = (data as any[]) || [];
+      const sorted = [...list].sort((a, b) => Number(b.friendly_kills) - Number(a.friendly_kills));
+      return sorted[0] ? {
+        name: sorted[0].player_name as string,
+        guild: (sorted[0].player_guild as string) || '',
+        friendlyKills: Number(sorted[0].friendly_kills),
+      } : null;
+    },
+  });
+
+  // Putinha da Noite: par dominador → vítima com mais mortes (Arka War)
+  const { data: putinhaNoiteData } = useQuery({
+    queryKey: ['putinha-noite-arka', debouncedDateFrom, debouncedDateTo],
+    staleTime: 30000,
+    queryFn: async () => {
+      let mq = supabase.from('pvp_matches').select('id').eq('event_type', 'arka_war');
+      if (debouncedDateFrom) mq = mq.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
+      if (debouncedDateTo) mq = mq.lte('match_date', format(debouncedDateTo, 'yyyy-MM-dd'));
+      const { data: matches, error: me } = await mq;
+      if (me) throw me;
+      const matchIds = (matches || []).map((m: any) => m.id);
+      if (matchIds.length === 0) return null;
+      const counts = new Map<string, { killer: string; victim: string; n: number }>();
+      const PAGE = 1000;
+      for (let i = 0; i < matchIds.length; i += 200) {
+        const slice = matchIds.slice(i, i + 200);
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from('pvp_kill_logs')
+            .select('killer_name,victim_name')
+            .in('match_id', slice)
+            .range(from, from + PAGE - 1);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          for (const r of data as any[]) {
+            if (r.killer_name === r.victim_name) continue;
+            const k = `${r.killer_name}→${r.victim_name}`;
+            const ex = counts.get(k);
+            if (ex) ex.n++;
+            else counts.set(k, { killer: r.killer_name, victim: r.victim_name, n: 1 });
+          }
+          if (data.length < PAGE) break;
+          from += PAGE;
+        }
+      }
+      const arr = Array.from(counts.values()).sort((a, b) => b.n - a.n);
+      return arr[0] ? { dominador: arr[0].killer, putinha: arr[0].victim, kills: arr[0].n } : null;
+    },
+  });
+
   const exportToExcel = () => {
     const worksheetData = [
       ['Ranking Arka War'],
