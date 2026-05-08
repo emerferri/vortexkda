@@ -44,14 +44,28 @@ export const Conquistas = () => {
     },
   });
 
-  const { data: badges, isLoading: loadingB } = useQuery({
-    queryKey: ['player-badges'],
+  const { data: activeSeason } = useQuery({
+    queryKey: ['active-season'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await supabase.rpc('get_active_season');
+      if (error) throw error;
+      return (data && data[0]) || null;
+    },
+  });
+
+  const { data: badges, isLoading: loadingB } = useQuery({
+    queryKey: ['player-badges', activeSeason?.started_at],
+    enabled: activeSeason !== undefined,
+    queryFn: async () => {
+      let q = supabase
         .from('player_badges')
         .select('*')
         .order('achieved_at', { ascending: false })
         .range(0, 9999);
+      if (activeSeason?.started_at) {
+        q = q.gte('achieved_at', activeSeason.started_at);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       return data || [];
     },
@@ -119,6 +133,12 @@ export const Conquistas = () => {
             <RefreshCw className={`w-4 h-4 ${running ? 'animate-spin' : ''}`} />
             {running ? 'Verificando...' : 'Verificar conquistas agora'}
           </Button>
+        </div>
+      )}
+
+      {activeSeason && (
+        <div className="text-center text-xs text-muted-foreground">
+          Exibindo conquistas da <span className="text-primary font-semibold">{activeSeason.name}</span> (desde {new Date(activeSeason.started_at).toLocaleDateString('pt-BR')})
         </div>
       )}
 
