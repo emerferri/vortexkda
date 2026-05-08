@@ -221,6 +221,11 @@ export const HallDaFama = () => {
                 ))}
               </SelectContent>
             </Select>
+            {currentId && (
+              <Button onClick={exportPDF} variant="secondary" size="sm">
+                <FileDown className="w-4 h-4 mr-1" /> Exportar PDF
+              </Button>
+            )}
             {isAdmin && currentId && (
               <Button onClick={() => handleReopenSeason(currentId)} variant="outline" size="sm">
                 <Unlock className="w-4 h-4 mr-1" /> Reabrir temporada
