@@ -307,13 +307,41 @@ export const AutoProcessMonitor = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   {isProcessed ? (
-                    <Badge className={isThrone
-                      ? "bg-amber-500/20 text-amber-500 border-amber-500/30"
-                      : "bg-green-500/20 text-green-500 border-green-500/30"
-                    }>
-                      <CheckCircle2 className="w-3 h-3 mr-1" />
-                      Processado
-                    </Badge>
+                    <>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline" size="sm"
+                            disabled={isProcessing}
+                            className="gap-1 h-7 text-xs"
+                          >
+                            {isProcessing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                            {isProcessing ? 'Reprocessando...' : 'Reprocessar'}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Reprocessar evento?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Isso vai apagar os dados atuais deste evento ({getDateLabel(event.date)} {formatEventTime(event)}) e buscar novamente no banco externo, postando o resultado no Discord.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleManualProcess(event, true)}>
+                              Reprocessar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      <Badge className={isThrone
+                        ? "bg-amber-500/20 text-amber-500 border-amber-500/30"
+                        : "bg-green-500/20 text-green-500 border-green-500/30"
+                      }>
+                        <CheckCircle2 className="w-3 h-3 mr-1" />
+                        Processado
+                      </Badge>
+                    </>
                   ) : isPast ? (
                     <>
                       <Button
