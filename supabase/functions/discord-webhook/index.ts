@@ -10,6 +10,8 @@ interface SpecialRankings {
   reiDoPVP: { name: string; kills: number; deaths: number; matches: number };
   brabissimo: { name: string; singleMatchKills: number; matches: number };
   coneMonodedo: { name: string; deaths: number; matches: number };
+  agenteDuplo?: { name: string; friendlyKills: number; guild: string };
+  putinhaNoite?: { dominador: string; putinha: string; kills: number };
 }
 
 interface StreakRankings {
