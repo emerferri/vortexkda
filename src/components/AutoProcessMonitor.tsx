@@ -70,7 +70,7 @@ export const AutoProcessMonitor = () => {
     setRefreshing(false);
   };
 
-  const handleManualProcess = async (event: ExpectedEvent, reprocess = false) => {
+  const handleManualProcess = async (event: ExpectedEvent, reprocess = false, testHomolog = false) => {
     const eventKey = `${event.date}-${event.hour}-${event.eventType}`;
     setProcessingEvent(eventKey);
 
@@ -80,6 +80,7 @@ export const AutoProcessMonitor = () => {
           attempt: 3,
           forceProcess: true,
           forceReprocess: reprocess,
+          testHomolog,
           eventHour: event.hour,
           eventMinute: event.minute,
           eventType: event.eventType,
@@ -90,7 +91,7 @@ export const AutoProcessMonitor = () => {
 
       if (data?.success) {
         toast({
-          title: reprocess ? "Reprocessamento concluído!" : "Processamento concluído!",
+          title: testHomolog ? "Teste em homologação enviado!" : reprocess ? "Reprocessamento concluído!" : "Processamento concluído!",
           description: `Ranking de ${event.date} ${event.hour}:${String(event.minute).padStart(2, '0')} processado com ${data.playersCount || data.playerCount || 0} jogadores.`,
         });
         await fetchRecentMatches();
