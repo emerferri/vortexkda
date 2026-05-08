@@ -40,6 +40,7 @@ interface RequestBody {
   trigger?: string;
   attempt?: number;        // 1, 2, or 3
   forceProcess?: boolean;  // true on 3rd attempt
+  forceReprocess?: boolean; // delete existing match and reprocess
   eventHour?: number;      // boss hour (20, 21, 22)
   eventMinute?: number;    // boss minute (0 or 30)
   eventType?: 'boss_event' | 'throne_conquest'; // Type of event
@@ -520,11 +521,12 @@ Deno.serve(async (req) => {
   const processRanking = async (body: RequestBody) => {
     const attempt = body.attempt || 1;
     const forceProcess = body.forceProcess || false;
+    const forceReprocess = body.forceReprocess || false;
     const eventHour = body.eventHour;
     const eventMinute = body.eventMinute || 0;
     const eventType = body.eventType || 'boss_event';
     
-    console.log(`[Auto Process] Starting automatic ranking processing... Attempt: ${attempt}, Force: ${forceProcess}, EventHour: ${eventHour}, EventMinute: ${eventMinute}, EventType: ${eventType}`);
+    console.log(`[Auto Process] Starting automatic ranking processing... Attempt: ${attempt}, Force: ${forceProcess}, Reprocess: ${forceReprocess}, EventHour: ${eventHour}, EventMinute: ${eventMinute}, EventType: ${eventType}`);
 
     const internalSupabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const internalServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -543,15 +545,23 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (existingMatch) {
-      console.log(`[Auto Process] ${eventType} match already exists for ${matchDate} ${matchHour}:00, skipping`);
-      return {
-        success: true,
-        status: 'already_exists',
-        message: 'Match already processed',
-        matchDate,
-        matchHour,
-        eventType,
-      };
+      if (forceReprocess) {
+        console.log(`[Auto Process] forceReprocess=true: deleting existing match ${existingMatch.id} and related data`);
+        await internalClient.from('pvp_kill_logs').delete().eq('match_id', existingMatch.id);
+        await internalClient.from('pvp_match_players').delete().eq('match_id', existingMatch.id);
+        await internalClient.from('player_badges').delete().eq('match_id', existingMatch.id);
+        await internalClient.from('pvp_matches').delete().eq('id', existingMatch.id);
+      } else {
+        console.log(`[Auto Process] ${eventType} match already exists for ${matchDate} ${matchHour}:00, skipping`);
+        return {
+          success: true,
+          status: 'already_exists',
+          message: 'Match already processed',
+          matchDate,
+          matchHour,
+          eventType,
+        };
+      }
     }
 
     // Connect to external Supabase

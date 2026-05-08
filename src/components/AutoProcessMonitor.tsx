@@ -3,7 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Activity, CheckCircle2, Clock, AlertCircle, RefreshCw, Calendar, Users, Play, Loader2, Crown } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Activity, CheckCircle2, Clock, AlertCircle, RefreshCw, Calendar, Users, Play, Loader2, Crown, RotateCcw } from 'lucide-react';
 import { format, formatDistanceToNow, parseISO, isToday, isYesterday, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -69,7 +70,7 @@ export const AutoProcessMonitor = () => {
     setRefreshing(false);
   };
 
-  const handleManualProcess = async (event: ExpectedEvent) => {
+  const handleManualProcess = async (event: ExpectedEvent, reprocess = false) => {
     const eventKey = `${event.date}-${event.hour}-${event.eventType}`;
     setProcessingEvent(eventKey);
 
@@ -78,6 +79,7 @@ export const AutoProcessMonitor = () => {
         body: {
           attempt: 3,
           forceProcess: true,
+          forceReprocess: reprocess,
           eventHour: event.hour,
           eventMinute: event.minute,
           eventType: event.eventType,
@@ -88,7 +90,7 @@ export const AutoProcessMonitor = () => {
 
       if (data?.success) {
         toast({
-          title: "Processamento concluído!",
+          title: reprocess ? "Reprocessamento concluído!" : "Processamento concluído!",
           description: `Ranking de ${event.date} ${event.hour}:${String(event.minute).padStart(2, '0')} processado com ${data.playersCount || data.playerCount || 0} jogadores.`,
         });
         await fetchRecentMatches();
@@ -305,13 +307,41 @@ export const AutoProcessMonitor = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   {isProcessed ? (
-                    <Badge className={isThrone
-                      ? "bg-amber-500/20 text-amber-500 border-amber-500/30"
-                      : "bg-green-500/20 text-green-500 border-green-500/30"
-                    }>
-                      <CheckCircle2 className="w-3 h-3 mr-1" />
-                      Processado
-                    </Badge>
+                    <>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline" size="sm"
+                            disabled={isProcessing}
+                            className="gap-1 h-7 text-xs"
+                          >
+                            {isProcessing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                            {isProcessing ? 'Reprocessando...' : 'Reprocessar'}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Reprocessar evento?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Isso vai apagar os dados atuais deste evento ({getDateLabel(event.date)} {formatEventTime(event)}) e buscar novamente no banco externo, postando o resultado no Discord.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleManualProcess(event, true)}>
+                              Reprocessar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      <Badge className={isThrone
+                        ? "bg-amber-500/20 text-amber-500 border-amber-500/30"
+                        : "bg-green-500/20 text-green-500 border-green-500/30"
+                      }>
+                        <CheckCircle2 className="w-3 h-3 mr-1" />
+                        Processado
+                      </Badge>
+                    </>
                   ) : isPast ? (
                     <>
                       <Button
