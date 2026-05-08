@@ -778,6 +778,34 @@ Deno.serve(async (req) => {
     // Calculate best kill streak from killLogs
     const bestKillStreak = calculateBestKillStreak(parseResult.killLogs, bannedPlayerNames);
 
+    // Agente Duplo: jogador que mais matou aliados da mesma guild (excluindo banidos)
+    const friendlyKillsCount: Record<string, number> = {};
+    for (const log of parseResult.killLogs) {
+      if (bannedPlayerNames.has(log.killer) || bannedPlayerNames.has(log.victim)) continue;
+      if (log.killer === log.victim) continue;
+      const kg = characterMap[log.killer]?.guild;
+      const vg = characterMap[log.victim]?.guild;
+      if (!kg || !vg || kg !== vg) continue;
+      friendlyKillsCount[log.killer] = (friendlyKillsCount[log.killer] || 0) + 1;
+    }
+    const agenteDuploEntry = Object.entries(friendlyKillsCount).sort((a, b) => b[1] - a[1])[0];
+    const agenteDuplo = agenteDuploEntry
+      ? { name: agenteDuploEntry[0], friendlyKills: agenteDuploEntry[1], guild: characterMap[agenteDuploEntry[0]]?.guild || '' }
+      : null;
+
+    // Putinha da Noite: par killer→victim com mais ocorrências
+    const pairCount: Record<string, number> = {};
+    for (const log of parseResult.killLogs) {
+      if (bannedPlayerNames.has(log.killer) || bannedPlayerNames.has(log.victim)) continue;
+      if (log.killer === log.victim) continue;
+      const k = `${log.killer}→${log.victim}`;
+      pairCount[k] = (pairCount[k] || 0) + 1;
+    }
+    const putinhaEntry = Object.entries(pairCount).sort((a, b) => b[1] - a[1])[0];
+    const putinhaNoite = putinhaEntry
+      ? (() => { const [d, p] = putinhaEntry[0].split('→'); return { dominador: d, putinha: p, kills: putinhaEntry[1] }; })()
+      : null;
+
     const totals = {
       kills: nonBannedPlayers.reduce((sum, p) => sum + p.kills, 0),
       deaths: nonBannedPlayers.reduce((sum, p) => sum + p.deaths, 0),
@@ -882,6 +910,16 @@ Deno.serve(async (req) => {
             value: coneMonodedo ? `**${coneMonodedo.name}**\nScore: ${coneMonodedo.eventScore.toFixed(2)} • ${coneMonodedo.kills}K/${coneMonodedo.deaths}D` : 'N/A',
             inline: true,
           },
+          ...(agenteDuplo ? [{
+            name: '🕵️ Agente Duplo',
+            value: `**${agenteDuplo.name}**\n${agenteDuplo.friendlyKills} kills em aliados${agenteDuplo.guild ? ` • ${agenteDuplo.guild}` : ''}`,
+            inline: true,
+          }] : []),
+          ...(putinhaNoite ? [{
+            name: '💔 Putinha da Noite',
+            value: `**${putinhaNoite.dominador}** → **${putinhaNoite.putinha}**\n${putinhaNoite.kills} mortes`,
+            inline: true,
+          }] : []),
           {
             name: '📈 Totais',
             value: `${totals.playerCount} jogadores • ${totals.kills} kills • ${totals.deaths} deaths`,
