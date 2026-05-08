@@ -699,6 +699,25 @@ export const RankingGeral = () => {
           </p>
           <p className="text-xs text-muted-foreground mt-1">{coneMonodedo?.matches} boss(es)</p>
         </div>
+
+        <div className="bg-orange-500/10 border-2 border-orange-500 rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
+          <Skull className="w-10 h-10 text-orange-500 mx-auto mb-3 animate-pulse" />
+          <h3 className="text-lg font-bold text-orange-500 mb-2">🕵️ Agente Duplo</h3>
+          <p className="text-2xl font-bold text-foreground text-glow mb-1">{agenteDuploData?.name || '—'}</p>
+          <p className="text-sm text-muted-foreground">
+            <span className="text-orange-500 font-bold">{agenteDuploData?.friendlyKills ?? 0}</span> kills em aliados
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">{agenteDuploData?.guild || '—'}</p>
+        </div>
+
+        <div className="bg-pink-500/10 border-2 border-pink-500 rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
+          <Skull className="w-10 h-10 text-pink-500 mx-auto mb-3 animate-pulse" />
+          <h3 className="text-lg font-bold text-pink-500 mb-2">💔 Putinha da Noite</h3>
+          <p className="text-base font-bold text-foreground text-glow mb-1">
+            {putinhaNoiteData?.dominador || '—'} → {putinhaNoiteData?.putinha || '—'}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            <span className="text-pink-500 font-bold">{putinhaNoiteData?.kills ?? 0}</span> mortes
       </div>
 
       {/* Botões de ordenação e exportação */}
