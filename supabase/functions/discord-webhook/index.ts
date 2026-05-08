@@ -663,6 +663,16 @@ serve(async (req) => {
             value: `**${generalBody.specialRankings.coneMonodedo.name}**\n${generalBody.specialRankings.coneMonodedo.deaths} deaths`,
             inline: true
           },
+          ...(generalBody.specialRankings.agenteDuplo && generalBody.specialRankings.agenteDuplo.name ? [{
+            name: '🕵️ Agente Duplo',
+            value: `**${generalBody.specialRankings.agenteDuplo.name}**\n${generalBody.specialRankings.agenteDuplo.friendlyKills} kills em aliados${generalBody.specialRankings.agenteDuplo.guild ? ` • ${generalBody.specialRankings.agenteDuplo.guild}` : ''}`,
+            inline: true
+          }] : []),
+          ...(generalBody.specialRankings.putinhaNoite && generalBody.specialRankings.putinhaNoite.dominador ? [{
+            name: '💔 Putinha da Noite',
+            value: `**${generalBody.specialRankings.putinhaNoite.dominador}** → **${generalBody.specialRankings.putinhaNoite.putinha}**\n${generalBody.specialRankings.putinhaNoite.kills} mortes`,
+            inline: true
+          }] : []),
           {
             name: '📈 Totais',
             value: `${generalBody.totals.playerCount} jogadores • ${generalBody.totals.kills} kills • ${generalBody.totals.deaths} deaths`,
