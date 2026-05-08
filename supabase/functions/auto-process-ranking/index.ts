@@ -40,6 +40,7 @@ interface RequestBody {
   trigger?: string;
   attempt?: number;        // 1, 2, or 3
   forceProcess?: boolean;  // true on 3rd attempt
+  forceReprocess?: boolean; // delete existing match and reprocess
   eventHour?: number;      // boss hour (20, 21, 22)
   eventMinute?: number;    // boss minute (0 or 30)
   eventType?: 'boss_event' | 'throne_conquest'; // Type of event
