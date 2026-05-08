@@ -718,6 +718,8 @@ export const RankingGeral = () => {
           </p>
           <p className="text-sm text-muted-foreground">
             <span className="text-pink-500 font-bold">{putinhaNoiteData?.kills ?? 0}</span> mortes
+          </p>
+        </div>
       </div>
 
       {/* Botões de ordenação e exportação */}
