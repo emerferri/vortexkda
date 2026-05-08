@@ -136,6 +136,12 @@ export const Conquistas = () => {
         </div>
       )}
 
+      {activeSeason && (
+        <div className="text-center text-xs text-muted-foreground">
+          Exibindo conquistas da <span className="text-primary font-semibold">{activeSeason.name}</span> (desde {new Date(activeSeason.started_at).toLocaleDateString('pt-BR')})
+        </div>
+      )}
+
       {/* Catalogo de badges */}
       <Card className="gaming-card">
         <CardHeader>
