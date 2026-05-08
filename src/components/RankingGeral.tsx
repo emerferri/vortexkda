@@ -269,6 +269,53 @@ export const RankingGeral = () => {
     return [...sortedPlayers].sort((a, b) => b.weightedKda - a.weightedKda)[0];
   }, [sortedPlayers]);
 
+  // Agente Duplo: jogador que mais matou amigos (fogo amigo)
+  const { data: agenteDuploData } = useQuery({
+    queryKey: ['agente-duplo', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    staleTime: 30000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_ranking_fogo_amigo', {
+        p_date_from: debouncedDateFrom ? format(debouncedDateFrom, 'yyyy-MM-dd') : null,
+        p_date_to: debouncedDateTo ? format(debouncedDateTo, 'yyyy-MM-dd') : null,
+        p_hour_from: debouncedHourFrom ?? null,
+        p_hour_to: debouncedHourTo ?? null,
+        p_event_type: 'boss_event',
+      });
+      if (error) throw error;
+      const list = (data as any[]) || [];
+      const sorted = [...list].sort((a, b) => Number(b.friendly_kills) - Number(a.friendly_kills));
+      return sorted[0] ? {
+        name: sorted[0].player_name as string,
+        guild: (sorted[0].player_guild as string) || '',
+        friendlyKills: Number(sorted[0].friendly_kills),
+        friendlyDeaths: Number(sorted[0].friendly_deaths),
+      } : null;
+    },
+  });
+
+  // Putinha da Noite: par dominador → vítima com mais mortes no período
+  const { data: putinhaNoiteData } = useQuery({
+    queryKey: ['putinha-noite', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    staleTime: 30000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_ranking_putinha', {
+        p_date_from: debouncedDateFrom ? format(debouncedDateFrom, 'yyyy-MM-dd') : null,
+        p_date_to: debouncedDateTo ? format(debouncedDateTo, 'yyyy-MM-dd') : null,
+        p_hour_from: debouncedHourFrom ?? null,
+        p_hour_to: debouncedHourTo ?? null,
+        p_event_type: 'boss_event',
+      });
+      if (error) throw error;
+      const list = (data as any[]) || [];
+      const sorted = [...list].sort((a, b) => Number(b.deaths) - Number(a.deaths));
+      return sorted[0] ? {
+        dominador: sorted[0].killer_name as string,
+        putinha: sorted[0].victim_name as string,
+        kills: Number(sorted[0].deaths),
+      } : null;
+    },
+  });
+
   const exportToExcel = () => {
     const worksheetData = [
       ['Ranking Geral - PVP'],
