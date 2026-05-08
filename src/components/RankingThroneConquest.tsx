@@ -773,7 +773,7 @@ export const RankingThroneConquest = () => {
       ) : (
       <>
       {/* Classificações Especiais */}
-      <div ref={specialCardsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div ref={specialCardsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="bg-success/10 border-2 border-success rounded-xl p-6 text-center transform hover:scale-105 transition-all duration-300">
           <Crown className="w-10 h-10 text-success mx-auto mb-3 animate-pulse" />
           <h3 className="text-lg font-bold text-success mb-2">👑 Rei do Throne</h3>
