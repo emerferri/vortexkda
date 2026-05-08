@@ -544,6 +544,16 @@ export const RankingThroneConquest = () => {
             name: coneMonodedo?.name || '',
             deaths: coneMonodedo?.deaths || 0,
             matches: coneMonodedo?.matches || 0
+          },
+          agenteDuplo: {
+            name: agenteDuploData?.name || '',
+            friendlyKills: agenteDuploData?.friendlyKills || 0,
+            guild: agenteDuploData?.guild || ''
+          },
+          putinhaNoite: {
+            dominador: putinhaNoiteData?.dominador || '',
+            putinha: putinhaNoiteData?.putinha || '',
+            kills: putinhaNoiteData?.kills || 0
           }
         },
         totals: {
