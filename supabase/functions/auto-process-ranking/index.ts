@@ -1087,7 +1087,7 @@ Deno.serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ accepted: true, trigger: 'cron' }),
+        JSON.stringify({ accepted: true, trigger: body.trigger }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
