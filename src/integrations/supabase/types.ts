@@ -403,7 +403,15 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_friendly_fire_per_match: {
+        Row: {
+          ff_deaths: number | null
+          ff_kills: number | null
+          match_id: string | null
+          player_name: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       assign_user_role: {
