@@ -24,7 +24,25 @@ Deno.serve(async (req) => {
     const { data: newOnes, error } = await supabase.rpc('check_player_badges');
     if (error) throw error;
 
-    const list = (newOnes || []) as Array<{ p_name: string; p_badge_code: string; p_label: string; p_emoji: string; p_rarity: string }>;
+    const allList = (newOnes || []) as Array<{ p_name: string; p_badge_code: string; p_label: string; p_emoji: string; p_rarity: string }>;
+
+    // Apenas notificar conquistas de jogadores que participaram do evento de HOJE (BRT)
+    const brt = new Date(Date.now() - 3 * 3600000);
+    const today = `${brt.getFullYear()}-${String(brt.getMonth() + 1).padStart(2, '0')}-${String(brt.getDate()).padStart(2, '0')}`;
+    const { data: todayMatches } = await supabase
+      .from('pvp_matches')
+      .select('id')
+      .eq('match_date', today);
+    const todayMatchIds = (todayMatches || []).map((m: any) => m.id);
+    let todayPlayers = new Set<string>();
+    if (todayMatchIds.length > 0) {
+      const { data: tps } = await supabase
+        .from('pvp_match_players')
+        .select('player_name')
+        .in('match_id', todayMatchIds);
+      todayPlayers = new Set((tps || []).map((p: any) => (p.player_name || '').toLowerCase()));
+    }
+    const list = allList.filter((b) => todayPlayers.has((b.p_name || '').toLowerCase()));
     let posted = 0;
 
     if (list.length > 0) {
