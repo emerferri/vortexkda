@@ -18,7 +18,25 @@ Deno.serve(async (req) => {
     if (error) throw error;
 
     const raw = (newOnes || []) as Array<{ p_name: string; p_metric: string; p_threshold: number; p_label: string; p_emoji: string }>;
-    const list = raw.map((r) => ({ player_name: r.p_name, metric: r.p_metric, threshold: r.p_threshold, label: r.p_label, emoji: r.p_emoji }));
+    const allList = raw.map((r) => ({ player_name: r.p_name, metric: r.p_metric, threshold: r.p_threshold, label: r.p_label, emoji: r.p_emoji }));
+
+    // Apenas notificar marcos de jogadores que participaram do evento de HOJE (BRT)
+    const brt = new Date(Date.now() - 3 * 3600000);
+    const today = `${brt.getFullYear()}-${String(brt.getMonth() + 1).padStart(2, '0')}-${String(brt.getDate()).padStart(2, '0')}`;
+    const { data: todayMatches } = await supabase
+      .from('pvp_matches')
+      .select('id')
+      .eq('match_date', today);
+    const todayMatchIds = (todayMatches || []).map((m: any) => m.id);
+    let todayPlayers = new Set<string>();
+    if (todayMatchIds.length > 0) {
+      const { data: tps } = await supabase
+        .from('pvp_match_players')
+        .select('player_name')
+        .in('match_id', todayMatchIds);
+      todayPlayers = new Set((tps || []).map((p: any) => (p.player_name || '').toLowerCase()));
+    }
+    const list = allList.filter((m) => todayPlayers.has(m.player_name.toLowerCase()));
     let posted = 0;
 
     if (list.length > 0) {
