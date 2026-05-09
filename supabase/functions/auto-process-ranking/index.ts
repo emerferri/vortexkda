@@ -1061,7 +1061,7 @@ Deno.serve(async (req) => {
     // --- Authentication ---
     const authHeader = req.headers.get('Authorization');
 
-    if (body.trigger === 'cron') {
+    if (body.trigger === 'cron' || body.trigger === 'watchdog') {
       // Cron calls come from pg_net with the service role or anon key.
       // Validate that the bearer token matches the service role key or anon key.
       const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
