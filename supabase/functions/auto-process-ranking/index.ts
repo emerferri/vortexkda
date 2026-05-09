@@ -1061,14 +1061,14 @@ Deno.serve(async (req) => {
     // --- Authentication ---
     const authHeader = req.headers.get('Authorization');
 
-    if (body.trigger === 'cron') {
+    if (body.trigger === 'cron' || body.trigger === 'watchdog') {
       // Cron calls come from pg_net with the service role or anon key.
       // Validate that the bearer token matches the service role key or anon key.
       const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
       const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
       const token = authHeader?.replace('Bearer ', '') || '';
       if (!token || (token !== serviceRoleKey && token !== anonKey)) {
-        console.error('[Auto Process] Unauthorized cron trigger attempt');
+        console.error(`[Auto Process] Unauthorized ${body.trigger} trigger attempt`);
         return new Response(
           JSON.stringify({ error: 'Unauthorized' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -1087,7 +1087,7 @@ Deno.serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ accepted: true, trigger: 'cron' }),
+        JSON.stringify({ accepted: true, trigger: body.trigger }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
