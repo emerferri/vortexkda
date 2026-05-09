@@ -81,6 +81,18 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Marca como notificados também os marcos antigos (de jogadores que não participaram hoje)
+    // para evitar reposts futuros desnecessários.
+    const skipped = allList.filter((m) => !todayPlayers.has(m.player_name.toLowerCase()));
+    for (const m of skipped) {
+      await supabase
+        .from('player_milestones')
+        .update({ notified: true })
+        .eq('player_name', m.player_name)
+        .eq('metric', m.metric)
+        .eq('threshold', m.threshold);
+    }
+
     return new Response(
       JSON.stringify({ success: true, new_milestones: list.length, discord_chunks_posted: posted, milestones: list }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
