@@ -84,6 +84,16 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Marca como notificadas conquistas antigas (jogadores que não participaram hoje) para evitar reposts
+    const skipped = allList.filter((b) => !todayPlayers.has((b.p_name || '').toLowerCase()));
+    for (const b of skipped) {
+      await supabase
+        .from('player_badges')
+        .update({ notified: true })
+        .eq('player_name', b.p_name)
+        .eq('badge_code', b.p_badge_code);
+    }
+
     return new Response(
       JSON.stringify({ success: true, new_badges: list.length, discord_chunks_posted: posted, badges: list }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
