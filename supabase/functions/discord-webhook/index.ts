@@ -250,7 +250,7 @@ async function enrichPlayerRankingWithClassShort(players: PlayerData[]): Promise
 
     const { data, error } = await serviceClient
       .from('characters')
-      .select('name, class_short')
+      .select('name, class, class_short')
       .in('name', missingNames);
 
     if (error) {
@@ -258,8 +258,25 @@ async function enrichPlayerRankingWithClassShort(players: PlayerData[]): Promise
       return players;
     }
 
+    const CLASS_SHORT_MAP: Record<string, string> = {
+      'Arcane Lancer': 'GL', 'Battle Mage': 'LEM', 'Bloody Fighter': 'RF',
+      'Creator': 'ALQ', 'Dark Knight': 'BK', 'Dark Wizard': 'SM',
+      'Darkness Wizard': 'SM', 'Douple Knight': 'MG', 'Endless Summoner': 'SUM',
+      'Fist Blazer': 'RF', 'Force Emperor': 'DL', 'Glory Wizard': 'KD',
+      'Grand Master': 'SM', 'Ignition Knight': 'BK', 'Infinity Rune Wizard': 'RW',
+      'Light Wizard': 'KD', 'Magnus Gun Crusher': 'GUN', 'Majestic Rune Wizard': 'RW',
+      'Master Paladim': 'CRZ', 'Noble Elves': 'ELF', 'Phantom Pain Knight': 'IK',
+      'Rage Fighter': 'RF', 'Rogue Slayer': 'SLA', 'Royal Elf': 'ELF',
+      'Shining Lancer': 'GL', 'Slaughterer': 'SLA', 'Soul Wizard': 'SM',
+      'Templar Commander': 'CRZ',
+    };
+
     const classShortByName = new Map(
-      (data || []).map((row) => [row.name, row.class_short || ''])
+      (data || []).map((row) => {
+        const fromDb = (row.class_short || '').trim();
+        const fromMap = CLASS_SHORT_MAP[(row.class || '').trim()] || '';
+        return [row.name, fromDb || fromMap];
+      })
     );
 
     return players.map((player) => ({
