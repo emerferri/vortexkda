@@ -174,7 +174,7 @@ export const AutoProcessMonitor = () => {
     const eventDate = parseISO(event.date);
     const eventTime = new Date(eventDate);
     eventTime.setHours(event.hour);
-    eventTime.setMinutes(event.minute + 10);
+    eventTime.setMinutes(event.minute + 5);
     return now > eventTime;
   };
 
