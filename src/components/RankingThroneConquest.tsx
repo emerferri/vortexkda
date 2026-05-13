@@ -529,6 +529,7 @@ export const RankingThroneConquest = () => {
       const payload = {
         environment,
         eventType: 'throne_conquest',
+        winnerGuild: winnerGuild || '',
         filters: {
           class: classFilter,
           dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
