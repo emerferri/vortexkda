@@ -350,7 +350,7 @@ export const RankingThroneConquest = () => {
         return { name: original, class: data.class || null, guild: data.guild || null };
       });
 
-      return { aggregated, brabissimoRecord, coneMonodedoName, characters: dedupCharacters, killLogs: logs.map((l: any) => ({ killer_name: l.killer_name, victim_name: l.victim_name })) };
+      return { aggregated, brabissimoRecord, coneMonodedoName, characters: dedupCharacters, matchIds, killLogs: logs.map((l: any) => ({ killer_name: l.killer_name, victim_name: l.victim_name })) };
     }
   });
 
