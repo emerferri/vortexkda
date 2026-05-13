@@ -152,7 +152,7 @@ export const RankingArkaWar = () => {
       }
 
       const matchIds = matchesAccum.map((m: any) => m.id);
-      if (!matchIds.length) return { aggregated: [], brabissimoRecord: undefined, coneMonodedoName: '', characters: [] };
+      if (!matchIds.length) return { aggregated: [], brabissimoRecord: undefined, coneMonodedoName: '', characters: [], matchIds: [] };
 
       // Fetch logs
       let fromLogs = 0;
