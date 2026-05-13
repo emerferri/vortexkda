@@ -751,8 +751,32 @@ Deno.serve(async (req) => {
         .map(([name, _]) => name),
     );
 
-    const nonBannedPlayers = Object.values(parseResult.players)
+    let nonBannedPlayers = Object.values(parseResult.players)
       .filter(p => !bannedPlayerNames.has(p.name));
+
+    // Boss event: descontar fogo amigo (mesma guild) das kills/deaths/KDA
+    // para alinhar com o site (get_ranking_geral). Throne/Arka mantêm contagem bruta.
+    // Os kill_logs no banco continuam intactos (preserva ranking de Fogo Amigo).
+    if (eventType === 'boss_event') {
+      const ffKills: Record<string, number> = {};
+      const ffDeaths: Record<string, number> = {};
+      for (const log of parseResult.killLogs) {
+        if (bannedPlayerNames.has(log.killer) || bannedPlayerNames.has(log.victim)) continue;
+        if (log.killer === log.victim) continue;
+        const kg = characterMap[log.killer]?.guild;
+        const vg = characterMap[log.victim]?.guild;
+        if (!kg || !vg || kg !== vg) continue;
+        ffKills[log.killer] = (ffKills[log.killer] || 0) + 1;
+        ffDeaths[log.victim] = (ffDeaths[log.victim] || 0) + 1;
+      }
+      nonBannedPlayers = nonBannedPlayers.map(p => {
+        const k = Math.max(0, p.kills - (ffKills[p.name] || 0));
+        const d = Math.max(0, p.deaths - (ffDeaths[p.name] || 0));
+        const kda = d === 0 ? k : parseFloat((k / d).toFixed(2));
+        return { ...p, kills: k, deaths: d, kda };
+      });
+      console.log(`[Auto Process] Boss FF excluído: ${Object.keys(ffKills).length} killers, ${Object.keys(ffDeaths).length} victims ajustados`);
+    }
 
     // Calculate guild summary with full stats (only non-banned players)
     const guildSummary: Record<string, GuildStats> = {};
