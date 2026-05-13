@@ -279,6 +279,11 @@ export const RankingThroneConquest = () => {
 
         if (bannedNames.has(killerKey) || bannedNames.has(victimKey)) continue;
 
+        // Throne Conquest não permite fogo amigo: ignorar kills entre membros da mesma guild
+        const killerGuild = (characterMap.get(killerKey)?.guild || '').trim();
+        const victimGuild = (characterMap.get(victimKey)?.guild || '').trim();
+        if (killerGuild && victimGuild && killerGuild === victimGuild && killerKey !== victimKey) continue;
+
         if (killerKey) {
           const kstats = playerMap.get(killerKey) || { kills: 0, deaths: 0, displayName: killerDisplay, matches: new Set<string>() };
           kstats.kills += 1;
