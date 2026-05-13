@@ -826,6 +826,7 @@ export const Characters = () => {
                 <TableHead>Guild</TableHead>
                 <TableHead>Classe</TableHead>
                 <TableHead>Sigla</TableHead>
+                {isAdmin && <TableHead className="text-center">Main</TableHead>}
                 {canEditData && <TableHead>Status</TableHead>}
                 {canEditData && <TableHead className="w-[100px]">Ações</TableHead>}
               </TableRow>
