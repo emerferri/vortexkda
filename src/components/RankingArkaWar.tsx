@@ -231,7 +231,8 @@ export const RankingArkaWar = () => {
         }
       }
 
-      return { aggregated, brabissimoRecord, coneMonodedoName, characters: [], matchIds };
+      const matchesMeta = matchesAccum.map((m: any) => ({ id: m.id, date: m.match_date, hour: m.match_hour }));
+      return { aggregated, brabissimoRecord, coneMonodedoName, characters: [], matchIds, matchesMeta };
     }
   });
 
@@ -446,9 +447,9 @@ export const RankingArkaWar = () => {
         </div>
       </div>
 
-      {!isLoading && aggregatedData?.matchIds && aggregatedData.matchIds.length > 0 && (
+      {!isLoading && aggregatedData?.matchesMeta && aggregatedData.matchesMeta.length > 0 && (
         <div className="max-w-2xl mx-auto">
-          <WinnerGuildPicker matchIds={aggregatedData.matchIds} guilds={guildOptions} />
+          <WinnerGuildPicker matches={aggregatedData.matchesMeta} guilds={guildOptions} />
         </div>
       )}
 
