@@ -847,9 +847,13 @@ export const Characters = () => {
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         {character.banned && <Ban className="w-4 h-4 text-destructive" />}
+                        {character.is_main && <Crown className="w-4 h-4 text-yellow-500" />}
                         <span className={character.banned ? 'text-destructive line-through' : ''}>
                           {character.name}
                         </span>
+                        {character.is_main && (
+                          <Badge variant="outline" className="border-yellow-500 text-yellow-600 text-[10px] px-1.5 py-0">MAIN</Badge>
+                        )}
                         {isIncomplete(character) && (
                           <span className="text-xs text-yellow-600 font-semibold">
                             (Cadastro incompleto)
