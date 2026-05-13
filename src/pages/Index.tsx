@@ -166,10 +166,19 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background gradient-gaming flex">
+      <Helmet>
+        <title>Ranking de Kill - PVP BOSS</title>
+        <meta name="description" content="Ranking de PvP BOSS: kills, deaths, KDA e score por jogador, classe e guild. Acompanhe Boss, Throne Conquest e Arka War em tempo real." />
+        <link rel="canonical" href="https://rankingpvpboss.lovable.app/" />
+        <meta property="og:title" content="Ranking de Kill - PVP BOSS" />
+        <meta property="og:description" content="Ranking de PvP BOSS: kills, deaths, KDA e score por jogador, classe e guild." />
+        <meta property="og:url" content="https://rankingpvpboss.lovable.app/" />
+        <meta property="og:type" content="website" />
+      </Helmet>
       <AppSidebar activeTab={activeTab} onTabChange={handleTabChange} />
 
       <div className="flex-1 flex flex-col min-h-screen">
-        <div className="container mx-auto px-4 py-8 max-w-6xl flex-1">
+        <main className="container mx-auto px-4 py-8 max-w-6xl flex-1">
           <header className="text-center mb-8 relative">
             <div className="absolute right-0 top-0">
               <LiveIndicator lastEventAt={lastEventAt} />
@@ -187,7 +196,7 @@ const Index = () => {
           <div className="space-y-8">
             {renderContent()}
           </div>
-        </div>
+        </main>
         <Footer />
       </div>
     </div>
