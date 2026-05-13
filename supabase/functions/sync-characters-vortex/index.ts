@@ -5,6 +5,21 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Mapeamento class -> sigla curta (espelho de src/lib/classShortMap.ts)
+const CLASS_SHORT_MAP: Record<string, string> = {
+  'Arcane Lancer': 'GL', 'Battle Mage': 'LEM', 'Bloody Fighter': 'RF',
+  'Creator': 'ALQ', 'Dark Knight': 'BK', 'Dark Wizard': 'SM',
+  'Darkness Wizard': 'SM', 'Douple Knight': 'MG', 'Endless Summoner': 'SUM',
+  'Fist Blazer': 'RF', 'Force Emperor': 'DL', 'Glory Wizard': 'KD',
+  'Grand Master': 'SM', 'Ignition Knight': 'BK', 'Infinity Rune Wizard': 'RW',
+  'Light Wizard': 'KD', 'Magnus Gun Crusher': 'GUN', 'Majestic Rune Wizard': 'RW',
+  'Master Paladim': 'CRZ', 'Noble Elves': 'ELF', 'Phantom Pain Knight': 'IK',
+  'Rage Fighter': 'RF', 'Rogue Slayer': 'SLA', 'Royal Elf': 'ELF',
+  'Shining Lancer': 'GL', 'Slaughterer': 'SLA', 'Soul Wizard': 'SM',
+  'Templar Commander': 'CRZ',
+};
+const getClassShort = (c: string | null | undefined) => (c ? (CLASS_SHORT_MAP[c.trim()] || '') : '');
+
 // Convert character name to hexadecimal for VortexMU URL
 const nameToHex = (name: string): string => {
   return Array.from(name)
@@ -288,6 +303,7 @@ Deno.serve(async (req) => {
             .from("characters")
             .update({
               class: vortexData.class,
+              class_short: getClassShort(vortexData.class),
               guild: vortexData.guild,
             })
             .eq("id", existing.id);
@@ -301,6 +317,7 @@ Deno.serve(async (req) => {
             .insert({
               name,
               class: vortexData.class,
+              class_short: getClassShort(vortexData.class),
               guild: vortexData.guild,
             });
 
