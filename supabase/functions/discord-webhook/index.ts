@@ -591,26 +591,42 @@ serve(async (req) => {
       
       embeds = [embed1, embed2, embed3];
     } else {
-      // Ranking Geral - texto apenas, sem imagens
+      // Ranking Geral - formato rico texto (mesmo modelo do auto-process-ranking)
       const generalBody = body as GeneralRankingBody;
       const isThrone = generalBody.eventType === 'throne_conquest';
       const enrichedPlayerRanking = await enrichPlayerRankingWithClassShort(generalBody.playerRanking || []);
 
-      
-      // Títulos dinâmicos baseados no tipo de evento
-      const rankingTitle = isThrone ? '📊 Ranking Throne Conquest' : '📊 Ranking BOSS Diário';
-      const reiTitle = isThrone ? '👑 Rei do Trono!' : '👑 Rei do PVP';
-      
-      // Calculate kill streak from kill logs if available
-      const bestStreak = generalBody.killLogs ? calculateBestKillStreakFromLogs(generalBody.killLogs) : null;
-      
-      // Best KDA player (brabissimo)
-      const bestKDAPlayer = generalBody.specialRankings.brabissimo;
-      const conePlayer = generalBody.specialRankings.coneMonodedo;
-      
+      const rankingTitle = isThrone ? '🏆 Ranking Throne Conquest' : '🏆 Ranking BOSS Diário';
+      const embedColor = isThrone ? 0xF59E0B : 0x10B981;
       const eventLabel = isThrone ? 'Throne Conquest' : 'Boss/evento';
+      const SEP = '━━━━━━━━━━━━━━━━━━';
 
-      // Fetch dynamic phrases from database
+      // Lookup helper para enriquecer Rei/Brabíssimo/Cone com K/D/KDA/Score
+      const playerByName = new Map<string, PlayerData>();
+      for (const p of enrichedPlayerRanking) playerByName.set(p.name, p);
+      const lookup = (name: string) => playerByName.get(name);
+
+      const rei = generalBody.specialRankings.reiDoPVP;
+      const brab = generalBody.specialRankings.brabissimo;
+      const cone = generalBody.specialRankings.coneMonodedo;
+      const reiStats = rei?.name ? lookup(rei.name) : undefined;
+      const brabStats = brab?.name ? lookup(brab.name) : undefined;
+      const coneStats = cone?.name ? lookup(cone.name) : undefined;
+      const agenteDuplo = generalBody.specialRankings.agenteDuplo;
+      const putinhaNoite = generalBody.specialRankings.putinhaNoite;
+
+      // Data/hora formatadas a partir dos filtros
+      const dateFromStr = generalBody.filters.dateFrom || '';
+      let formattedDate = '';
+      if (dateFromStr) {
+        const [y, m, d] = dateFromStr.split('-');
+        formattedDate = `${d}/${m}/${y}`;
+      }
+      const formattedHour = generalBody.filters.hourFrom !== undefined
+        ? `${String(generalBody.filters.hourFrom).padStart(2, '0')}:00`
+        : '';
+
+      // Frases dinâmicas (rotação) – mantém compatibilidade com o sistema atual
       let dynamicPhrases: Record<string, string[]> = {};
       try {
         const serviceClient = createClient(
@@ -629,11 +645,9 @@ serve(async (req) => {
       } catch (e) {
         console.log('[Discord Webhook] Failed to fetch dynamic phrases, using defaults');
       }
-
       const nowDate = new Date();
       const startOfYear = new Date(nowDate.getFullYear(), 0, 0);
       const dayOfYear = Math.floor((nowDate.getTime() - startOfYear.getTime()) / 86400000);
-
       const selectPhrase = (category: string, name: string, value: string, fallback: string): string => {
         const phrases = dynamicPhrases[category];
         if (phrases && phrases.length > 0) {
@@ -643,96 +657,126 @@ serve(async (req) => {
         return fallback;
       };
 
+      const bestStreak = generalBody.killLogs ? calculateBestKillStreakFromLogs(generalBody.killLogs) : null;
       const footerLines: string[] = [`**Destaques ${eventLabel}:**`];
       if (bestStreak) {
-        footerLines.push(`1 - ${selectPhrase('kill_streak', `**${bestStreak.name}**`, String(bestStreak.streak), `**${bestStreak.name}** matou ${bestStreak.streak} vezes sem morrer! é um monstro do PVP.`)}`);
+        footerLines.push(`1 - ${selectPhrase('kill_streak', `**${bestStreak.name}**`, String(bestStreak.streak), `**${bestStreak.name}** matou ${bestStreak.streak} vezes sem morrer!`)}`);
       }
-      if (bestKDAPlayer && bestKDAPlayer.name) {
-        const kdaValue = generalBody.playerRanking?.find(p => p.name === bestKDAPlayer.name)?.kda;
-        footerLines.push(`2 - ${selectPhrase('best_kda', `**${bestKDAPlayer.name}**`, kdaValue?.toFixed(2) || 'N/A', `**${bestKDAPlayer.name}** esse manja de posicionamento, KDA implacável ${kdaValue?.toFixed(2) || 'N/A'}`)}`);
+      if (brabStats) {
+        footerLines.push(`2 - ${selectPhrase('best_kda', `**${brabStats.name}**`, brabStats.kda.toFixed(2), `**${brabStats.name}** KDA implacável ${brabStats.kda.toFixed(2)}`)}`);
       }
-      if (conePlayer && conePlayer.name) {
-        footerLines.push(`3 - ${selectPhrase('cone', `**${conePlayer.name}**`, String(conePlayer.deaths), `**${conePlayer.name}** Esse deve estar jogando sem mouse! morreu ${conePlayer.deaths} vezes!`)}`);
+      if (coneStats) {
+        footerLines.push(`3 - ${selectPhrase('cone', `**${coneStats.name}**`, String(coneStats.deaths), `**${coneStats.name}** morreu ${coneStats.deaths} vezes!`)}`);
       }
       const footerMessage = footerLines.join('\n');
-      
+
+      // === Embed 1 — Resumo principal estruturado ===
+      const lines: string[] = [];
+      if (formattedDate || formattedHour) {
+        lines.push(`📅 ${formattedDate}${formattedHour ? `  •  ⏰ ${formattedHour}` : ''}`);
+      }
+      lines.push(`🎯 Ordenação: Event Score`);
+      lines.push(SEP);
+
+      if (rei?.name) {
+        lines.push(`${isThrone ? '👑 **REI DO TRONO**' : '🥇 **REI DO PvP**'}`);
+        lines.push(`👑 **${rei.name}**`);
+        if (reiStats) {
+          lines.push(`⚔️ ${reiStats.eventScore.toFixed(2)} Score • ${reiStats.kills}K / ${reiStats.deaths}D`);
+        } else {
+          lines.push(`⚔️ ${rei.kills}K / ${rei.deaths}D`);
+        }
+        lines.push('');
+      }
+      if (brab?.name) {
+        lines.push(`🥈 **BRABÍSSIMO**`);
+        lines.push(`⚡ **${brab.name}**`);
+        if (brabStats) {
+          lines.push(`⚔️ KDA ${brabStats.kda.toFixed(2)} • ${brabStats.kills}K / ${brabStats.deaths}D`);
+        } else {
+          lines.push(`⚔️ ${brab.singleMatchKills} kills em 1 partida`);
+        }
+        lines.push('');
+      }
+      if (cone?.name) {
+        lines.push(`🥉 **CONE MONODEDO**`);
+        lines.push(`🍦 **${cone.name}**`);
+        if (coneStats) {
+          lines.push(`💀 ${coneStats.eventScore.toFixed(2)} Score • ${coneStats.kills}K / ${coneStats.deaths}D`);
+        } else {
+          lines.push(`💀 ${cone.deaths} deaths`);
+        }
+      }
+
+      lines.push(SEP);
+      lines.push(`😂 **TROFÉUS ESPECIAIS**`);
+      lines.push('');
+      if (agenteDuplo && agenteDuplo.name) {
+        lines.push(`🕵️ **Agente Duplo**`);
+        lines.push(`📛 **${agenteDuplo.name}**${agenteDuplo.guild ? ` • ${agenteDuplo.guild}` : ''}`);
+        lines.push(`☠️ ${agenteDuplo.friendlyKills} aliado(s) eliminado(s)`);
+        lines.push('');
+      } else {
+        lines.push(`🕵️ **Agente Duplo** — _nenhum traidor hoje_`);
+        lines.push('');
+      }
+      if (putinhaNoite && putinhaNoite.dominador) {
+        lines.push(`💔 **Putinha da Noite**`);
+        lines.push(`📛 **${putinhaNoite.dominador}** → **${putinhaNoite.putinha}**`);
+        lines.push(`⚰️ ${putinhaNoite.kills} morte(s) sofrida(s)`);
+      } else {
+        lines.push(`💔 **Putinha da Noite** — _sem dominância clara_`);
+      }
+
+      lines.push(SEP);
+      lines.push(`📊 **ESTATÍSTICAS**`);
+      lines.push(`👥 Jogadores: **${generalBody.totals.playerCount}**`);
+      lines.push(`⚔️ Kills: **${generalBody.totals.kills}**`);
+      lines.push(`💀 Deaths: **${generalBody.totals.deaths}**`);
+
       const embed1 = {
         title: rankingTitle,
-        color: isThrone ? 0xF59E0B : 0x10B981, // Amarelo para throne, verde para boss
-        fields: [
-          {
-            name: '🔍 Filtros Aplicados',
-            value: formatFilters(body.filters),
-            inline: false
-          },
-          {
-            name: reiTitle,
-            value: `**${generalBody.specialRankings.reiDoPVP.name}**\n${generalBody.specialRankings.reiDoPVP.kills} kills • ${generalBody.specialRankings.reiDoPVP.deaths} deaths`,
-            inline: true
-          },
-          {
-            name: '⚡ Brabissimo',
-            value: `**${generalBody.specialRankings.brabissimo.name}**\n${generalBody.specialRankings.brabissimo.singleMatchKills} kills em 1 partida`,
-            inline: true
-          },
-          {
-            name: '🍦 Cone Monodedo',
-            value: `**${generalBody.specialRankings.coneMonodedo.name}**\n${generalBody.specialRankings.coneMonodedo.deaths} deaths`,
-            inline: true
-          },
-          ...(generalBody.specialRankings.agenteDuplo && generalBody.specialRankings.agenteDuplo.name ? [{
-            name: '🕵️ Agente Duplo',
-            value: `**${generalBody.specialRankings.agenteDuplo.name}**\n${generalBody.specialRankings.agenteDuplo.friendlyKills} kills em aliados${generalBody.specialRankings.agenteDuplo.guild ? ` • ${generalBody.specialRankings.agenteDuplo.guild}` : ''}`,
-            inline: true
-          }] : []),
-          ...(generalBody.specialRankings.putinhaNoite && generalBody.specialRankings.putinhaNoite.dominador ? [{
-            name: '💔 Putinha da Noite',
-            value: `**${generalBody.specialRankings.putinhaNoite.dominador}** → **${generalBody.specialRankings.putinhaNoite.putinha}**\n${generalBody.specialRankings.putinhaNoite.kills} mortes`,
-            inline: true
-          }] : []),
-          {
-            name: '📈 Totais',
-            value: `${generalBody.totals.playerCount} jogadores • ${generalBody.totals.kills} kills • ${generalBody.totals.deaths} deaths`,
-            inline: false
-          },
-          {
-            name: '⚔️ Ranking por Guild',
-            value: generalBody.guildRanking && generalBody.guildRanking.length > 0
-              ? '```\n' + formatGuildRankingTable(generalBody.guildRanking).substring(0, 1000) + '\n```'
-              : Object.entries(generalBody.guildSummary)
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([guild, count]) => `**${guild}**: ${count} ${count === 1 ? 'jogador' : 'jogadores'}`)
-                  .join('\n') || 'Nenhuma guild registrada',
-            inline: false
-          }
-        ],
-        timestamp: new Date().toISOString()
+        description: lines.join('\n'),
+        color: embedColor,
+        timestamp: new Date().toISOString(),
       };
-      
-      // Embed with player ranking table (text format)
-      const embed2 = enrichedPlayerRanking.length > 0
+
+      // === Embed 2 — Ranking por Guild ===
+      const guildText = generalBody.guildRanking && generalBody.guildRanking.length > 0
+        ? formatGuildRankingTable(generalBody.guildRanking)
+        : 'Nenhuma guild registrada';
+      const embed2 = {
+        title: '⚔️ Ranking por Guild',
+        description: '```\n' + guildText.substring(0, 3990) + '\n```',
+        color: embedColor,
+      };
+
+      // === Embed 3 — Ranking completo ===
+      const embed3 = enrichedPlayerRanking.length > 0
         ? {
-            description: '```\n' + formatRankingTable(enrichedPlayerRanking).substring(0, 4000) + '\n```',
-            color: isThrone ? 0xF59E0B : 0x10B981
+            title: '🏆 Ranking Completo',
+            description: '```\n' + formatRankingTable(enrichedPlayerRanking).substring(0, 3990) + '\n```',
+            color: embedColor,
           }
         : null;
-      
-      // Build link with date/hour filters
-      const frontendUrl = 'https://rankingpvpboss.lovable.app';
+
+      // === Embed 4 — Destaques + link ===
+      const frontendUrlRaw = Deno.env.get('FRONTEND_URL') || 'https://rankingpvpboss.lovable.app';
+      const frontendUrl = frontendUrlRaw.replace(/\/+$/, '');
       const tabParam = isThrone ? 'throne' : 'ranking';
-      const dateParam = body.filters.dateFrom || '';
-      const hourParam = body.filters.hourFrom !== undefined ? body.filters.hourFrom : '';
+      const dateParam = generalBody.filters.dateFrom || '';
+      const hourParam = generalBody.filters.hourFrom !== undefined ? generalBody.filters.hourFrom : '';
       const linkParts = [`tab=${tabParam}`];
       if (dateParam) linkParts.push(`date=${dateParam}`);
       if (hourParam !== '') linkParts.push(`hour=${hourParam}`);
       const rankingLink = `${frontendUrl}/?${linkParts.join('&')}`;
 
-      const embed3 = {
+      const embed4 = {
         description: `${footerMessage}\n\n🔗 **[Ver ranking completo no site](${rankingLink})**`,
-        color: 0x9b87f5
+        color: 0x9b87f5,
       };
-      
-      embeds = [embed1, embed2, embed3].filter(Boolean);
+
+      embeds = [embed1, embed2, embed3, embed4].filter(Boolean);
     }
 
     formData.append('payload_json', JSON.stringify({ embeds }));
