@@ -133,8 +133,8 @@ export const AutoProcessMonitor = () => {
         eventType: 'boss_event',
       });
 
-      // Tuesday: Throne Conquest at 21:36
-      if (dayOfWeek === 2) {
+      // Tuesday and Thursday: Throne Conquest at 21:36
+      if (dayOfWeek === 2 || dayOfWeek === 4) {
         events.push({
           date: dateStr, hour: 21, minute: 36,
           label: `Throne ${format(date, 'dd/MM/yyyy')} 21:36`,
