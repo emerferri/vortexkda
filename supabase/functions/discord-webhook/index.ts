@@ -783,7 +783,69 @@ serve(async (req) => {
         color: 0x9b87f5,
       };
 
-      embeds = [embed1, embed2, embed3, embed4].filter(Boolean);
+      // === Embed Mains (apenas Throne) ===
+      let embedMains: any = null;
+      if (isThrone && generalBody.killLogs && generalBody.killLogs.length > 0) {
+        try {
+          const serviceClient = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+          );
+          const { data: mainsData } = await serviceClient
+            .from('characters')
+            .select('name, guild')
+            .eq('is_main', true);
+          const mains = (mainsData || []) as { name: string; guild: string }[];
+          if (mains.length > 0) {
+            const mainNameSet = new Set(mains.map((m) => m.name.toLowerCase()));
+            // For each main, count kills against them and per-killer breakdown
+            const perMain = new Map<string, { guild: string; total: number; killers: Map<string, number> }>();
+            for (const m of mains) {
+              perMain.set(m.name, { guild: m.guild, total: 0, killers: new Map() });
+            }
+            for (const log of generalBody.killLogs) {
+              const victim = log.victim_name;
+              const victimKey = victim?.toLowerCase();
+              if (!victimKey || !mainNameSet.has(victimKey)) continue;
+              // Find the main entry by case-insensitive match
+              const mainKey = mains.find((m) => m.name.toLowerCase() === victimKey)?.name;
+              if (!mainKey) continue;
+              const entry = perMain.get(mainKey)!;
+              entry.total += 1;
+              entry.killers.set(log.killer_name, (entry.killers.get(log.killer_name) || 0) + 1);
+            }
+            const blocks: string[] = [];
+            // Order by total deaths desc, then guild
+            const ordered = [...perMain.entries()]
+              .filter(([, v]) => v.total > 0)
+              .sort((a, b) => b[1].total - a[1].total);
+            for (const [name, info] of ordered) {
+              const lines2: string[] = [];
+              lines2.push(`**${name}** (${info.guild}) morreu: **${info.total}x**`);
+              lines2.push('Morreu para:');
+              const killerRows = [...info.killers.entries()].sort((a, b) => b[1] - a[1]);
+              const tableLines = ['Jogador          Vezes', '-----------------------'];
+              for (const [killer, cnt] of killerRows) {
+                tableLines.push(`${killer.padEnd(16, ' ').slice(0, 16)} ${cnt}x`);
+              }
+              lines2.push('```\n' + tableLines.join('\n') + '\n```');
+              blocks.push(lines2.join('\n'));
+            }
+            if (blocks.length === 0) {
+              blocks.push('_Nenhum Main foi morto neste evento._');
+            }
+            embedMains = {
+              title: '👑 Kill dos Mains',
+              description: blocks.join('\n\n').substring(0, 4000),
+              color: 0xFACC15,
+            };
+          }
+        } catch (e) {
+          console.error('[Discord Webhook] Failed to build Kill dos Mains embed:', e);
+        }
+      }
+
+      embeds = [embed1, embed2, embed3, embedMains, embed4].filter(Boolean);
     }
 
     formData.append('payload_json', JSON.stringify({ embeds }));
