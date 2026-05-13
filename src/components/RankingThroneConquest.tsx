@@ -697,10 +697,10 @@ export const RankingThroneConquest = () => {
         </div>
       </div>
 
-      {!isLoading && aggregatedData?.matchIds && aggregatedData.matchIds.length > 0 && (
+      {!isLoading && aggregatedData?.matchesMeta && aggregatedData.matchesMeta.length > 0 && (
         <div className="max-w-2xl mx-auto">
           <WinnerGuildPicker
-            matchIds={aggregatedData.matchIds}
+            matches={aggregatedData.matchesMeta}
             guilds={guildOptions}
             onWinnerChange={setWinnerGuild}
           />
