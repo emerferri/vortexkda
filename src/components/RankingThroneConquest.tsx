@@ -765,6 +765,16 @@ export const RankingThroneConquest = () => {
         </div>
       </div>
 
+      {!isLoading && aggregatedData?.matchIds && aggregatedData.matchIds.length > 0 && (
+        <div className="max-w-2xl mx-auto">
+          <WinnerGuildPicker
+            matchIds={aggregatedData.matchIds}
+            guilds={guildOptions}
+            onWinnerChange={setWinnerGuild}
+          />
+        </div>
+      )}
+
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">
           <p>Carregando dados do Throne Conquest...</p>
