@@ -230,7 +230,7 @@ export const RankingArkaWar = () => {
         }
       }
 
-      return { aggregated, brabissimoRecord, coneMonodedoName, characters: [] };
+      return { aggregated, brabissimoRecord, coneMonodedoName, characters: [], matchIds };
     }
   });
 
