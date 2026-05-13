@@ -231,7 +231,8 @@ export const RankingArkaWar = () => {
         }
       }
 
-      return { aggregated, brabissimoRecord, coneMonodedoName, characters: [], matchIds };
+      const matchesMeta = matchesAccum.map((m: any) => ({ id: m.id, date: m.match_date, hour: m.match_hour }));
+      return { aggregated, brabissimoRecord, coneMonodedoName, characters: [], matchIds, matchesMeta };
     }
   });
 
