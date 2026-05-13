@@ -678,7 +678,8 @@ serve(async (req) => {
       }
       lines.push(`🎯 Ordenação: Event Score`);
       if (generalBody.winnerGuild && generalBody.winnerGuild.trim()) {
-        lines.push(`🏆 **GUILD VENCEDORA:** ${generalBody.winnerGuild.trim()}`);
+        lines.push(`🏆 GUILD VENCEDORA:`);
+        lines.push(`## **${generalBody.winnerGuild.trim()}**`);
       }
       lines.push(SEP);
 
