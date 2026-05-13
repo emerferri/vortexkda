@@ -13,8 +13,8 @@ interface Props {
 }
 
 export const WinnerGuildPicker = ({ matchIds, guilds, onWinnerChange }: Props) => {
-  const { isAdmin, isModerator } = useUserRole();
-  const canEdit = isAdmin || isModerator;
+  const { isAdmin } = useUserRole();
+  const canEdit = isAdmin;
   const [current, setCurrent] = useState<string | null>(null);
   const [selected, setSelected] = useState<string>('__none__');
   const [loading, setLoading] = useState(false);
