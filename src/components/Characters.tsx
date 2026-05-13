@@ -868,6 +868,18 @@ export const Characters = () => {
                         {character.class_short || CLASS_SHORT_MAP[character.class] || '-'}
                       </Badge>
                     </TableCell>
+                    {isAdmin && (
+                      <TableCell className="text-center">
+                        <input
+                          type="checkbox"
+                          checked={!!character.is_main}
+                          onChange={() => handleToggleMain(character)}
+                          disabled={character.id.startsWith('unregistered-') || !character.guild}
+                          title={character.is_main ? 'Remover marca de Main' : 'Marcar como Main da guild'}
+                          className="h-4 w-4 cursor-pointer accent-yellow-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      </TableCell>
+                    )}
                     {canEditData && (
                       <TableCell>
                         <div className="flex items-center gap-2">
