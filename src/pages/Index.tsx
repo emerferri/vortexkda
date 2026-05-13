@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { FileUpload } from '@/components/FileUpload';
 import { Scoreboard, PlayerStats } from '@/components/Scoreboard';
 import { RankingGeral } from '@/components/RankingGeral';
