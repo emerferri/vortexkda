@@ -303,6 +303,7 @@ Deno.serve(async (req) => {
             .from("characters")
             .update({
               class: vortexData.class,
+              class_short: getClassShort(vortexData.class),
               guild: vortexData.guild,
             })
             .eq("id", existing.id);
@@ -316,6 +317,7 @@ Deno.serve(async (req) => {
             .insert({
               name,
               class: vortexData.class,
+              class_short: getClassShort(vortexData.class),
               guild: vortexData.guild,
             });
 
