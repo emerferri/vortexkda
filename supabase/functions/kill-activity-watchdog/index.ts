@@ -8,9 +8,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const INACTIVITY_MIN = 3;       // minutos sem kill = "evento encerrado"
-const MIN_ELAPSED_MIN = 7;      // só dispara após X min do início (evita falso positivo no início)
-const MAX_WINDOW_MIN = 90;      // só considera eventos que começaram nas últimas 90 min
+const INACTIVITY_MIN = 12;      // minutos sem kill = "evento encerrado" (cobre 99,9% dos gaps internos legítimos do Boss)
+const MIN_ELAPSED_MIN = 35;     // só dispara após X min do início (nenhum evento real terminou antes disso)
+const MAX_WINDOW_MIN = 120;     // hard fallback: força considerar até 2h depois do início
 
 interface EventWindow {
   eventType: 'boss_event' | 'throne_conquest';
