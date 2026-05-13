@@ -834,7 +834,7 @@ export const Characters = () => {
             <TableBody>
               {filteredCharacters.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={canEditData ? 7 : 4} className="text-center text-muted-foreground">
+                  <TableCell colSpan={(canEditData ? 6 : 4) + (isAdmin ? 1 : 0)} className="text-center text-muted-foreground">
                     {showUnregisteredOnly ? 'Nenhum personagem sem cadastro no momento' : 'Nenhum personagem encontrado'}
                   </TableCell>
                 </TableRow>
