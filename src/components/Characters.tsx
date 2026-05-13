@@ -70,7 +70,7 @@ export const Characters = () => {
       while (true) {
         const { data, error: charsError } = await supabase
           .from('characters')
-          .select('id, name, guild, class, class_short, banned, pilot_name')
+          .select('id, name, guild, class, class_short, banned, pilot_name, is_main')
           .order('name')
           .range(charFrom, charFrom + CHAR_PAGE_SIZE - 1);
         if (charsError) throw charsError;
