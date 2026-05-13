@@ -84,6 +84,17 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-background gradient-gaming flex items-center justify-center p-4">
+      <Helmet>
+        <title>Login - Ranking de Kill PVP BOSS</title>
+        <meta name="description" content="Acesse o painel administrativo do Ranking de Kill PVP BOSS para gerenciar partidas, personagens e configurações." />
+        <meta name="robots" content="noindex,follow" />
+        <link rel="canonical" href="https://rankingpvpboss.lovable.app/auth" />
+        <meta property="og:title" content="Login - Ranking de Kill PVP BOSS" />
+        <meta property="og:description" content="Acesse o painel administrativo do Ranking de Kill PVP BOSS." />
+        <meta property="og:url" content="https://rankingpvpboss.lovable.app/auth" />
+        <meta property="og:type" content="website" />
+      </Helmet>
+      <main className="w-full max-w-md">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
