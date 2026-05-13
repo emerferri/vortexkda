@@ -29,6 +29,7 @@ interface Character {
   class_short?: string;
   banned: boolean;
   pilot_name?: string;
+  is_main?: boolean;
 }
 
 export const Characters = () => {
