@@ -290,6 +290,48 @@ export const Characters = () => {
     }
   };
 
+  const handleToggleMain = async (character: Character) => {
+    if (!user || !isAdmin) {
+      toast({ title: 'Erro', description: 'Apenas administradores podem definir o Main', variant: 'destructive' });
+      return;
+    }
+    if (character.id.startsWith('unregistered-')) {
+      toast({ title: 'Aviso', description: 'Cadastre o personagem antes de marcar como Main', variant: 'destructive' });
+      return;
+    }
+    if (!character.guild || !character.guild.trim()) {
+      toast({ title: 'Aviso', description: 'Personagem precisa ter uma guild definida', variant: 'destructive' });
+      return;
+    }
+    const becomingMain = !character.is_main;
+    try {
+      if (becomingMain) {
+        // Clear any other main of the same guild first (only one main per guild)
+        const { error: clearErr } = await supabase
+          .from('characters')
+          .update({ is_main: false })
+          .eq('guild', character.guild)
+          .eq('is_main', true);
+        if (clearErr) throw clearErr;
+      }
+      const { error } = await supabase
+        .from('characters')
+        .update({ is_main: becomingMain })
+        .eq('id', character.id);
+      if (error) throw error;
+      toast({
+        title: 'Sucesso',
+        description: becomingMain
+          ? `"${character.name}" agora é o Main da guild ${character.guild}`
+          : `"${character.name}" não é mais Main`,
+      });
+      loadCharacters();
+    } catch (error: any) {
+      console.error('Error toggling main:', error);
+      toast({ title: 'Erro', description: error.message || 'Falha ao atualizar Main', variant: 'destructive' });
+    }
+  };
+
   const openEditDialog = (character: Character) => {
     setEditingCharacter(character);
     setFormData({ name: character.name, guild: character.guild, class: character.class, class_short: character.class_short || CLASS_SHORT_MAP[character.class] || '', pilot_name: (character as any).pilot_name || '' });
