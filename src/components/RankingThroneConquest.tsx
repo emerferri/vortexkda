@@ -243,7 +243,7 @@ export const RankingThroneConquest = () => {
       
       const matchIds = (matchesAccum || []).map((m: any) => m.id);
       if (!matchIds.length) {
-        return { aggregated: [], brabissimoRecord: undefined, coneMonodedoName: '', characters: [] };
+        return { aggregated: [], brabissimoRecord: undefined, coneMonodedoName: '', characters: [], matchIds: [] };
       }
 
       // Fetch logs for those matches
