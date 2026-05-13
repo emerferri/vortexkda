@@ -42,6 +42,7 @@ export const RankingThroneConquest = () => {
   const [sortBy, setSortBy] = useState<SortKey>('eventScore');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
+  const [winnerGuild, setWinnerGuild] = useState<string | null>(null);
   const [debouncedDateFrom, setDebouncedDateFrom] = useState<Date>();
   const [debouncedDateTo, setDebouncedDateTo] = useState<Date>();
   const [classFilter, setClassFilter] = useState<string>('all');
