@@ -352,7 +352,8 @@ export const RankingThroneConquest = () => {
         return { name: original, class: data.class || null, guild: data.guild || null };
       });
 
-      return { aggregated, brabissimoRecord, coneMonodedoName, characters: dedupCharacters, matchIds, killLogs: logs.map((l: any) => ({ killer_name: l.killer_name, victim_name: l.victim_name })) };
+      const matchesMeta = (matchesAccum || []).map((m: any) => ({ id: m.id, date: m.match_date, hour: m.match_hour }));
+      return { aggregated, brabissimoRecord, coneMonodedoName, characters: dedupCharacters, matchIds, matchesMeta, killLogs: logs.map((l: any) => ({ killer_name: l.killer_name, victim_name: l.victim_name })) };
     }
   });
 
