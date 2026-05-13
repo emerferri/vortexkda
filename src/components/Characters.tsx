@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Plus, Search, Trash2, Pencil, Filter, FilterX, FileUp, RefreshCw, ChevronDown, Ban, ShieldCheck } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Pencil, Filter, FilterX, FileUp, RefreshCw, ChevronDown, Ban, ShieldCheck, Crown } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -29,6 +29,7 @@ interface Character {
   class_short?: string;
   banned: boolean;
   pilot_name?: string;
+  is_main?: boolean;
 }
 
 export const Characters = () => {
@@ -69,7 +70,7 @@ export const Characters = () => {
       while (true) {
         const { data, error: charsError } = await supabase
           .from('characters')
-          .select('id, name, guild, class, class_short, banned, pilot_name')
+          .select('id, name, guild, class, class_short, banned, pilot_name, is_main')
           .order('name')
           .range(charFrom, charFrom + CHAR_PAGE_SIZE - 1);
         if (charsError) throw charsError;
@@ -286,6 +287,48 @@ export const Characters = () => {
         description: `Falha ao ${action} personagem`,
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleToggleMain = async (character: Character) => {
+    if (!user || !isAdmin) {
+      toast({ title: 'Erro', description: 'Apenas administradores podem definir o Main', variant: 'destructive' });
+      return;
+    }
+    if (character.id.startsWith('unregistered-')) {
+      toast({ title: 'Aviso', description: 'Cadastre o personagem antes de marcar como Main', variant: 'destructive' });
+      return;
+    }
+    if (!character.guild || !character.guild.trim()) {
+      toast({ title: 'Aviso', description: 'Personagem precisa ter uma guild definida', variant: 'destructive' });
+      return;
+    }
+    const becomingMain = !character.is_main;
+    try {
+      if (becomingMain) {
+        // Clear any other main of the same guild first (only one main per guild)
+        const { error: clearErr } = await supabase
+          .from('characters')
+          .update({ is_main: false })
+          .eq('guild', character.guild)
+          .eq('is_main', true);
+        if (clearErr) throw clearErr;
+      }
+      const { error } = await supabase
+        .from('characters')
+        .update({ is_main: becomingMain })
+        .eq('id', character.id);
+      if (error) throw error;
+      toast({
+        title: 'Sucesso',
+        description: becomingMain
+          ? `"${character.name}" agora é o Main da guild ${character.guild}`
+          : `"${character.name}" não é mais Main`,
+      });
+      loadCharacters();
+    } catch (error: any) {
+      console.error('Error toggling main:', error);
+      toast({ title: 'Erro', description: error.message || 'Falha ao atualizar Main', variant: 'destructive' });
     }
   };
 
@@ -783,6 +826,7 @@ export const Characters = () => {
                 <TableHead>Guild</TableHead>
                 <TableHead>Classe</TableHead>
                 <TableHead>Sigla</TableHead>
+                {isAdmin && <TableHead className="text-center">Main</TableHead>}
                 {canEditData && <TableHead>Status</TableHead>}
                 {canEditData && <TableHead className="w-[100px]">Ações</TableHead>}
               </TableRow>
@@ -790,7 +834,7 @@ export const Characters = () => {
             <TableBody>
               {filteredCharacters.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={canEditData ? 7 : 4} className="text-center text-muted-foreground">
+                  <TableCell colSpan={(canEditData ? 6 : 4) + (isAdmin ? 1 : 0)} className="text-center text-muted-foreground">
                     {showUnregisteredOnly ? 'Nenhum personagem sem cadastro no momento' : 'Nenhum personagem encontrado'}
                   </TableCell>
                 </TableRow>
@@ -803,9 +847,13 @@ export const Characters = () => {
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         {character.banned && <Ban className="w-4 h-4 text-destructive" />}
+                        {character.is_main && <Crown className="w-4 h-4 text-yellow-500" />}
                         <span className={character.banned ? 'text-destructive line-through' : ''}>
                           {character.name}
                         </span>
+                        {character.is_main && (
+                          <Badge variant="outline" className="border-yellow-500 text-yellow-600 text-[10px] px-1.5 py-0">MAIN</Badge>
+                        )}
                         {isIncomplete(character) && (
                           <span className="text-xs text-yellow-600 font-semibold">
                             (Cadastro incompleto)
@@ -820,6 +868,18 @@ export const Characters = () => {
                         {character.class_short || CLASS_SHORT_MAP[character.class] || '-'}
                       </Badge>
                     </TableCell>
+                    {isAdmin && (
+                      <TableCell className="text-center">
+                        <input
+                          type="checkbox"
+                          checked={!!character.is_main}
+                          onChange={() => handleToggleMain(character)}
+                          disabled={character.id.startsWith('unregistered-') || !character.guild}
+                          title={character.is_main ? 'Remover marca de Main' : 'Marcar como Main da guild'}
+                          className="h-4 w-4 cursor-pointer accent-yellow-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      </TableCell>
+                    )}
                     {canEditData && (
                       <TableCell>
                         <div className="flex items-center gap-2">

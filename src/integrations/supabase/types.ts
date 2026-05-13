@@ -61,6 +61,7 @@ export type Database = {
           created_at: string
           guild: string
           id: string
+          is_main: boolean
           name: string
           pilot_name: string
         }
@@ -71,6 +72,7 @@ export type Database = {
           created_at?: string
           guild: string
           id?: string
+          is_main?: boolean
           name: string
           pilot_name?: string
         }
@@ -81,6 +83,7 @@ export type Database = {
           created_at?: string
           guild?: string
           id?: string
+          is_main?: boolean
           name?: string
           pilot_name?: string
         }
