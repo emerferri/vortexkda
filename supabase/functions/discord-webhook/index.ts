@@ -68,6 +68,7 @@ interface GeneralRankingBody {
   playerRanking?: PlayerData[]; // Player ranking for text table
   killLogs?: KillLogEntry[]; // Kill logs for streak calculation
   eventType?: 'boss_event' | 'throne_conquest'; // Type of event
+  winnerGuild?: string; // Guild vencedora do evento (Throne/Arka)
 }
 
 interface PutinhaEntry {
