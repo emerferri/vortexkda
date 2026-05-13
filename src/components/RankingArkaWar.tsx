@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { WinnerGuildPicker } from '@/components/WinnerGuildPicker';
 
 
 interface AggregatedPlayer {
@@ -152,7 +153,7 @@ export const RankingArkaWar = () => {
       }
 
       const matchIds = matchesAccum.map((m: any) => m.id);
-      if (!matchIds.length) return { aggregated: [], brabissimoRecord: undefined, coneMonodedoName: '', characters: [] };
+      if (!matchIds.length) return { aggregated: [], brabissimoRecord: undefined, coneMonodedoName: '', characters: [], matchIds: [] };
 
       // Fetch logs
       let fromLogs = 0;
@@ -230,7 +231,7 @@ export const RankingArkaWar = () => {
         }
       }
 
-      return { aggregated, brabissimoRecord, coneMonodedoName, characters: [] };
+      return { aggregated, brabissimoRecord, coneMonodedoName, characters: [], matchIds };
     }
   });
 
@@ -444,6 +445,12 @@ export const RankingArkaWar = () => {
           </Button>
         </div>
       </div>
+
+      {!isLoading && aggregatedData?.matchIds && aggregatedData.matchIds.length > 0 && (
+        <div className="max-w-2xl mx-auto">
+          <WinnerGuildPicker matchIds={aggregatedData.matchIds} guilds={guildOptions} />
+        </div>
+      )}
 
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground"><p>Carregando dados do Arka War...</p></div>

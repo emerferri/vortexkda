@@ -278,6 +278,7 @@ export type Database = {
           id: string
           match_date: string
           match_hour: number
+          winner_guild: string | null
         }
         Insert: {
           boss_label: string
@@ -286,6 +287,7 @@ export type Database = {
           id?: string
           match_date: string
           match_hour: number
+          winner_guild?: string | null
         }
         Update: {
           boss_label?: string
@@ -294,6 +296,7 @@ export type Database = {
           id?: string
           match_date?: string
           match_hour?: number
+          winner_guild?: string | null
         }
         Relationships: []
       }

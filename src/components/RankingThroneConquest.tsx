@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { WinnerGuildPicker } from '@/components/WinnerGuildPicker';
 
 interface AggregatedPlayer {
   name: string;
@@ -41,6 +42,7 @@ export const RankingThroneConquest = () => {
   const [sortBy, setSortBy] = useState<SortKey>('eventScore');
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
+  const [winnerGuild, setWinnerGuild] = useState<string | null>(null);
   const [debouncedDateFrom, setDebouncedDateFrom] = useState<Date>();
   const [debouncedDateTo, setDebouncedDateTo] = useState<Date>();
   const [classFilter, setClassFilter] = useState<string>('all');
@@ -243,7 +245,7 @@ export const RankingThroneConquest = () => {
       
       const matchIds = (matchesAccum || []).map((m: any) => m.id);
       if (!matchIds.length) {
-        return { aggregated: [], brabissimoRecord: undefined, coneMonodedoName: '', characters: [] };
+        return { aggregated: [], brabissimoRecord: undefined, coneMonodedoName: '', characters: [], matchIds: [] };
       }
 
       // Fetch logs for those matches
@@ -350,7 +352,7 @@ export const RankingThroneConquest = () => {
         return { name: original, class: data.class || null, guild: data.guild || null };
       });
 
-      return { aggregated, brabissimoRecord, coneMonodedoName, characters: dedupCharacters, killLogs: logs.map((l: any) => ({ killer_name: l.killer_name, victim_name: l.victim_name })) };
+      return { aggregated, brabissimoRecord, coneMonodedoName, characters: dedupCharacters, matchIds, killLogs: logs.map((l: any) => ({ killer_name: l.killer_name, victim_name: l.victim_name })) };
     }
   });
 
@@ -527,6 +529,7 @@ export const RankingThroneConquest = () => {
       const payload = {
         environment,
         eventType: 'throne_conquest',
+        winnerGuild: winnerGuild || '',
         filters: {
           class: classFilter,
           dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
@@ -764,6 +767,16 @@ export const RankingThroneConquest = () => {
           </Button>
         </div>
       </div>
+
+      {!isLoading && aggregatedData?.matchIds && aggregatedData.matchIds.length > 0 && (
+        <div className="max-w-2xl mx-auto">
+          <WinnerGuildPicker
+            matchIds={aggregatedData.matchIds}
+            guilds={guildOptions}
+            onWinnerChange={setWinnerGuild}
+          />
+        </div>
+      )}
 
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">
