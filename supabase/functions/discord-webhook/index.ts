@@ -677,6 +677,9 @@ serve(async (req) => {
         lines.push(`📅 ${formattedDate}${formattedHour ? `  •  ⏰ ${formattedHour}` : ''}`);
       }
       lines.push(`🎯 Ordenação: Event Score`);
+      if (generalBody.winnerGuild && generalBody.winnerGuild.trim()) {
+        lines.push(`🏆 **GUILD VENCEDORA:** ${generalBody.winnerGuild.trim()}`);
+      }
       lines.push(SEP);
 
       if (rei?.name) {
