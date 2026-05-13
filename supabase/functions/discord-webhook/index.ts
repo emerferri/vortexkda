@@ -704,7 +704,7 @@ serve(async (req) => {
         lines.push('');
       }
       if (cone?.name) {
-        lines.push(`🥉 **CONE MONODEDO**`);
+        lines.push(`🥉 **${isThrone ? 'ALVO PRIORITÁRIO' : 'CONE MONODEDO'}**`);
         lines.push(`🍦 **${cone.name}**`);
         if (coneStats) {
           lines.push(`💀 ${coneStats.eventScore.toFixed(2)} Score • ${coneStats.kills}K / ${coneStats.deaths}D`);
@@ -713,24 +713,26 @@ serve(async (req) => {
         }
       }
 
-      lines.push(SEP);
-      lines.push(`😂 **TROFÉUS ESPECIAIS**`);
-      lines.push('');
-      if (agenteDuplo && agenteDuplo.name) {
-        lines.push(`🕵️ **Agente Duplo**`);
-        lines.push(`📛 **${agenteDuplo.name}**${agenteDuplo.guild ? ` • ${agenteDuplo.guild}` : ''}`);
-        lines.push(`☠️ ${agenteDuplo.friendlyKills} aliado(s) eliminado(s)`);
+      if (!isThrone) {
+        lines.push(SEP);
+        lines.push(`😂 **TROFÉUS ESPECIAIS**`);
         lines.push('');
-      } else {
-        lines.push(`🕵️ **Agente Duplo** — _nenhum traidor hoje_`);
-        lines.push('');
-      }
-      if (putinhaNoite && putinhaNoite.dominador) {
-        lines.push(`💔 **Putinha da Noite**`);
-        lines.push(`📛 **${putinhaNoite.dominador}** → **${putinhaNoite.putinha}**`);
-        lines.push(`⚰️ ${putinhaNoite.kills} morte(s) sofrida(s)`);
-      } else {
-        lines.push(`💔 **Putinha da Noite** — _sem dominância clara_`);
+        if (agenteDuplo && agenteDuplo.name) {
+          lines.push(`🕵️ **Agente Duplo**`);
+          lines.push(`📛 **${agenteDuplo.name}**${agenteDuplo.guild ? ` • ${agenteDuplo.guild}` : ''}`);
+          lines.push(`☠️ ${agenteDuplo.friendlyKills} aliado(s) eliminado(s)`);
+          lines.push('');
+        } else {
+          lines.push(`🕵️ **Agente Duplo** — _nenhum traidor hoje_`);
+          lines.push('');
+        }
+        if (putinhaNoite && putinhaNoite.dominador) {
+          lines.push(`💔 **Putinha da Noite**`);
+          lines.push(`📛 **${putinhaNoite.dominador}** → **${putinhaNoite.putinha}**`);
+          lines.push(`⚰️ ${putinhaNoite.kills} morte(s) sofrida(s)`);
+        } else {
+          lines.push(`💔 **Putinha da Noite** — _sem dominância clara_`);
+        }
       }
 
       lines.push(SEP);
