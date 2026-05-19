@@ -51,6 +51,76 @@ async function postChunks(webhook: string, chunks: string[]) {
   }
 }
 
+function pickWebhook(target: 'prod' | 'homolog'): string | undefined {
+  return target === 'prod'
+    ? Deno.env.get('DISCORD_WEBHOOK_URL_PROD')
+    : Deno.env.get('DISCORD_WEBHOOK_URL');
+}
+
+async function buildGroupedFromActiveSeason(supabase: any) {
+  const { data: active, error: actErr } = await supabase
+    .from('seasons')
+    .select('id, name, started_at')
+    .eq('status', 'active')
+    .order('year', { ascending: false })
+    .order('month', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (actErr) throw actErr;
+  if (!active) throw new Error('Nenhuma temporada ativa encontrada');
+
+  const today = new Date().toISOString().slice(0, 10);
+  const dateFrom = active.started_at;
+
+  const [geral, reis, killStreak, mural, fogo, putinha] = await Promise.all([
+    supabase.rpc('get_ranking_geral', { p_date_from: dateFrom, p_date_to: today, p_hour_from: null, p_hour_to: null }),
+    supabase.rpc('get_ranking_reis_pvp', { p_date_from: dateFrom, p_date_to: today, p_event_type: 'boss_event' }),
+    supabase.rpc('get_ranking_kill_streak', { p_date_from: dateFrom, p_date_to: today, p_hour_from: null, p_hour_to: null, p_event_type: 'boss_event' }),
+    supabase.rpc('get_ranking_mural_vergonha', { p_date_from: dateFrom, p_date_to: today, p_hour_from: null, p_hour_to: null, p_event_type: 'boss_event' }),
+    supabase.rpc('get_ranking_fogo_amigo', { p_date_from: dateFrom, p_date_to: today, p_hour_from: null, p_hour_to: null, p_event_type: 'boss_event' }),
+    supabase.rpc('get_ranking_putinha', { p_date_from: dateFrom, p_date_to: today, p_hour_from: null, p_hour_to: null, p_event_type: 'boss_event' }),
+  ]);
+
+  const grouped: Record<string, any[]> = {};
+
+  grouped['geral'] = (geral.data || []).slice()
+    .sort((a: any, b: any) => Number(b.event_score) - Number(a.event_score))
+    .slice(0, 10)
+    .map((r: any, i: number) => ({ position: i + 1, player_name: r.player_name, player_class: r.player_class, score: r.event_score }));
+
+  grouped['reis_pvp'] = (reis.data || []).filter((r: any) => r.is_rei)
+    .sort((a: any, b: any) => Number(b.vezes) - Number(a.vezes) || Number(b.melhor_score) - Number(a.melhor_score))
+    .slice(0, 10)
+    .map((r: any, i: number) => ({ position: i + 1, player_name: r.player_name, score: r.melhor_score }));
+
+  grouped['cones'] = (reis.data || []).filter((r: any) => !r.is_rei)
+    .sort((a: any, b: any) => Number(b.vezes) - Number(a.vezes) || Number(a.pior_score) - Number(b.pior_score))
+    .slice(0, 10)
+    .map((r: any, i: number) => ({ position: i + 1, player_name: r.player_name, score: r.pior_score }));
+
+  grouped['kill_streak'] = (killStreak.data || []).slice()
+    .sort((a: any, b: any) => Number(b.max_streak) - Number(a.max_streak))
+    .slice(0, 10)
+    .map((r: any, i: number) => ({ position: i + 1, player_name: r.player_name, player_class: r.player_class, score: r.max_streak }));
+
+  grouped['mural_vergonha'] = (mural.data || []).slice()
+    .sort((a: any, b: any) => Number(b.total_deaths) - Number(a.total_deaths))
+    .slice(0, 10)
+    .map((r: any, i: number) => ({ position: i + 1, player_name: r.player_name, player_class: r.player_class, score: r.total_deaths }));
+
+  grouped['fogo_amigo'] = (fogo.data || []).slice()
+    .sort((a: any, b: any) => Number(b.event_score) - Number(a.event_score))
+    .slice(0, 10)
+    .map((r: any, i: number) => ({ position: i + 1, player_name: r.player_name, player_class: r.player_class, score: r.event_score }));
+
+  grouped['putinha'] = (putinha.data || []).slice()
+    .sort((a: any, b: any) => Number(b.deaths) - Number(a.deaths))
+    .slice(0, 10)
+    .map((r: any, i: number) => ({ position: i + 1, player_name: `${r.killer_name} → ${r.victim_name}`, score: r.deaths }));
+
+  return { season: active, grouped };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -60,101 +130,63 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Parse optional body
     let body: any = {};
     try { body = await req.json(); } catch (_) {}
     const preview: boolean = body?.preview === true;
-    const target: 'prod' | 'homolog' = body?.target === 'homolog' ? 'homolog' : 'prod';
+    const postOnly: boolean = body?.post_only === true;
+    const skipDiscord: boolean = body?.skip_discord === true;
+    const target: 'prod' | 'homolog' = body?.target === 'prod' ? 'prod' : (body?.target === 'homolog' ? 'homolog' : 'prod');
 
-    // ===== PREVIEW MODE: não fecha temporada, gera snapshot temporário e posta no webhook escolhido =====
-    if (preview) {
-      // Pega temporada ativa
-      const { data: active, error: actErr } = await supabase
-        .from('seasons')
-        .select('id, name, started_at')
-        .eq('status', 'active')
-        .order('year', { ascending: false })
-        .order('month', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (actErr) throw actErr;
-      if (!active) throw new Error('Nenhuma temporada ativa encontrada');
+    // ===== POST ONLY MODE: post an already-closed season to Discord =====
+    if (postOnly) {
+      const seasonId: string | undefined = body?.season_id;
+      if (!seasonId) throw new Error('season_id é obrigatório no modo post_only');
 
-      const today = new Date().toISOString().slice(0, 10);
-      const dateFrom = active.started_at;
-
-      // Roda os mesmos RPCs do close_current_season, em memória
-      const [geral, reis, killStreak, mural, fogo, putinha] = await Promise.all([
-        supabase.rpc('get_ranking_geral', { p_date_from: dateFrom, p_date_to: today, p_hour_from: null, p_hour_to: null }),
-        supabase.rpc('get_ranking_reis_pvp', { p_date_from: dateFrom, p_date_to: today, p_event_type: 'boss_event' }),
-        supabase.rpc('get_ranking_kill_streak', { p_date_from: dateFrom, p_date_to: today, p_hour_from: null, p_hour_to: null, p_event_type: 'boss_event' }),
-        supabase.rpc('get_ranking_mural_vergonha', { p_date_from: dateFrom, p_date_to: today, p_hour_from: null, p_hour_to: null, p_event_type: 'boss_event' }),
-        supabase.rpc('get_ranking_fogo_amigo', { p_date_from: dateFrom, p_date_to: today, p_hour_from: null, p_hour_to: null, p_event_type: 'boss_event' }),
-        supabase.rpc('get_ranking_putinha', { p_date_from: dateFrom, p_date_to: today, p_hour_from: null, p_hour_to: null, p_event_type: 'boss_event' }),
+      const [{ data: season }, { data: snaps }] = await Promise.all([
+        supabase.from('seasons').select('name').eq('id', seasonId).maybeSingle(),
+        supabase.from('season_snapshots').select('*').eq('season_id', seasonId).order('ranking_type').order('position'),
       ]);
+      if (!season) throw new Error('Temporada não encontrada');
+      if (!snaps || snaps.length === 0) throw new Error('Sem snapshots para postar');
 
-      const grouped: Record<string, any[]> = {};
-
-      const geralRows = (geral.data || []).slice()
-        .sort((a: any, b: any) => Number(b.event_score) - Number(a.event_score))
-        .slice(0, 10)
-        .map((r: any, i: number) => ({ position: i + 1, player_name: r.player_name, player_class: r.player_class, score: r.event_score }));
-      grouped['geral'] = geralRows;
-
-      const reisRows = (reis.data || []).filter((r: any) => r.is_rei)
-        .sort((a: any, b: any) => Number(b.vezes) - Number(a.vezes) || Number(b.melhor_score) - Number(a.melhor_score))
-        .slice(0, 10)
-        .map((r: any, i: number) => ({ position: i + 1, player_name: r.player_name, score: r.melhor_score }));
-      grouped['reis_pvp'] = reisRows;
-
-      const conesRows = (reis.data || []).filter((r: any) => !r.is_rei)
-        .sort((a: any, b: any) => Number(b.vezes) - Number(a.vezes) || Number(a.pior_score) - Number(b.pior_score))
-        .slice(0, 10)
-        .map((r: any, i: number) => ({ position: i + 1, player_name: r.player_name, score: r.pior_score }));
-      grouped['cones'] = conesRows;
-
-      const ksRows = (killStreak.data || []).slice()
-        .sort((a: any, b: any) => Number(b.max_streak) - Number(a.max_streak))
-        .slice(0, 10)
-        .map((r: any, i: number) => ({ position: i + 1, player_name: r.player_name, player_class: r.player_class, score: r.max_streak }));
-      grouped['kill_streak'] = ksRows;
-
-      const muralRows = (mural.data || []).slice()
-        .sort((a: any, b: any) => Number(b.total_deaths) - Number(a.total_deaths))
-        .slice(0, 10)
-        .map((r: any, i: number) => ({ position: i + 1, player_name: r.player_name, player_class: r.player_class, score: r.total_deaths }));
-      grouped['mural_vergonha'] = muralRows;
-
-      const fogoRows = (fogo.data || []).slice()
-        .sort((a: any, b: any) => Number(b.event_score) - Number(a.event_score))
-        .slice(0, 10)
-        .map((r: any, i: number) => ({ position: i + 1, player_name: r.player_name, player_class: r.player_class, score: r.event_score }));
-      grouped['fogo_amigo'] = fogoRows;
-
-      const putRows = (putinha.data || []).slice()
-        .sort((a: any, b: any) => Number(b.deaths) - Number(a.deaths))
-        .slice(0, 10)
-        .map((r: any, i: number) => ({ position: i + 1, player_name: `${r.killer_name} → ${r.victim_name}`, score: r.deaths }));
-      grouped['putinha'] = putRows;
-
-      const webhook = target === 'prod'
-        ? Deno.env.get('DISCORD_WEBHOOK_URL_PROD')
-        : Deno.env.get('DISCORD_WEBHOOK_URL');
-
+      const webhook = pickWebhook(target);
       if (!webhook) throw new Error(`Webhook ${target} não configurado`);
 
-      const prefix = target === 'homolog' ? '🧪 **[PREVIEW / HOMOLOG]**\n' : '';
-      const chunks = buildDiscordChunks(active.name + ' (preview)', grouped, prefix);
+      const grouped: Record<string, any[]> = {};
+      for (const s of snaps) (grouped[s.ranking_type] ||= []).push(s);
+
+      const prefix = target === 'homolog' ? '🧪 **[HOMOLOG]**\n' : '';
+      const chunks = buildDiscordChunks(season.name, grouped, prefix);
       await postChunks(webhook, chunks);
 
-      const totalRows = Object.values(grouped).reduce((acc, l) => acc + l.length, 0);
       return new Response(
-        JSON.stringify({ success: true, preview: true, target, season: active.name, snapshots: totalRows, discord_posted: true, grouped }),
+        JSON.stringify({ success: true, post_only: true, target, season: season.name, discord_posted: true, snapshots: snaps.length }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // ===== Fluxo normal: fecha temporada =====
+    // ===== PREVIEW MODE =====
+    if (preview) {
+      const { season, grouped } = await buildGroupedFromActiveSeason(supabase);
+      const totalRows = Object.values(grouped).reduce((acc, l) => acc + l.length, 0);
+
+      let discordPosted = false;
+      if (!skipDiscord) {
+        const webhook = pickWebhook(target);
+        if (!webhook) throw new Error(`Webhook ${target} não configurado`);
+        const prefix = target === 'homolog' ? '🧪 **[PREVIEW / HOMOLOG]**\n' : '🧪 **[PREVIEW]**\n';
+        const chunks = buildDiscordChunks(season.name + ' (preview)', grouped, prefix);
+        await postChunks(webhook, chunks);
+        discordPosted = true;
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, preview: true, target, season: season.name, snapshots: totalRows, discord_posted: discordPosted, grouped }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ===== Normal flow: close season =====
     const { data: closeData, error: closeErr } = await supabase.rpc('close_current_season');
     if (closeErr) throw closeErr;
 
@@ -164,22 +196,19 @@ Deno.serve(async (req) => {
 
     let discordPosted = false;
 
-    if (closedId) {
+    // Auto post only if explicitly requested (skip_discord defaults to true now — manual post)
+    if (closedId && !skipDiscord && body?.auto_post === true) {
       const [{ data: season }, { data: snaps }] = await Promise.all([
-        supabase.from('seasons').select('name, year, month').eq('id', closedId).maybeSingle(),
+        supabase.from('seasons').select('name').eq('id', closedId).maybeSingle(),
         supabase.from('season_snapshots').select('*').eq('season_id', closedId).order('ranking_type').order('position'),
       ]);
 
-      const webhook = target === 'homolog'
-        ? Deno.env.get('DISCORD_WEBHOOK_URL')
-        : Deno.env.get('DISCORD_WEBHOOK_URL_PROD');
+      const webhook = pickWebhook(target);
       const paused = Deno.env.get('AUTO_POST_PAUSED') === 'true';
 
       if (webhook && !paused && snaps && snaps.length > 0) {
         const grouped: Record<string, any[]> = {};
-        for (const s of snaps) {
-          (grouped[s.ranking_type] ||= []).push(s);
-        }
+        for (const s of snaps) (grouped[s.ranking_type] ||= []).push(s);
         const prefix = target === 'homolog' ? '🧪 **[HOMOLOG]**\n' : '';
         const chunks = buildDiscordChunks(season?.name ?? 'Temporada', grouped, prefix);
         await postChunks(webhook, chunks);
