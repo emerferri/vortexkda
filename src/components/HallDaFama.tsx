@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Trophy, Crown, Skull, Flame, Swords, Award, Heart, Lock, Unlock, FileDown } from 'lucide-react';
+import { Trophy, Crown, Skull, Flame, Swords, Award, Heart, Lock, Unlock, FileDown, FlaskConical } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useUserRole } from '@/hooks/useUserRole';
 import jsPDF from 'jspdf';
@@ -27,6 +27,7 @@ export const HallDaFama = () => {
   const queryClient = useQueryClient();
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [closing, setClosing] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
 
   const { data: seasons, isLoading: loadingSeasons } = useQuery({
     queryKey: ['seasons-list'],
@@ -75,6 +76,25 @@ export const HallDaFama = () => {
       toast({ title: 'Erro', description: e?.message ?? String(e), variant: 'destructive' });
     } finally {
       setClosing(false);
+    }
+  };
+
+  const handlePreviewHomolog = async () => {
+    if (!confirm('Gerar PREVIEW do Hall da Fama com a temporada ATUAL (sem fechar) e postar no webhook de HOMOLOGAÇÃO?')) return;
+    setPreviewing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('close-season', {
+        body: { preview: true, target: 'homolog' },
+      });
+      if (error) throw error;
+      toast({
+        title: 'Preview enviado!',
+        description: `${data?.snapshots ?? 0} registros postados no Discord de homologação.`,
+      });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e?.message ?? String(e), variant: 'destructive' });
+    } finally {
+      setPreviewing(false);
     }
   };
 
@@ -191,10 +211,16 @@ export const HallDaFama = () => {
         )}
 
         {isAdmin && activeSeason && (
-          <Button onClick={handleCloseSeason} disabled={closing} variant="destructive" size="sm">
-            <Lock className="w-4 h-4 mr-1" />
-            {closing ? 'Fechando...' : 'Fechar temporada atual'}
-          </Button>
+          <>
+            <Button onClick={handlePreviewHomolog} disabled={previewing} variant="secondary" size="sm">
+              <FlaskConical className="w-4 h-4 mr-1" />
+              {previewing ? 'Enviando...' : 'Preview no Discord (Homolog)'}
+            </Button>
+            <Button onClick={handleCloseSeason} disabled={closing} variant="destructive" size="sm">
+              <Lock className="w-4 h-4 mr-1" />
+              {closing ? 'Fechando...' : 'Fechar temporada atual'}
+            </Button>
+          </>
         )}
       </div>
 
