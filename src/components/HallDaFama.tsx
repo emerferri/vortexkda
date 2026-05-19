@@ -79,6 +79,25 @@ export const HallDaFama = () => {
     }
   };
 
+  const handlePreviewHomolog = async () => {
+    if (!confirm('Gerar PREVIEW do Hall da Fama com a temporada ATUAL (sem fechar) e postar no webhook de HOMOLOGAÇÃO?')) return;
+    setPreviewing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('close-season', {
+        body: { preview: true, target: 'homolog' },
+      });
+      if (error) throw error;
+      toast({
+        title: 'Preview enviado!',
+        description: `${data?.snapshots ?? 0} registros postados no Discord de homologação.`,
+      });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e?.message ?? String(e), variant: 'destructive' });
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
   const exportPDF = () => {
     if (!currentSeason || !snapshots || snapshots.length === 0) {
       toast({ title: 'Sem dados', description: 'Selecione uma temporada com snapshots.', variant: 'destructive' });
