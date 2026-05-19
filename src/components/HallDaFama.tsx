@@ -211,10 +211,16 @@ export const HallDaFama = () => {
         )}
 
         {isAdmin && activeSeason && (
-          <Button onClick={handleCloseSeason} disabled={closing} variant="destructive" size="sm">
-            <Lock className="w-4 h-4 mr-1" />
-            {closing ? 'Fechando...' : 'Fechar temporada atual'}
-          </Button>
+          <>
+            <Button onClick={handlePreviewHomolog} disabled={previewing} variant="secondary" size="sm">
+              <FlaskConical className="w-4 h-4 mr-1" />
+              {previewing ? 'Enviando...' : 'Preview no Discord (Homolog)'}
+            </Button>
+            <Button onClick={handleCloseSeason} disabled={closing} variant="destructive" size="sm">
+              <Lock className="w-4 h-4 mr-1" />
+              {closing ? 'Fechando...' : 'Fechar temporada atual'}
+            </Button>
+          </>
         )}
       </div>
 
