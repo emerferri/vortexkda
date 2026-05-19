@@ -27,6 +27,7 @@ export const HallDaFama = () => {
   const queryClient = useQueryClient();
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [closing, setClosing] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
 
   const { data: seasons, isLoading: loadingSeasons } = useQuery({
     queryKey: ['seasons-list'],
