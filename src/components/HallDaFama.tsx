@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Trophy, Crown, Skull, Flame, Swords, Award, Heart, Lock, Unlock, FileDown, FlaskConical } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Trophy, Crown, Skull, Flame, Award, Heart, Lock, Unlock, FileDown, FlaskConical, Eye, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useUserRole } from '@/hooks/useUserRole';
 import jsPDF from 'jspdf';
@@ -28,6 +29,8 @@ export const HallDaFama = () => {
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [closing, setClosing] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  const [posting, setPosting] = useState<'prod' | 'homolog' | null>(null);
+  const [previewData, setPreviewData] = useState<{ season: string; grouped: Record<string, any[]> } | null>(null);
 
   const { data: seasons, isLoading: loadingSeasons } = useQuery({
     queryKey: ['seasons-list'],
@@ -62,16 +65,20 @@ export const HallDaFama = () => {
   });
 
   const handleCloseSeason = async () => {
-    if (!confirm('Fechar a temporada atual? Isso salvará o snapshot Top 10 e abrirá uma nova temporada.')) return;
+    if (!confirm('Fechar a temporada atual? Isso salvará o snapshot Top 10 e abrirá uma nova temporada. A postagem no Discord NÃO é automática — você poderá postar manualmente depois.')) return;
     setClosing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('close-season');
+      const { data, error } = await supabase.functions.invoke('close-season', {
+        body: { skip_discord: true },
+      });
       if (error) throw error;
       toast({
         title: 'Temporada fechada!',
-        description: `${data?.snapshots ?? 0} registros salvos no Hall da Fama.`,
+        description: `${data?.snapshots ?? 0} registros salvos. Revise os dados e poste no Discord quando quiser.`,
       });
+      if (data?.closed_season_id) setSelectedSeason(data.closed_season_id);
       await queryClient.invalidateQueries({ queryKey: ['seasons-list'] });
+      await queryClient.invalidateQueries({ queryKey: ['season-snapshots'] });
     } catch (e: any) {
       toast({ title: 'Erro', description: e?.message ?? String(e), variant: 'destructive' });
     } finally {
@@ -79,22 +86,52 @@ export const HallDaFama = () => {
     }
   };
 
+  const handlePreviewOnScreen = async () => {
+    setPreviewing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('close-season', {
+        body: { preview: true, skip_discord: true },
+      });
+      if (error) throw error;
+      setPreviewData({ season: data?.season ?? 'Temporada atual', grouped: data?.grouped ?? {} });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e?.message ?? String(e), variant: 'destructive' });
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
   const handlePreviewHomolog = async () => {
-    if (!confirm('Gerar PREVIEW do Hall da Fama com a temporada ATUAL (sem fechar) e postar no webhook de HOMOLOGAÇÃO?')) return;
+    if (!confirm('Gerar PREVIEW da temporada ATUAL e postar no webhook de HOMOLOGAÇÃO?')) return;
     setPreviewing(true);
     try {
       const { data, error } = await supabase.functions.invoke('close-season', {
         body: { preview: true, target: 'homolog' },
       });
       if (error) throw error;
-      toast({
-        title: 'Preview enviado!',
-        description: `${data?.snapshots ?? 0} registros postados no Discord de homologação.`,
-      });
+      toast({ title: 'Preview enviado!', description: `${data?.snapshots ?? 0} registros postados no Discord de homologação.` });
     } catch (e: any) {
       toast({ title: 'Erro', description: e?.message ?? String(e), variant: 'destructive' });
     } finally {
       setPreviewing(false);
+    }
+  };
+
+  const handlePostToDiscord = async (target: 'prod' | 'homolog') => {
+    if (!currentId) return;
+    const label = target === 'prod' ? 'PRODUÇÃO' : 'HOMOLOGAÇÃO';
+    if (!confirm(`Postar esta temporada no Discord de ${label}?`)) return;
+    setPosting(target);
+    try {
+      const { data, error } = await supabase.functions.invoke('close-season', {
+        body: { post_only: true, season_id: currentId, target },
+      });
+      if (error) throw error;
+      toast({ title: 'Postado no Discord!', description: `${data?.snapshots ?? 0} registros enviados (${label}).` });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e?.message ?? String(e), variant: 'destructive' });
+    } finally {
+      setPosting(null);
     }
   };
 
@@ -169,10 +206,7 @@ export const HallDaFama = () => {
     try {
       const { data, error } = await supabase.rpc('reopen_season', { _season_id: seasonId });
       if (error) throw error;
-      toast({
-        title: 'Temporada reaberta!',
-        description: `Snapshots removidos: ${(data as any)?.snapshots_deleted ?? 0}.`,
-      });
+      toast({ title: 'Temporada reaberta!', description: `Snapshots removidos: ${(data as any)?.snapshots_deleted ?? 0}.` });
       setSelectedSeason('');
       await queryClient.invalidateQueries({ queryKey: ['seasons-list'] });
       await queryClient.invalidateQueries({ queryKey: ['season-snapshots'] });
@@ -212,13 +246,17 @@ export const HallDaFama = () => {
 
         {isAdmin && activeSeason && (
           <>
+            <Button onClick={handlePreviewOnScreen} disabled={previewing} variant="outline" size="sm">
+              <Eye className="w-4 h-4 mr-1" />
+              {previewing ? 'Carregando...' : 'Preview em tela'}
+            </Button>
             <Button onClick={handlePreviewHomolog} disabled={previewing} variant="secondary" size="sm">
               <FlaskConical className="w-4 h-4 mr-1" />
-              {previewing ? 'Enviando...' : 'Preview no Discord (Homolog)'}
+              Preview no Discord (Homolog)
             </Button>
             <Button onClick={handleCloseSeason} disabled={closing} variant="destructive" size="sm">
               <Lock className="w-4 h-4 mr-1" />
-              {closing ? 'Fechando...' : 'Fechar temporada atual'}
+              {closing ? 'Fechando...' : 'Fechar temporada (sem postar)'}
             </Button>
           </>
         )}
@@ -253,9 +291,19 @@ export const HallDaFama = () => {
               </Button>
             )}
             {isAdmin && currentId && (
-              <Button onClick={() => handleReopenSeason(currentId)} variant="outline" size="sm">
-                <Unlock className="w-4 h-4 mr-1" /> Reabrir temporada
-              </Button>
+              <>
+                <Button onClick={() => handlePostToDiscord('homolog')} disabled={posting !== null} variant="secondary" size="sm">
+                  <Send className="w-4 h-4 mr-1" />
+                  {posting === 'homolog' ? 'Postando...' : 'Postar Discord (Homolog)'}
+                </Button>
+                <Button onClick={() => handlePostToDiscord('prod')} disabled={posting !== null} variant="default" size="sm">
+                  <Send className="w-4 h-4 mr-1" />
+                  {posting === 'prod' ? 'Postando...' : 'Postar Discord (Prod)'}
+                </Button>
+                <Button onClick={() => handleReopenSeason(currentId)} variant="outline" size="sm">
+                  <Unlock className="w-4 h-4 mr-1" /> Reabrir temporada
+                </Button>
+              </>
             )}
           </div>
 
@@ -309,6 +357,51 @@ export const HallDaFama = () => {
           )}
         </>
       )}
+
+      {/* Preview Dialog (active season, on-screen only) */}
+      <Dialog open={!!previewData} onOpenChange={(open) => !open && setPreviewData(null)}>
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5" /> Preview — {previewData?.season}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {previewData && Object.entries(RANKING_META).map(([type, meta]) => {
+              const list = previewData.grouped[type];
+              if (!list || list.length === 0) return null;
+              const Icon = meta.icon;
+              return (
+                <Card key={type} className="gaming-card">
+                  <CardHeader className="pb-2">
+                    <CardTitle className={`flex items-center gap-2 text-base ${meta.color}`}>
+                      <Icon className="w-5 h-5" /> {meta.label}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <ol className="space-y-1 text-sm">
+                      {list.slice(0, 10).map((s: any, idx: number) => (
+                        <li key={idx} className="flex items-center justify-between gap-2 py-1 border-b border-border/40 last:border-0">
+                          <span className="flex items-center gap-2 truncate">
+                            <span className="font-bold w-7 shrink-0">
+                              {s.position === 1 ? '🥇' : s.position === 2 ? '🥈' : s.position === 3 ? '🥉' : `#${s.position}`}
+                            </span>
+                            <span className="truncate font-medium">{s.player_name}</span>
+                            {s.player_class && (
+                              <span className="text-xs text-muted-foreground truncate">({s.player_class})</span>
+                            )}
+                          </span>
+                          <span className="font-mono text-xs font-semibold shrink-0">{Number(s.score).toFixed(2)}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
