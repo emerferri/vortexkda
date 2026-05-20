@@ -29,9 +29,11 @@ function getValidWindows(brtNow: Date): EventWindow[] {
     list.push({ eventType: 'boss_event', hour: 22, minute: 0 });
   } else {
     list.push({ eventType: 'boss_event', hour: 20, minute: 0 });
-    list.push({ eventType: 'boss_event', hour: 22, minute: 0 });
+    // Tue/Thu: boss da noite começa às 22:30 (não há 22:00)
     if (dow === 2 || dow === 4) {
       list.push({ eventType: 'boss_event', hour: 22, minute: 30 });
+    } else {
+      list.push({ eventType: 'boss_event', hour: 22, minute: 0 });
     }
   }
 
