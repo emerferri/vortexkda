@@ -556,14 +556,16 @@ Deno.serve(async (req) => {
 
     console.log(`[Auto Process] Fetching logs for ${matchDate} ${matchHour}:${String(eventMinute).padStart(2, '0')} (${eventType})`);
 
-    // Check if this match already exists - filter by event_type to allow same hour different event types
-    const { data: existingMatch } = await internalClient
+    // Check if this match already exists - filter by event_type + minute to distinguish 22:00 vs 22:30
+    const { data: existingRows } = await internalClient
       .from('pvp_matches')
       .select('id')
       .eq('match_date', matchDate)
       .eq('match_hour', matchHour)
+      .eq('match_minute', eventMinute)
       .eq('event_type', eventType)
-      .maybeSingle();
+      .limit(1);
+    const existingMatch = existingRows && existingRows.length > 0 ? existingRows[0] : null;
 
     if (existingMatch) {
       if (forceReprocess) {
@@ -686,6 +688,7 @@ Deno.serve(async (req) => {
       .insert({
         match_date: matchDate,
         match_hour: matchHour,
+        match_minute: eventMinute,
         boss_label: bossLabel,
         event_type: eventType,
       })

@@ -84,16 +84,17 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Já foi processada hoje?
-      const { data: existing } = await internal
+      // Já foi processada hoje? (inclui match_minute para distinguir 22:00 vs 22:30)
+      const { data: existingRows } = await internal
         .from('pvp_matches')
         .select('id')
         .eq('match_date', today)
         .eq('match_hour', w.hour)
+        .eq('match_minute', w.minute)
         .eq('event_type', w.eventType)
-        .maybeSingle();
+        .limit(1);
 
-      if (existing) {
+      if (existingRows && existingRows.length > 0) {
         results.push({ ...w, skipped: 'already_processed' });
         continue;
       }
