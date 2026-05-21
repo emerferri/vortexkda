@@ -26,23 +26,37 @@ Deno.serve(async (req) => {
 
     const allList = (newOnes || []) as Array<{ p_name: string; p_badge_code: string; p_label: string; p_emoji: string; p_rarity: string }>;
 
-    // Apenas notificar conquistas de jogadores que participaram do evento de HOJE (BRT)
-    const brt = new Date(Date.now() - 3 * 3600000);
-    const today = `${brt.getFullYear()}-${String(brt.getMonth() + 1).padStart(2, '0')}-${String(brt.getDate()).padStart(2, '0')}`;
-    const { data: todayMatches } = await supabase
-      .from('pvp_matches')
-      .select('id')
-      .eq('match_date', today);
-    const todayMatchIds = (todayMatches || []).map((m: any) => m.id);
-    let todayPlayers = new Set<string>();
-    if (todayMatchIds.length > 0) {
-      const { data: tps } = await supabase
+    // Tenta ler match_id do body para restringir aos participantes desta partida
+    let matchId: string | null = null;
+    try {
+      const body = await req.json().catch(() => ({}));
+      matchId = body?.match_id ?? null;
+    } catch (_) {}
+
+    let participants = new Set<string>();
+    if (matchId) {
+      const { data: mps } = await supabase
         .from('pvp_match_players')
         .select('player_name')
-        .in('match_id', todayMatchIds);
-      todayPlayers = new Set((tps || []).map((p: any) => (p.player_name || '').toLowerCase()));
+        .eq('match_id', matchId);
+      participants = new Set((mps || []).map((p: any) => (p.player_name || '').toLowerCase()));
+    } else {
+      const brt = new Date(Date.now() - 3 * 3600000);
+      const today = `${brt.getFullYear()}-${String(brt.getMonth() + 1).padStart(2, '0')}-${String(brt.getDate()).padStart(2, '0')}`;
+      const { data: todayMatches } = await supabase
+        .from('pvp_matches')
+        .select('id')
+        .eq('match_date', today);
+      const todayMatchIds = (todayMatches || []).map((m: any) => m.id);
+      if (todayMatchIds.length > 0) {
+        const { data: tps } = await supabase
+          .from('pvp_match_players')
+          .select('player_name')
+          .in('match_id', todayMatchIds);
+        participants = new Set((tps || []).map((p: any) => (p.player_name || '').toLowerCase()));
+      }
     }
-    const list = allList.filter((b) => todayPlayers.has((b.p_name || '').toLowerCase()));
+    const list = allList.filter((b) => participants.has((b.p_name || '').toLowerCase()));
     let posted = 0;
 
     if (list.length > 0) {
@@ -85,7 +99,7 @@ Deno.serve(async (req) => {
     }
 
     // Marca como notificadas conquistas antigas (jogadores que não participaram hoje) para evitar reposts
-    const skipped = allList.filter((b) => !todayPlayers.has((b.p_name || '').toLowerCase()));
+    const skipped = allList.filter((b) => !participants.has((b.p_name || '').toLowerCase()));
     for (const b of skipped) {
       await supabase
         .from('player_badges')

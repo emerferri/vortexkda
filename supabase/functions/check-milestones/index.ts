@@ -20,23 +20,38 @@ Deno.serve(async (req) => {
     const raw = (newOnes || []) as Array<{ p_name: string; p_metric: string; p_threshold: number; p_label: string; p_emoji: string }>;
     const allList = raw.map((r) => ({ player_name: r.p_name, metric: r.p_metric, threshold: r.p_threshold, label: r.p_label, emoji: r.p_emoji }));
 
-    // Apenas notificar marcos de jogadores que participaram do evento de HOJE (BRT)
-    const brt = new Date(Date.now() - 3 * 3600000);
-    const today = `${brt.getFullYear()}-${String(brt.getMonth() + 1).padStart(2, '0')}-${String(brt.getDate()).padStart(2, '0')}`;
-    const { data: todayMatches } = await supabase
-      .from('pvp_matches')
-      .select('id')
-      .eq('match_date', today);
-    const todayMatchIds = (todayMatches || []).map((m: any) => m.id);
-    let todayPlayers = new Set<string>();
-    if (todayMatchIds.length > 0) {
-      const { data: tps } = await supabase
+    // Tenta ler match_id do body para restringir aos participantes desta partida
+    let matchId: string | null = null;
+    try {
+      const body = await req.json().catch(() => ({}));
+      matchId = body?.match_id ?? null;
+    } catch (_) {}
+
+    let participants = new Set<string>();
+    if (matchId) {
+      const { data: mps } = await supabase
         .from('pvp_match_players')
         .select('player_name')
-        .in('match_id', todayMatchIds);
-      todayPlayers = new Set((tps || []).map((p: any) => (p.player_name || '').toLowerCase()));
+        .eq('match_id', matchId);
+      participants = new Set((mps || []).map((p: any) => (p.player_name || '').toLowerCase()));
+    } else {
+      // Fallback: jogadores de hoje (BRT)
+      const brt = new Date(Date.now() - 3 * 3600000);
+      const today = `${brt.getFullYear()}-${String(brt.getMonth() + 1).padStart(2, '0')}-${String(brt.getDate()).padStart(2, '0')}`;
+      const { data: todayMatches } = await supabase
+        .from('pvp_matches')
+        .select('id')
+        .eq('match_date', today);
+      const todayMatchIds = (todayMatches || []).map((m: any) => m.id);
+      if (todayMatchIds.length > 0) {
+        const { data: tps } = await supabase
+          .from('pvp_match_players')
+          .select('player_name')
+          .in('match_id', todayMatchIds);
+        participants = new Set((tps || []).map((p: any) => (p.player_name || '').toLowerCase()));
+      }
     }
-    const list = allList.filter((m) => todayPlayers.has(m.player_name.toLowerCase()));
+    const list = allList.filter((m) => participants.has(m.player_name.toLowerCase()));
     let posted = 0;
 
     if (list.length > 0) {
@@ -83,7 +98,7 @@ Deno.serve(async (req) => {
 
     // Marca como notificados também os marcos antigos (de jogadores que não participaram hoje)
     // para evitar reposts futuros desnecessários.
-    const skipped = allList.filter((m) => !todayPlayers.has(m.player_name.toLowerCase()));
+    const skipped = allList.filter((m) => !participants.has(m.player_name.toLowerCase()));
     for (const m of skipped) {
       await supabase
         .from('player_milestones')
