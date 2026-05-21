@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
     }
 
     // Marca como notificadas conquistas antigas (jogadores que não participaram hoje) para evitar reposts
-    const skipped = allList.filter((b) => !todayPlayers.has((b.p_name || '').toLowerCase()));
+    const skipped = allList.filter((b) => !participants.has((b.p_name || '').toLowerCase()));
     for (const b of skipped) {
       await supabase
         .from('player_badges')
