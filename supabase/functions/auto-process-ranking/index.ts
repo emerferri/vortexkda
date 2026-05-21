@@ -1040,7 +1040,7 @@ Deno.serve(async (req) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ match_id: newMatch.id }),
       }).catch((e) => console.error('[Auto Process] check-milestones invoke failed:', e));
     } catch (e) {
       console.error('[Auto Process] check-milestones setup error:', e);
