@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
 
     // Marca como notificados também os marcos antigos (de jogadores que não participaram hoje)
     // para evitar reposts futuros desnecessários.
-    const skipped = allList.filter((m) => !todayPlayers.has(m.player_name.toLowerCase()));
+    const skipped = allList.filter((m) => !participants.has(m.player_name.toLowerCase()));
     for (const m of skipped) {
       await supabase
         .from('player_milestones')
