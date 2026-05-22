@@ -34,14 +34,27 @@ export const ClassAnalytics = ({ filters }: Props) => {
 
   const data = useMemo(() => {
     if (!dataset) return null;
-    const { logs, charMap } = dataset;
+    const { logs: rawLogs, charMap } = dataset;
+
+      // When a guild filter is active, restrict analytics to that guild's members only.
+      // The RPC returns logs where killer OR victim belongs to the guild — but for class
+      // analysis we want to count only players that actually belong to the filtered guild.
+      const guildFilter = filters.guild;
+      const isInGuild = (name: string) => {
+        if (!guildFilter || guildFilter === 'all') return true;
+        return charMap.get(name)?.guild === guildFilter;
+      };
+
+      const logs = guildFilter && guildFilter !== 'all'
+        ? rawLogs.filter(l => isInGuild(l.killer_name) || isInGuild(l.victim_name))
+        : rawLogs;
 
       // Count players per class
       const classPlayers = new Map<string, Set<string>>();
       const activeChars = new Set<string>();
       for (const l of logs) {
-        activeChars.add(l.killer_name);
-        activeChars.add(l.victim_name);
+        if (isInGuild(l.killer_name)) activeChars.add(l.killer_name);
+        if (isInGuild(l.victim_name)) activeChars.add(l.victim_name);
       }
 
       for (const name of activeChars) {
@@ -60,15 +73,21 @@ export const ClassAnalytics = ({ filters }: Props) => {
       const cvcMap = new Map<string, Map<string, number>>();
 
       for (const l of logs) {
+        const killerIn = isInGuild(l.killer_name);
+        const victimIn = isInGuild(l.victim_name);
         const killerClass = charMap.get(l.killer_name)?.class || 'Desconhecido';
         const victimClass = charMap.get(l.victim_name)?.class || 'Desconhecido';
 
-        classKills.set(killerClass, (classKills.get(killerClass) || 0) + 1);
-        classDeaths.set(victimClass, (classDeaths.get(victimClass) || 0) + 1);
+        if (killerIn) classKills.set(killerClass, (classKills.get(killerClass) || 0) + 1);
+        if (victimIn) classDeaths.set(victimClass, (classDeaths.get(victimClass) || 0) + 1);
 
-        if (!cvcMap.has(killerClass)) cvcMap.set(killerClass, new Map());
-        const inner = cvcMap.get(killerClass)!;
-        inner.set(victimClass, (inner.get(victimClass) || 0) + 1);
+        // Matchup matrix: only count when both sides are in the filtered guild,
+        // otherwise comparisons would be meaningless under a guild filter.
+        if (killerIn && victimIn) {
+          if (!cvcMap.has(killerClass)) cvcMap.set(killerClass, new Map());
+          const inner = cvcMap.get(killerClass)!;
+          inner.set(victimClass, (inner.get(victimClass) || 0) + 1);
+        }
       }
 
       // Build CvC array
@@ -134,7 +153,7 @@ export const ClassAnalytics = ({ filters }: Props) => {
       }
 
     return { stats: stats.sort((a, b) => b.dominanceScore - a.dominanceScore), classVsClass, matrix, classes };
-  }, [dataset]);
+  }, [dataset, filters.guild]);
 
   const meta = useMemo(() => {
     if (!data) return [];
