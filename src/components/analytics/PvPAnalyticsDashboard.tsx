@@ -8,8 +8,9 @@ import { ClassAnalytics } from './ClassAnalytics';
 import { AnalyticsCharts } from './AnalyticsCharts';
 import { AIInsights } from './AIInsights';
 import { TeamBuilder } from './TeamBuilder';
+import { PerformanceAnalytics } from './PerformanceAnalytics';
 import { AnalyticsFilters, defaultFilters } from '@/hooks/useAnalyticsData';
-import { BarChart3, Users, Swords, Shield, LineChart, Brain, Target } from 'lucide-react';
+import { BarChart3, Users, Swords, Shield, LineChart, Brain, Target, Trophy } from 'lucide-react';
 
 export const PvPAnalyticsDashboard = () => {
   const [filters, setFilters] = useState<AnalyticsFilters>(defaultFilters);
@@ -30,7 +31,7 @@ export const PvPAnalyticsDashboard = () => {
       <AnalyticsFiltersBar filters={filters} onChange={setFilters} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-4 md:grid-cols-7 w-full">
+        <TabsList className="grid grid-cols-4 md:grid-cols-8 w-full">
           <TabsTrigger value="players" className="gap-1 text-xs">
             <Users className="w-3 h-3" /> Players
           </TabsTrigger>
@@ -43,6 +44,9 @@ export const PvPAnalyticsDashboard = () => {
           <TabsTrigger value="classes" className="gap-1 text-xs">
             <BarChart3 className="w-3 h-3" /> Classes
           </TabsTrigger>
+          <TabsTrigger value="performance" className="gap-1 text-xs">
+            <Trophy className="w-3 h-3" /> Desempenho
+          </TabsTrigger>
           <TabsTrigger value="charts" className="gap-1 text-xs">
             <LineChart className="w-3 h-3" /> Gráficos
           </TabsTrigger>
@@ -54,17 +58,12 @@ export const PvPAnalyticsDashboard = () => {
           </TabsTrigger>
         </TabsList>
 
-        {/*
-          Lazy-mount: render ONLY the active tab. This avoids 7 simultaneous
-          queries / heavy aggregations when the dashboard opens. The shared
-          useAnalyticsDataset cache means switching tabs is instant after the
-          first load.
-        */}
         <div className="mt-4">
           {activeTab === 'players' && <PlayerAnalytics filters={filters} />}
           {activeTab === 'guilds' && <GuildAnalytics filters={filters} />}
           {activeTab === 'pvp' && <DirectCombat filters={filters} />}
           {activeTab === 'classes' && <ClassAnalytics filters={filters} />}
+          {activeTab === 'performance' && <PerformanceAnalytics filters={filters} />}
           {activeTab === 'charts' && <AnalyticsCharts filters={filters} />}
           {activeTab === 'team' && <TeamBuilder filters={filters} />}
           {activeTab === 'insights' && <AIInsights filters={filters} />}
