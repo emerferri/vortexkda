@@ -34,14 +34,27 @@ export const ClassAnalytics = ({ filters }: Props) => {
 
   const data = useMemo(() => {
     if (!dataset) return null;
-    const { logs, charMap } = dataset;
+    const { logs: rawLogs, charMap } = dataset;
+
+      // When a guild filter is active, restrict analytics to that guild's members only.
+      // The RPC returns logs where killer OR victim belongs to the guild — but for class
+      // analysis we want to count only players that actually belong to the filtered guild.
+      const guildFilter = filters.guild;
+      const isInGuild = (name: string) => {
+        if (!guildFilter || guildFilter === 'all') return true;
+        return charMap.get(name)?.guild === guildFilter;
+      };
+
+      const logs = guildFilter && guildFilter !== 'all'
+        ? rawLogs.filter(l => isInGuild(l.killer_name) || isInGuild(l.victim_name))
+        : rawLogs;
 
       // Count players per class
       const classPlayers = new Map<string, Set<string>>();
       const activeChars = new Set<string>();
       for (const l of logs) {
-        activeChars.add(l.killer_name);
-        activeChars.add(l.victim_name);
+        if (isInGuild(l.killer_name)) activeChars.add(l.killer_name);
+        if (isInGuild(l.victim_name)) activeChars.add(l.victim_name);
       }
 
       for (const name of activeChars) {
