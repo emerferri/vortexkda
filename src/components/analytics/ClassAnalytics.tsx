@@ -153,7 +153,7 @@ export const ClassAnalytics = ({ filters }: Props) => {
       }
 
     return { stats: stats.sort((a, b) => b.dominanceScore - a.dominanceScore), classVsClass, matrix, classes };
-  }, [dataset]);
+  }, [dataset, filters.guild]);
 
   const meta = useMemo(() => {
     if (!data) return [];
