@@ -73,15 +73,21 @@ export const ClassAnalytics = ({ filters }: Props) => {
       const cvcMap = new Map<string, Map<string, number>>();
 
       for (const l of logs) {
+        const killerIn = isInGuild(l.killer_name);
+        const victimIn = isInGuild(l.victim_name);
         const killerClass = charMap.get(l.killer_name)?.class || 'Desconhecido';
         const victimClass = charMap.get(l.victim_name)?.class || 'Desconhecido';
 
-        classKills.set(killerClass, (classKills.get(killerClass) || 0) + 1);
-        classDeaths.set(victimClass, (classDeaths.get(victimClass) || 0) + 1);
+        if (killerIn) classKills.set(killerClass, (classKills.get(killerClass) || 0) + 1);
+        if (victimIn) classDeaths.set(victimClass, (classDeaths.get(victimClass) || 0) + 1);
 
-        if (!cvcMap.has(killerClass)) cvcMap.set(killerClass, new Map());
-        const inner = cvcMap.get(killerClass)!;
-        inner.set(victimClass, (inner.get(victimClass) || 0) + 1);
+        // Matchup matrix: only count when both sides are in the filtered guild,
+        // otherwise comparisons would be meaningless under a guild filter.
+        if (killerIn && victimIn) {
+          if (!cvcMap.has(killerClass)) cvcMap.set(killerClass, new Map());
+          const inner = cvcMap.get(killerClass)!;
+          inner.set(victimClass, (inner.get(victimClass) || 0) + 1);
+        }
       }
 
       // Build CvC array
