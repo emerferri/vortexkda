@@ -46,20 +46,41 @@ export function useAnalyticsDataset(filters: AnalyticsFilters) {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     queryFn: async () => {
-      const [matches, characters, logsResp] = await Promise.all([
+      const PAGE_SIZE = 1000;
+
+      const fetchAllLogs = async (): Promise<KillLog[]> => {
+        const all: KillLog[] = [];
+        let page = 0;
+        // Supabase trunca RPC em 1000 linhas por padrão. Paginar via .range().
+        // Loop até receber menos que PAGE_SIZE.
+         
+        while (true) {
+          const { data, error } = await (supabase.rpc as any)(
+            'get_analytics_kill_logs',
+            {
+              p_date_from: filters.dateFrom || null,
+              p_date_to: filters.dateTo || null,
+              p_hour_from: filters.hourFrom,
+              p_hour_to: filters.hourTo,
+              p_event_type: filters.eventType,
+              p_guild: filters.guild,
+            },
+          ).range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+          if (error) throw error;
+          const rows = (data || []) as KillLog[];
+          all.push(...rows);
+          if (rows.length < PAGE_SIZE) break;
+          page++;
+          if (page > 500) break; // safety cap (500k rows)
+        }
+        return all;
+      };
+
+      const [matches, characters, logs] = await Promise.all([
         fetchMatchesWithType(filters),
         fetchAllCharacters(),
-        (supabase.rpc as any)('get_analytics_kill_logs', {
-          p_date_from: filters.dateFrom || null,
-          p_date_to: filters.dateTo || null,
-          p_hour_from: filters.hourFrom,
-          p_hour_to: filters.hourTo,
-          p_event_type: filters.eventType,
-          p_guild: filters.guild,
-        }),
+        fetchAllLogs(),
       ]);
-
-      if (logsResp.error) throw logsResp.error;
 
       const charMap = buildCharacterMap(characters);
       const matchIds = matches.map((m) => m.id);
@@ -71,7 +92,7 @@ export function useAnalyticsDataset(filters: AnalyticsFilters) {
         matchTypeMap.set(m.id, m.event_type);
       }
 
-      const logs: KillLog[] = (logsResp.data || []) as KillLog[];
+
 
       return {
         matches,
