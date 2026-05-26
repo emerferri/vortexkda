@@ -104,6 +104,11 @@ export const RankingGeral = () => {
     debouncedSetFilters(dateFrom, dateTo, hourFrom, hourTo);
   }, [dateFrom, dateTo, hourFrom, hourTo, debouncedSetFilters]);
 
+  // Se o usuário selecionar apenas uma data inicial, tratar como filtro do dia exato.
+  // Isso evita que "24/05" some também os bosses dos dias seguintes.
+  const effectiveDateFrom = debouncedDateFrom;
+  const effectiveDateTo = debouncedDateTo ?? debouncedDateFrom;
+
   const { data: classes } = useQuery({
     queryKey: ['classes'],
     queryFn: async () => {
@@ -157,13 +162,13 @@ export const RankingGeral = () => {
   }, [classes]);
 
   const { data: aggregatedData, isLoading } = useQuery({
-    queryKey: ['ranking-geral', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    queryKey: ['ranking-geral', effectiveDateFrom, effectiveDateTo, debouncedHourFrom, debouncedHourTo],
     staleTime: 30000,
     queryFn: async () => {
       // Chamar a função RPC que faz toda a agregação no banco
       const { data: rpcData, error } = await supabase.rpc('get_ranking_geral', {
-        p_date_from: debouncedDateFrom ? format(debouncedDateFrom, 'yyyy-MM-dd') : null,
-        p_date_to: debouncedDateTo ? format(debouncedDateTo, 'yyyy-MM-dd') : null,
+        p_date_from: effectiveDateFrom ? format(effectiveDateFrom, 'yyyy-MM-dd') : null,
+        p_date_to: effectiveDateTo ? format(effectiveDateTo, 'yyyy-MM-dd') : null,
         p_hour_from: debouncedHourFrom ?? null,
         p_hour_to: debouncedHourTo ?? null,
       });
@@ -241,7 +246,7 @@ export const RankingGeral = () => {
     }
     
     return [...filtered].sort((a, b) => b[sortBy] - a[sortBy]);
-  }, [aggregatedData, sortBy, classFilter, guildFilter, debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo]);
+  }, [aggregatedData, sortBy, classFilter, guildFilter, effectiveDateFrom, effectiveDateTo, debouncedHourFrom, debouncedHourTo]);
 
   const topPlayer = sortedPlayers[0];
 
@@ -271,12 +276,12 @@ export const RankingGeral = () => {
 
   // Agente Duplo: jogador que mais matou amigos (fogo amigo)
   const { data: agenteDuploData } = useQuery({
-    queryKey: ['agente-duplo', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    queryKey: ['agente-duplo', effectiveDateFrom, effectiveDateTo, debouncedHourFrom, debouncedHourTo],
     staleTime: 30000,
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_ranking_fogo_amigo', {
-        p_date_from: debouncedDateFrom ? format(debouncedDateFrom, 'yyyy-MM-dd') : null,
-        p_date_to: debouncedDateTo ? format(debouncedDateTo, 'yyyy-MM-dd') : null,
+        p_date_from: effectiveDateFrom ? format(effectiveDateFrom, 'yyyy-MM-dd') : null,
+        p_date_to: effectiveDateTo ? format(effectiveDateTo, 'yyyy-MM-dd') : null,
         p_hour_from: debouncedHourFrom ?? null,
         p_hour_to: debouncedHourTo ?? null,
         p_event_type: 'boss_event',
