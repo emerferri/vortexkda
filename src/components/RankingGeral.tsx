@@ -300,12 +300,12 @@ export const RankingGeral = () => {
 
   // Putinha da Noite: par dominador → vítima com mais mortes no período
   const { data: putinhaNoiteData } = useQuery({
-    queryKey: ['putinha-noite', debouncedDateFrom, debouncedDateTo, debouncedHourFrom, debouncedHourTo],
+    queryKey: ['putinha-noite', effectiveDateFrom, effectiveDateTo, debouncedHourFrom, debouncedHourTo],
     staleTime: 30000,
     queryFn: async () => {
       let mq = supabase.from('pvp_matches').select('id').eq('event_type', 'boss_event');
-      if (debouncedDateFrom) mq = mq.gte('match_date', format(debouncedDateFrom, 'yyyy-MM-dd'));
-      if (debouncedDateTo) mq = mq.lte('match_date', format(debouncedDateTo, 'yyyy-MM-dd'));
+      if (effectiveDateFrom) mq = mq.gte('match_date', format(effectiveDateFrom, 'yyyy-MM-dd'));
+      if (effectiveDateTo) mq = mq.lte('match_date', format(effectiveDateTo, 'yyyy-MM-dd'));
       if (debouncedHourFrom !== undefined) mq = mq.gte('match_hour', debouncedHourFrom);
       if (debouncedHourTo !== undefined) mq = mq.lte('match_hour', debouncedHourTo);
       const { data: matches, error: me } = await mq;
