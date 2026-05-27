@@ -309,42 +309,16 @@ export const RankingGeral = () => {
     queryKey: ['putinha-noite', effectiveDateFromParam, effectiveDateToParam, debouncedHourFrom, debouncedHourTo],
     staleTime: 30000,
     queryFn: async () => {
-      let mq = supabase.from('pvp_matches').select('id').eq('event_type', 'boss_event');
-      if (effectiveDateFromParam) mq = mq.gte('match_date', effectiveDateFromParam);
-      if (effectiveDateToParam) mq = mq.lte('match_date', effectiveDateToParam);
-      if (debouncedHourFrom !== undefined) mq = mq.gte('match_hour', debouncedHourFrom);
-      if (debouncedHourTo !== undefined) mq = mq.lte('match_hour', debouncedHourTo);
-      const { data: matches, error: me } = await mq;
-      if (me) throw me;
-      const matchIds = (matches || []).map((m: any) => m.id);
-      if (matchIds.length === 0) return null;
-
-      const counts = new Map<string, { killer: string; victim: string; n: number }>();
-      const PAGE = 1000;
-      for (let i = 0; i < matchIds.length; i += 200) {
-        const slice = matchIds.slice(i, i + 200);
-        let from = 0;
-        while (true) {
-          const { data, error } = await supabase
-            .from('pvp_kill_logs')
-            .select('killer_name,victim_name')
-            .in('match_id', slice)
-            .range(from, from + PAGE - 1);
-          if (error) throw error;
-          if (!data || data.length === 0) break;
-          for (const r of data as any[]) {
-            if (r.killer_name === r.victim_name) continue;
-            const k = `${r.killer_name}→${r.victim_name}`;
-            const ex = counts.get(k);
-            if (ex) ex.n++;
-            else counts.set(k, { killer: r.killer_name, victim: r.victim_name, n: 1 });
-          }
-          if (data.length < PAGE) break;
-          from += PAGE;
-        }
-      }
-      const arr = Array.from(counts.values()).sort((a, b) => b.n - a.n);
-      return arr[0] ? { dominador: arr[0].killer, putinha: arr[0].victim, kills: arr[0].n } : null;
+      const { data, error } = await supabase.rpc('get_ranking_putinha', {
+        p_date_from: effectiveDateFromParam,
+        p_date_to: effectiveDateToParam,
+        p_hour_from: debouncedHourFrom ?? null,
+        p_hour_to: debouncedHourTo ?? null,
+        p_event_type: 'boss_event',
+      });
+      if (error) throw error;
+      const top = (data as any[])?.[0];
+      return top ? { dominador: top.killer_name, putinha: top.victim_name, kills: Number(top.deaths) } : null;
     },
   });
 
