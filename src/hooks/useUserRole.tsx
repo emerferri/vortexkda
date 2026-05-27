@@ -14,11 +14,13 @@ const fetchRoleForUser = (userId: string) => {
   const existingPromise = rolePromises.get(userId);
   if (existingPromise) return existingPromise;
 
-  const promise = supabase
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', userId)
-    .maybeSingle()
+  const promise = Promise.resolve(
+    supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle()
+  )
     .then(({ data, error }) => {
       if (error) throw error;
       const value = (data?.role as AppRole) ?? null;
