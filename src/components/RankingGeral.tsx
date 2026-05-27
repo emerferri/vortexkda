@@ -107,7 +107,8 @@ export const RankingGeral = () => {
   // Se o usuário selecionar apenas uma data inicial, tratar como filtro do dia exato.
   // Isso evita que "24/05" some também os bosses dos dias seguintes.
   const effectiveDateFrom = debouncedDateFrom;
-  const effectiveDateTo = debouncedDateTo ?? debouncedDateFrom;
+  // If "Até" is empty, default to today so that "De: X" means "from X onwards"
+  const effectiveDateTo = debouncedDateTo ?? (debouncedDateFrom ? new Date() : undefined);
 
   const { data: classes } = useQuery({
     queryKey: ['classes'],
