@@ -100,15 +100,20 @@ export const RankingGeral = () => {
   );
 
   // Update debounced values when filters change
-  useMemo(() => {
+  useEffect(() => {
     debouncedSetFilters(dateFrom, dateTo, hourFrom, hourTo);
   }, [dateFrom, dateTo, hourFrom, hourTo, debouncedSetFilters]);
 
-  // Se o usuário selecionar apenas uma data inicial, tratar como filtro do dia exato.
-  // Isso evita que "24/05" some também os bosses dos dias seguintes.
-  const effectiveDateFrom = debouncedDateFrom;
-  // If "Até" is empty, default to today so that "De: X" means "from X onwards"
-  const effectiveDateTo = debouncedDateTo ?? (debouncedDateFrom ? new Date() : undefined);
+  // Strings estáveis para evitar refetch infinito quando "Até" fica vazio.
+  // Se "Até" estiver vazio, usa hoje como limite final do período.
+  const effectiveDateFromParam = useMemo(
+    () => (debouncedDateFrom ? format(debouncedDateFrom, 'yyyy-MM-dd') : null),
+    [debouncedDateFrom]
+  );
+  const effectiveDateToParam = useMemo(
+    () => (debouncedDateTo ? format(debouncedDateTo, 'yyyy-MM-dd') : debouncedDateFrom ? format(new Date(), 'yyyy-MM-dd') : null),
+    [debouncedDateFrom, debouncedDateTo]
+  );
 
   const { data: classes } = useQuery({
     queryKey: ['classes'],
@@ -163,13 +168,13 @@ export const RankingGeral = () => {
   }, [classes]);
 
   const { data: aggregatedData, isLoading } = useQuery({
-    queryKey: ['ranking-geral', effectiveDateFrom, effectiveDateTo, debouncedHourFrom, debouncedHourTo],
+    queryKey: ['ranking-geral', effectiveDateFromParam, effectiveDateToParam, debouncedHourFrom, debouncedHourTo],
     staleTime: 30000,
     queryFn: async () => {
       // Chamar a função RPC que faz toda a agregação no banco
       const { data: rpcData, error } = await supabase.rpc('get_ranking_geral', {
-        p_date_from: effectiveDateFrom ? format(effectiveDateFrom, 'yyyy-MM-dd') : null,
-        p_date_to: effectiveDateTo ? format(effectiveDateTo, 'yyyy-MM-dd') : null,
+        p_date_from: effectiveDateFromParam,
+        p_date_to: effectiveDateToParam,
         p_hour_from: debouncedHourFrom ?? null,
         p_hour_to: debouncedHourTo ?? null,
       });
@@ -247,7 +252,7 @@ export const RankingGeral = () => {
     }
     
     return [...filtered].sort((a, b) => b[sortBy] - a[sortBy]);
-  }, [aggregatedData, sortBy, classFilter, guildFilter, effectiveDateFrom, effectiveDateTo, debouncedHourFrom, debouncedHourTo]);
+  }, [aggregatedData, sortBy, classFilter, guildFilter, effectiveDateFromParam, effectiveDateToParam, debouncedHourFrom, debouncedHourTo]);
 
   const topPlayer = sortedPlayers[0];
 
@@ -277,12 +282,12 @@ export const RankingGeral = () => {
 
   // Agente Duplo: jogador que mais matou amigos (fogo amigo)
   const { data: agenteDuploData } = useQuery({
-    queryKey: ['agente-duplo', effectiveDateFrom, effectiveDateTo, debouncedHourFrom, debouncedHourTo],
+    queryKey: ['agente-duplo', effectiveDateFromParam, effectiveDateToParam, debouncedHourFrom, debouncedHourTo],
     staleTime: 30000,
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_ranking_fogo_amigo', {
-        p_date_from: effectiveDateFrom ? format(effectiveDateFrom, 'yyyy-MM-dd') : null,
-        p_date_to: effectiveDateTo ? format(effectiveDateTo, 'yyyy-MM-dd') : null,
+        p_date_from: effectiveDateFromParam,
+        p_date_to: effectiveDateToParam,
         p_hour_from: debouncedHourFrom ?? null,
         p_hour_to: debouncedHourTo ?? null,
         p_event_type: 'boss_event',
@@ -301,12 +306,12 @@ export const RankingGeral = () => {
 
   // Putinha da Noite: par dominador → vítima com mais mortes no período
   const { data: putinhaNoiteData } = useQuery({
-    queryKey: ['putinha-noite', effectiveDateFrom, effectiveDateTo, debouncedHourFrom, debouncedHourTo],
+    queryKey: ['putinha-noite', effectiveDateFromParam, effectiveDateToParam, debouncedHourFrom, debouncedHourTo],
     staleTime: 30000,
     queryFn: async () => {
       let mq = supabase.from('pvp_matches').select('id').eq('event_type', 'boss_event');
-      if (effectiveDateFrom) mq = mq.gte('match_date', format(effectiveDateFrom, 'yyyy-MM-dd'));
-      if (effectiveDateTo) mq = mq.lte('match_date', format(effectiveDateTo, 'yyyy-MM-dd'));
+      if (effectiveDateFromParam) mq = mq.gte('match_date', effectiveDateFromParam);
+      if (effectiveDateToParam) mq = mq.lte('match_date', effectiveDateToParam);
       if (debouncedHourFrom !== undefined) mq = mq.gte('match_hour', debouncedHourFrom);
       if (debouncedHourTo !== undefined) mq = mq.lte('match_hour', debouncedHourTo);
       const { data: matches, error: me } = await mq;
