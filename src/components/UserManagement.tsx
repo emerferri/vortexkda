@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from '@/hooks/use-toast';
 import { Loader2, Plus, Trash2, Users, Shield, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+
+const passwordSchema = z.string()
+  .min(8, 'Mínimo 8 caracteres')
+  .regex(/[A-Z]/, 'Deve conter ao menos uma letra maiúscula')
+  .regex(/[a-z]/, 'Deve conter ao menos uma letra minúscula')
+  .regex(/[0-9]/, 'Deve conter ao menos um número');
 
 interface UserRole {
   id: string;
@@ -63,7 +70,20 @@ export const UserManagement = () => {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const pwResult = passwordSchema.safeParse(formData.password);
+    if (!pwResult.success) {
+      toast({
+        title: 'Senha inválida',
+        description: pwResult.error.errors[0]?.message ?? 'Senha não atende aos requisitos.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setSubmitting(true);
+
+
 
     try {
       // Save admin session before creating user
@@ -228,11 +248,11 @@ export const UserManagement = () => {
                   <Input
                     id="password"
                     type="password"
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder="Min. 8 caracteres, com maiúscula, minúscula e número"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     required
-                    minLength={6}
+                    minLength={8}
                     disabled={submitting}
                   />
                 </div>
