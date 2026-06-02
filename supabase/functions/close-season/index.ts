@@ -286,7 +286,7 @@ Deno.serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ success: true, mode: 'winners', target, season: seasonName, discord_posted: discordPosted, ...payload }),
+        JSON.stringify({ success: true, mode: 'winners', target, discord_posted: discordPosted, ...payload }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
