@@ -251,7 +251,7 @@ Deno.serve(async (req) => {
           const classLines = bestPerClass.length === 0
             ? '_Sem dados por classe no período._'
             : '```\n' +
-              header + '\n' +
+              tableHeader + '\n' +
               '-'.repeat(totalW) + '\n' +
               bestPerClass.map((b: any) =>
                 padR(String(b.class_name), W.cls) + SEP +
@@ -264,7 +264,7 @@ Deno.serve(async (req) => {
               '\n```';
 
           const content =
-            header + '\n\n' +
+            discordHeader + '\n\n' +
             '🏅 **Top 5 PvP — Ranking Geral**\n' + top5Lines + '\n\n' +
             '⚔️ **Melhor por Classe**\n' + classLines;
 
