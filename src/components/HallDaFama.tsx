@@ -224,6 +224,45 @@ export const HallDaFama = () => {
 
   const currentSeason = (seasons || []).find((s: any) => s.id === currentId);
 
+  // ===== Winners of the month (Top 3 + Best per Class) =====
+  // Use the selected season if any; otherwise the active season.
+  const winnersSeasonId: string | undefined = currentId || activeSeason?.id;
+  const winnersSeasonName: string = currentSeason?.name || activeSeason?.name || '';
+
+  const { data: winnersData, isLoading: loadingWinners, refetch: refetchWinners } = useQuery({
+    queryKey: ['winners-of-month', winnersSeasonId],
+    enabled: !!winnersSeasonId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('close-season', {
+        body: { winners: true, season_id: winnersSeasonId, skip_discord: true },
+      });
+      if (error) throw error;
+      return data as { season: string; top3: any[]; bestPerClass: any[] };
+    },
+  });
+
+  const handlePostWinners = async (target: 'prod' | 'homolog') => {
+    if (!winnersSeasonId) return;
+    const label = target === 'prod' ? 'PRODUÇÃO' : 'HOMOLOGAÇÃO';
+    if (!confirm(`Postar Ganhadores do Mês (${winnersSeasonName}) no Discord de ${label}?`)) return;
+    setPostingWinners(target);
+    try {
+      const { data, error } = await supabase.functions.invoke('close-season', {
+        body: { winners: true, season_id: winnersSeasonId, target },
+      });
+      if (error) throw error;
+      toast({
+        title: 'Ganhadores postados!',
+        description: `Top 3 + ${data?.bestPerClass?.length ?? 0} classes enviados (${label}).`,
+      });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e?.message ?? String(e), variant: 'destructive' });
+    } finally {
+      setPostingWinners(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="text-center">
