@@ -39,11 +39,14 @@ export const HallDaFama = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('seasons')
-        .select('*')
+        .select('*, season_snapshots(count)')
         .order('year', { ascending: false })
         .order('month', { ascending: false });
       if (error) throw error;
-      return data || [];
+      // Mostrar apenas temporada ativa + temporadas fechadas que tenham snapshots
+      return (data || []).filter((s: any) =>
+        s.status === 'active' || (s.season_snapshots?.[0]?.count ?? 0) > 0
+      );
     },
   });
 
