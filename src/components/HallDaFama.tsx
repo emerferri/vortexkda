@@ -241,7 +241,7 @@ export const HallDaFama = () => {
         body: { winners: true, season_id: winnersSeasonId, skip_discord: true },
       });
       if (error) throw error;
-      return data as { season: string; top3: any[]; bestPerClass: any[] };
+      return data as { season: string; top5: any[]; bestPerClass: any[] };
     },
   });
 
