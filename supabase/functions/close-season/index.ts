@@ -146,20 +146,28 @@ Deno.serve(async (req) => {
       let dateFrom: string;
       let dateTo: string;
 
+      // Helpers: first/last day of the season's month (YYYY-MM-DD)
+      const firstDay = (y: number, m: number) =>
+        `${y}-${String(m).padStart(2, '0')}-01`;
+      const lastDay = (y: number, m: number) => {
+        const d = new Date(Date.UTC(y, m, 0)); // day 0 of next month = last day of m
+        return d.toISOString().slice(0, 10);
+      };
+
       if (body?.season_id) {
         const { data: s } = await supabase
           .from('seasons')
-          .select('name, started_at, ended_at')
+          .select('name, year, month')
           .eq('id', body.season_id)
           .maybeSingle();
         if (!s) throw new Error('Temporada não encontrada');
         seasonName = s.name;
-        dateFrom = s.started_at;
-        dateTo = s.ended_at ?? new Date().toISOString().slice(0, 10);
+        dateFrom = firstDay(s.year, s.month);
+        dateTo = lastDay(s.year, s.month);
       } else {
         const { data: active } = await supabase
           .from('seasons')
-          .select('name, started_at')
+          .select('name, year, month')
           .eq('status', 'active')
           .order('year', { ascending: false })
           .order('month', { ascending: false })
@@ -167,8 +175,8 @@ Deno.serve(async (req) => {
           .maybeSingle();
         if (!active) throw new Error('Nenhuma temporada ativa');
         seasonName = active.name;
-        dateFrom = active.started_at;
-        dateTo = new Date().toISOString().slice(0, 10);
+        dateFrom = firstDay(active.year, active.month);
+        dateTo = lastDay(active.year, active.month);
       }
 
       const [geralRes, classRes] = await Promise.all([
@@ -197,7 +205,7 @@ Deno.serve(async (req) => {
       const bestPerClass = (classRes.data || [])
         .filter((r: any) => r.is_best)
         .slice()
-        .sort((a: any, b: any) => String(a.class_name).localeCompare(String(b.class_name)))
+        .sort((a: any, b: any) => Number(b.event_score) - Number(a.event_score))
         .map((r: any) => ({
           class_name: r.class_name,
           player_name: r.player_name,
