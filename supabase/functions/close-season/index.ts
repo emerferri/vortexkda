@@ -265,7 +265,7 @@ Deno.serve(async (req) => {
 
           const content =
             header + '\n\n' +
-            '🏅 **Top 3 PvP — Ranking Geral**\n' + top3Lines + '\n\n' +
+            '🏅 **Top 5 PvP — Ranking Geral**\n' + top5Lines + '\n\n' +
             '⚔️ **Melhor por Classe**\n' + classLines;
 
           // Chunk respecting Discord 2000 char limit
