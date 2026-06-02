@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Trophy, Crown, Skull, Flame, Award, Heart, Lock, Unlock, FileDown, FlaskConical, Eye, Send } from 'lucide-react';
+import { Trophy, Crown, Skull, Flame, Award, Heart, Lock, Unlock, FileDown, FlaskConical, Eye, Send, Medal, Swords } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useUserRole } from '@/hooks/useUserRole';
 import jsPDF from 'jspdf';
@@ -31,6 +32,7 @@ export const HallDaFama = () => {
   const [previewing, setPreviewing] = useState(false);
   const [posting, setPosting] = useState<'prod' | 'homolog' | null>(null);
   const [previewData, setPreviewData] = useState<{ season: string; grouped: Record<string, any[]> } | null>(null);
+  const [postingWinners, setPostingWinners] = useState<'prod' | 'homolog' | null>(null);
 
   const { data: seasons, isLoading: loadingSeasons } = useQuery({
     queryKey: ['seasons-list'],
@@ -222,6 +224,45 @@ export const HallDaFama = () => {
 
   const currentSeason = (seasons || []).find((s: any) => s.id === currentId);
 
+  // ===== Winners of the month (Top 3 + Best per Class) =====
+  // Use the selected season if any; otherwise the active season.
+  const winnersSeasonId: string | undefined = currentId || activeSeason?.id;
+  const winnersSeasonName: string = currentSeason?.name || activeSeason?.name || '';
+
+  const { data: winnersData, isLoading: loadingWinners, refetch: refetchWinners } = useQuery({
+    queryKey: ['winners-of-month', winnersSeasonId],
+    enabled: !!winnersSeasonId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('close-season', {
+        body: { winners: true, season_id: winnersSeasonId, skip_discord: true },
+      });
+      if (error) throw error;
+      return data as { season: string; top3: any[]; bestPerClass: any[] };
+    },
+  });
+
+  const handlePostWinners = async (target: 'prod' | 'homolog') => {
+    if (!winnersSeasonId) return;
+    const label = target === 'prod' ? 'PRODUÇÃO' : 'HOMOLOGAÇÃO';
+    if (!confirm(`Postar Ganhadores do Mês (${winnersSeasonName}) no Discord de ${label}?`)) return;
+    setPostingWinners(target);
+    try {
+      const { data, error } = await supabase.functions.invoke('close-season', {
+        body: { winners: true, season_id: winnersSeasonId, target },
+      });
+      if (error) throw error;
+      toast({
+        title: 'Ganhadores postados!',
+        description: `Top 3 + ${data?.bestPerClass?.length ?? 0} classes enviados (${label}).`,
+      });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e?.message ?? String(e), variant: 'destructive' });
+    } finally {
+      setPostingWinners(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -261,6 +302,133 @@ export const HallDaFama = () => {
           </>
         )}
       </div>
+
+      {/* ===== Ganhadores do Mês — Top 3 PvP + Melhor por Classe ===== */}
+      {winnersSeasonId && (
+        <Card className="gaming-card border-yellow-500/40 bg-gradient-to-br from-yellow-500/5 to-amber-500/5">
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <CardTitle className="flex items-center gap-2 text-lg text-yellow-400">
+                <Medal className="w-6 h-6" />
+                Ganhadores do Mês — {winnersSeasonName}
+              </CardTitle>
+              {isAdmin && (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => refetchWinners()}
+                    variant="ghost"
+                    size="sm"
+                    disabled={loadingWinners}
+                  >
+                    <Eye className="w-4 h-4 mr-1" /> Atualizar
+                  </Button>
+                  <Button
+                    onClick={() => handlePostWinners('homolog')}
+                    variant="secondary"
+                    size="sm"
+                    disabled={postingWinners !== null || loadingWinners}
+                  >
+                    <Send className="w-4 h-4 mr-1" />
+                    {postingWinners === 'homolog' ? 'Postando...' : 'Postar Ganhadores (Homolog)'}
+                  </Button>
+                  <Button
+                    onClick={() => handlePostWinners('prod')}
+                    variant="default"
+                    size="sm"
+                    disabled={postingWinners !== null || loadingWinners}
+                  >
+                    <Send className="w-4 h-4 mr-1" />
+                    {postingWinners === 'prod' ? 'Postando...' : 'Postar Ganhadores (Prod)'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {loadingWinners ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full" />)}
+              </div>
+            ) : (
+              <>
+                {/* Top 3 PvP */}
+                <div>
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-yellow-400" /> Top 3 PvP — Ranking Geral
+                  </h4>
+                  {(!winnersData?.top3 || winnersData.top3.length === 0) ? (
+                    <p className="text-sm text-muted-foreground italic">Sem dados de PvP no período.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {winnersData.top3.map((t: any) => (
+                        <div
+                          key={t.position}
+                          className={`p-4 rounded-lg border ${
+                            t.position === 1
+                              ? 'border-yellow-500/60 bg-yellow-500/10'
+                              : t.position === 2
+                              ? 'border-gray-400/50 bg-gray-400/10'
+                              : 'border-amber-700/50 bg-amber-700/10'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-2xl">
+                              {t.position === 1 ? '🥇' : t.position === 2 ? '🥈' : '🥉'}
+                            </span>
+                            <div className="truncate">
+                              <div className="font-bold truncate">{t.player_name}</div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {t.player_class || '—'} {t.player_guild ? `• ${t.player_guild}` : ''}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            <Badge variant="outline" className="font-mono">Score {Number(t.score).toFixed(2)}</Badge>
+                            <Badge variant="outline" className="font-mono">{t.kills}K / {t.deaths}D</Badge>
+                            <Badge variant="outline" className="font-mono">KDA {Number(t.kda).toFixed(2)}</Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Best per Class */}
+                <div>
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
+                    <Swords className="w-4 h-4 text-primary" /> Melhor por Classe
+                  </h4>
+                  {(!winnersData?.bestPerClass || winnersData.bestPerClass.length === 0) ? (
+                    <p className="text-sm text-muted-foreground italic">Sem dados por classe no período.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {winnersData.bestPerClass.map((b: any) => (
+                        <div
+                          key={b.class_name}
+                          className="flex items-center justify-between gap-2 p-3 rounded-md border border-border/60 bg-card/40"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-xs uppercase tracking-wide text-muted-foreground">{b.class_name}</div>
+                            <div className="font-semibold truncate">{b.player_name}</div>
+                          </div>
+                          <div className="flex flex-col items-end shrink-0">
+                            <span className="font-mono text-sm font-bold text-primary">
+                              {Number(b.score).toFixed(2)}
+                            </span>
+                            <span className="font-mono text-[10px] text-muted-foreground">
+                              {b.kills}K/{b.deaths}D • KDA {Number(b.kda).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {loadingSeasons ? (
         <Skeleton className="h-10 w-64 mx-auto" />

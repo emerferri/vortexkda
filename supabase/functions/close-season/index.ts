@@ -135,7 +135,143 @@ Deno.serve(async (req) => {
     const preview: boolean = body?.preview === true;
     const postOnly: boolean = body?.post_only === true;
     const skipDiscord: boolean = body?.skip_discord === true;
+    const winnersMode: boolean = body?.winners === true;
     const target: 'prod' | 'homolog' = body?.target === 'prod' ? 'prod' : (body?.target === 'homolog' ? 'homolog' : 'prod');
+
+    // ===== WINNERS OF THE MONTH MODE =====
+    // Builds Top 3 PvP (Ranking Geral) + Best per Class for a season.
+    // Defaults to the active season if no season_id is provided.
+    if (winnersMode) {
+      let seasonName: string;
+      let dateFrom: string;
+      let dateTo: string;
+
+      if (body?.season_id) {
+        const { data: s } = await supabase
+          .from('seasons')
+          .select('name, started_at, ended_at')
+          .eq('id', body.season_id)
+          .maybeSingle();
+        if (!s) throw new Error('Temporada não encontrada');
+        seasonName = s.name;
+        dateFrom = s.started_at;
+        dateTo = s.ended_at ?? new Date().toISOString().slice(0, 10);
+      } else {
+        const { data: active } = await supabase
+          .from('seasons')
+          .select('name, started_at')
+          .eq('status', 'active')
+          .order('year', { ascending: false })
+          .order('month', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!active) throw new Error('Nenhuma temporada ativa');
+        seasonName = active.name;
+        dateFrom = active.started_at;
+        dateTo = new Date().toISOString().slice(0, 10);
+      }
+
+      const [geralRes, classRes] = await Promise.all([
+        supabase.rpc('get_ranking_geral', { p_date_from: dateFrom, p_date_to: dateTo, p_hour_from: null, p_hour_to: null }),
+        supabase.rpc('get_ranking_best_per_class', { p_date_from: dateFrom, p_date_to: dateTo, p_event_type: 'boss_event' }),
+      ]);
+      if (geralRes.error) throw geralRes.error;
+      if (classRes.error) throw classRes.error;
+
+      const top3 = (geralRes.data || [])
+        .slice()
+        .sort((a: any, b: any) => Number(b.event_score) - Number(a.event_score))
+        .slice(0, 3)
+        .map((r: any, i: number) => ({
+          position: i + 1,
+          player_name: r.player_name,
+          player_class: r.player_class,
+          player_guild: r.player_guild,
+          kills: Number(r.total_kills),
+          deaths: Number(r.total_deaths),
+          kda: Number(r.kda),
+          matches: Number(r.matches_played),
+          score: Number(r.event_score),
+        }));
+
+      const bestPerClass = (classRes.data || [])
+        .filter((r: any) => r.is_best)
+        .slice()
+        .sort((a: any, b: any) => String(a.class_name).localeCompare(String(b.class_name)))
+        .map((r: any) => ({
+          class_name: r.class_name,
+          player_name: r.player_name,
+          kills: Number(r.total_kills),
+          deaths: Number(r.total_deaths),
+          kda: Number(r.total_kda),
+          matches: Number(r.match_count),
+          score: Number(r.event_score),
+        }));
+
+      const payload = { season: seasonName, top3, bestPerClass };
+
+      let discordPosted = false;
+      if (!skipDiscord) {
+        const webhook = pickWebhook(target);
+        const paused = Deno.env.get('AUTO_POST_PAUSED') === 'true';
+        if (!webhook) throw new Error(`Webhook ${target} não configurado`);
+        if (!paused) {
+          const prefix = target === 'homolog' ? '🧪 **[HOMOLOG]**\n' : '';
+          const header = `${prefix}🏆 **GANHADORES DO MÊS — ${seasonName}** 🏆`;
+
+          const medal = (p: number) => (p === 1 ? '🥇' : p === 2 ? '🥈' : '🥉');
+          const top3Lines = top3.length === 0
+            ? '_Sem dados de PvP no período._'
+            : top3.map((t: any) => {
+                const cls = t.player_class ? ` (${t.player_class})` : '';
+                const guild = t.player_guild ? ` [${t.player_guild}]` : '';
+                return `${medal(t.position)} **${t.player_name}**${cls}${guild} — \`${t.score.toFixed(2)}\` pts • ${t.kills}K/${t.deaths}D • KDA ${t.kda.toFixed(2)}`;
+              }).join('\n');
+
+          const padR = (s: string, n: number) => (s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.length));
+          const padL = (s: string, n: number) => (s.length >= n ? s.slice(0, n) : ' '.repeat(n - s.length) + s);
+          const classLines = bestPerClass.length === 0
+            ? '_Sem dados por classe no período._'
+            : '```\n' +
+              padR('Classe', 14) + padR('Jogador', 18) + padL('K', 4) + padL('D', 4) + padL('KDA', 6) + padL('Score', 8) + '\n' +
+              '-'.repeat(54) + '\n' +
+              bestPerClass.map((b: any) =>
+                padR(String(b.class_name), 14) +
+                padR(String(b.player_name), 18) +
+                padL(String(b.kills), 4) +
+                padL(String(b.deaths), 4) +
+                padL(b.kda.toFixed(2), 6) +
+                padL(b.score.toFixed(2), 8)
+              ).join('\n') +
+              '\n```';
+
+          const content =
+            header + '\n\n' +
+            '🏅 **Top 3 PvP — Ranking Geral**\n' + top3Lines + '\n\n' +
+            '⚔️ **Melhor por Classe**\n' + classLines;
+
+          // Chunk respecting Discord 2000 char limit
+          const chunks: string[] = [];
+          let buf = '';
+          for (const part of content.split('\n')) {
+            if ((buf + '\n' + part).length > 1900) {
+              chunks.push(buf);
+              buf = part;
+            } else {
+              buf = buf ? `${buf}\n${part}` : part;
+            }
+          }
+          if (buf) chunks.push(buf);
+          await postChunks(webhook, chunks);
+          discordPosted = true;
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, mode: 'winners', target, season: seasonName, discord_posted: discordPosted, ...payload }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // ===== POST ONLY MODE: post an already-closed season to Discord =====
     if (postOnly) {
