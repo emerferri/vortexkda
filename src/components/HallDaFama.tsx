@@ -257,7 +257,7 @@ export const HallDaFama = () => {
       if (error) throw error;
       toast({
         title: 'Ganhadores postados!',
-        description: `Top 3 + ${data?.bestPerClass?.length ?? 0} classes enviados (${label}).`,
+        description: `Top 5 + ${data?.bestPerClass?.length ?? 0} classes enviados (${label}).`,
       });
     } catch (e: any) {
       toast({ title: 'Erro', description: e?.message ?? String(e), variant: 'destructive' });
