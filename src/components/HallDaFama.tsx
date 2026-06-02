@@ -349,21 +349,21 @@ export const HallDaFama = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             {loadingWinners ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full" />)}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-24 w-full" />)}
               </div>
             ) : (
               <>
-                {/* Top 3 PvP */}
+                {/* Top 5 PvP */}
                 <div>
                   <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
-                    <Trophy className="w-4 h-4 text-yellow-400" /> Top 3 PvP — Ranking Geral
+                    <Trophy className="w-4 h-4 text-yellow-400" /> Top 5 PvP — Ranking Geral
                   </h4>
-                  {(!winnersData?.top3 || winnersData.top3.length === 0) ? (
+                  {(!winnersData?.top5 || winnersData.top5.length === 0) ? (
                     <p className="text-sm text-muted-foreground italic">Sem dados de PvP no período.</p>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      {winnersData.top3.map((t: any) => (
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                      {winnersData.top5.map((t: any) => (
                         <div
                           key={t.position}
                           className={`p-4 rounded-lg border ${
@@ -371,12 +371,14 @@ export const HallDaFama = () => {
                               ? 'border-yellow-500/60 bg-yellow-500/10'
                               : t.position === 2
                               ? 'border-gray-400/50 bg-gray-400/10'
-                              : 'border-amber-700/50 bg-amber-700/10'
+                              : t.position === 3
+                              ? 'border-amber-700/50 bg-amber-700/10'
+                              : 'border-border/60 bg-card/40'
                           }`}
                         >
                           <div className="flex items-center gap-2 mb-2">
                             <span className="text-2xl">
-                              {t.position === 1 ? '🥇' : t.position === 2 ? '🥈' : '🥉'}
+                              {t.position === 1 ? '🥇' : t.position === 2 ? '🥈' : t.position === 3 ? '🥉' : `#${t.position}`}
                             </span>
                             <div className="truncate">
                               <div className="font-bold truncate">{t.player_name}</div>
