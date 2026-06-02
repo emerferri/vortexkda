@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
     const target: 'prod' | 'homolog' = body?.target === 'prod' ? 'prod' : (body?.target === 'homolog' ? 'homolog' : 'prod');
 
     // ===== WINNERS OF THE MONTH MODE =====
-    // Builds Top 3 PvP (Ranking Geral) + Best per Class for a season.
+    // Builds Top 5 PvP (Ranking Geral) + Best per Class for a season.
     // Defaults to the active season if no season_id is provided.
     if (winnersMode) {
       let seasonName: string;
@@ -225,7 +225,7 @@ Deno.serve(async (req) => {
         if (!webhook) throw new Error(`Webhook ${target} não configurado`);
         if (!paused) {
           const prefix = target === 'homolog' ? '🧪 **[HOMOLOG]**\n' : '';
-          const header = `${prefix}🏆 **GANHADORES DO MÊS — ${seasonName}** 🏆`;
+          const discordHeader = `${prefix}🏆 **GANHADORES DO MÊS — ${seasonName}** 🏆`;
 
           const medal = (p: number) => (p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `#${p}`);
           const top5Lines = top5.length === 0
@@ -241,7 +241,7 @@ Deno.serve(async (req) => {
           const SEP = '  ';
           const W = { cls: 20, ply: 16, k: 5, d: 5, kda: 6, score: 9 };
           const totalW = W.cls + W.ply + W.k + W.d + W.kda + W.score + SEP.length * 5;
-          const header =
+          const tableHeader =
             padR('Classe', W.cls) + SEP +
             padR('Jogador', W.ply) + SEP +
             padL('K', W.k) + SEP +
