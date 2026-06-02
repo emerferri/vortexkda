@@ -257,7 +257,7 @@ export const RankingGeral = () => {
   const topPlayer = sortedPlayers[0];
 
   const reiDoPVP = useMemo(() => {
-    // Rei do PVP usa MVP score: kills * 3 + kda * 2 - deaths * 1.5
+    // Rei do PVP usa MVP score: (kills*3) + (kda*1) + (participação*1) - (deaths*3)
     // Exclui o cone monodedo do cálculo
     const coneMonodedoName = aggregatedData?.coneMonodedoName;
     const eligiblePlayers = sortedPlayers.filter(p => p.name !== coneMonodedoName);
@@ -444,7 +444,7 @@ export const RankingGeral = () => {
           return Object.entries(guildStats)
             .map(([guild, stats]) => {
               const guildKDA = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
-              const score = (stats.kills * 3) + (guildKDA * 2) - (stats.deaths * 1.5);
+              const score = (stats.kills * 3) + (guildKDA * 1) + (stats.playerCount * 1) - (stats.deaths * 3);
               return { guild, ...stats, score };
             })
             .sort((a, b) => b.score - a.score);

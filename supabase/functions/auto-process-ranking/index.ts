@@ -797,16 +797,16 @@ Deno.serve(async (req) => {
     // Calculate guild scores and sort
     const guildsWithScore = Object.entries(guildSummary).map(([guild, stats]) => {
       const guildKDA = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
-      const score = (stats.kills * 3) + (guildKDA * 2) - (stats.deaths * 1.5);
+      const score = (stats.kills * 3) + (guildKDA * 1) + (stats.playerCount * 1) - (stats.deaths * 3);
       return { guild, ...stats, score };
     });
     const sortedGuilds = guildsWithScore.sort((a, b) => b.score - a.score);
     const guildRankingText = formatGuildRankingTable(sortedGuilds);
 
-    // Calculate special rankings using correct eventScore formula: (kills * 3) + (kda * 2) - (deaths * 1.5)
+    // Calculate special rankings using formula: (kills*3) + (kda*1) + (participação*1) - (deaths*3)
     const playersWithEventScore = nonBannedPlayers.map(p => ({
       ...p,
-      eventScore: (p.kills * 3) + (p.kda * 2) - (p.deaths * 1.5),
+      eventScore: (p.kills * 3) + (p.kda * 1) + 1 - (p.deaths * 3),
     }));
 
     // Cone Monodedo = worst eventScore (lowest)
@@ -860,9 +860,9 @@ Deno.serve(async (req) => {
       playerCount: nonBannedPlayers.length,
     };
 
-    // Build ranking table text with correct eventScore formula - excluding banned
+    // Build ranking table text - excluding banned
     const playersWithScore = nonBannedPlayers.map(player => {
-      const eventScore = (player.kills * 3) + (player.kda * 2) - (player.deaths * 1.5);
+      const eventScore = (player.kills * 3) + (player.kda * 1) + 1 - (player.deaths * 3);
       const charInfo = characterMap[player.name];
       return { ...player, eventScore, class_short: charInfo?.class_short || '' };
     });
