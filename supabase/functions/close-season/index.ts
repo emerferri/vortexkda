@@ -236,20 +236,30 @@ Deno.serve(async (req) => {
                 return `${medal(t.position)} **${t.player_name}**${cls}${guild} — \`${t.score.toFixed(2)}\` pts • ${t.kills}K/${t.deaths}D • KDA ${t.kda.toFixed(2)}`;
               }).join('\n');
 
-          const padR = (s: string, n: number) => (s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.length));
+          const padR = (s: string, n: number) => (s.length >= n ? s.slice(0, n - 1) + '…' : s + ' '.repeat(n - s.length));
           const padL = (s: string, n: number) => (s.length >= n ? s.slice(0, n) : ' '.repeat(n - s.length) + s);
+          const SEP = '  ';
+          const W = { cls: 20, ply: 16, k: 5, d: 5, kda: 6, score: 9 };
+          const totalW = W.cls + W.ply + W.k + W.d + W.kda + W.score + SEP.length * 5;
+          const header =
+            padR('Classe', W.cls) + SEP +
+            padR('Jogador', W.ply) + SEP +
+            padL('K', W.k) + SEP +
+            padL('D', W.d) + SEP +
+            padL('KDA', W.kda) + SEP +
+            padL('Score', W.score);
           const classLines = bestPerClass.length === 0
             ? '_Sem dados por classe no período._'
             : '```\n' +
-              padR('Classe', 14) + padR('Jogador', 18) + padL('K', 4) + padL('D', 4) + padL('KDA', 6) + padL('Score', 8) + '\n' +
-              '-'.repeat(54) + '\n' +
+              header + '\n' +
+              '-'.repeat(totalW) + '\n' +
               bestPerClass.map((b: any) =>
-                padR(String(b.class_name), 14) +
-                padR(String(b.player_name), 18) +
-                padL(String(b.kills), 4) +
-                padL(String(b.deaths), 4) +
-                padL(b.kda.toFixed(2), 6) +
-                padL(b.score.toFixed(2), 8)
+                padR(String(b.class_name), W.cls) + SEP +
+                padR(String(b.player_name), W.ply) + SEP +
+                padL(String(b.kills), W.k) + SEP +
+                padL(String(b.deaths), W.d) + SEP +
+                padL(b.kda.toFixed(2), W.kda) + SEP +
+                padL(b.score.toFixed(2), W.score)
               ).join('\n') +
               '\n```';
 
