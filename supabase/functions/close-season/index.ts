@@ -186,10 +186,10 @@ Deno.serve(async (req) => {
       if (geralRes.error) throw geralRes.error;
       if (classRes.error) throw classRes.error;
 
-      const top3 = (geralRes.data || [])
+      const top5 = (geralRes.data || [])
         .slice()
         .sort((a: any, b: any) => Number(b.event_score) - Number(a.event_score))
-        .slice(0, 3)
+        .slice(0, 5)
         .map((r: any, i: number) => ({
           position: i + 1,
           player_name: r.player_name,
