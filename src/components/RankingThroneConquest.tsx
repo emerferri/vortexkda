@@ -311,8 +311,8 @@ export const RankingThroneConquest = () => {
       let aggregated: AggregatedPlayer[] = Array.from(playerMap.entries()).map(([normKey, stats]) => {
         const kda = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
         const weightedKda = totalEvents > 0 ? kda * (stats.matches.size / totalEvents) : 0;
-        const mvpScore = (stats.kills * 3) + (kda * 2) - (stats.deaths * 1.5);
-        const eventScore = (stats.kills * 3) + (kda * 2) - (stats.deaths * 1.5);
+        const mvpScore = (stats.kills * 3) + (kda * 1) + (stats.matches.size * 1) - (stats.deaths * 3);
+        const eventScore = (stats.kills * 3) + (kda * 1) + (stats.matches.size * 1) - (stats.deaths * 3);
         const charData = characterMap.get(normKey) || findClosestCharacterData(normKey);
         return {
           name: stats.displayName,
@@ -521,7 +521,7 @@ export const RankingThroneConquest = () => {
           return Object.entries(guildStats)
             .map(([guild, stats]) => {
               const guildKDA = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
-              const score = (stats.kills * 3) + (guildKDA * 2) - (stats.deaths * 1.5);
+              const score = (stats.kills * 3) + (guildKDA * 1) + (stats.playerCount * 1) - (stats.deaths * 3);
               return { guild, ...stats, score };
             })
             .sort((a, b) => b.score - a.score);

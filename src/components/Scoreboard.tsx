@@ -27,7 +27,7 @@ interface ScoreboardProps {
 
 type SortKey = 'kills' | 'deaths' | 'kda' | 'score';
 
-const calcScore = (p: PlayerStats) => (p.kills * 3) + (p.kda * 2) - (p.deaths * 1.5);
+const calcScore = (p: PlayerStats) => (p.kills * 3) + (p.kda * 1) + 1 - (p.deaths * 3);
 
 export const Scoreboard = ({ players, bossLabel, killLogs = [], eventType = 'boss_event' }: ScoreboardProps) => {
   const [sortBy, setSortBy] = useState<SortKey>('score');

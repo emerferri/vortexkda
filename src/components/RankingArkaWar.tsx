@@ -209,7 +209,7 @@ export const RankingArkaWar = () => {
       let aggregated: AggregatedPlayer[] = Array.from(playerMap.entries()).map(([normKey, stats]) => {
         const kda = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
         const weightedKda = totalEvents > 0 ? kda * (stats.matches.size / totalEvents) : 0;
-        const eventScore = (stats.kills * 3) + (kda * 2) - (stats.deaths * 1.5);
+        const eventScore = (stats.kills * 3) + (kda * 1) + (stats.matches.size * 1) - (stats.deaths * 3);
         const charData = characterMap.get(normKey) || { class: null, guild: null };
         return { name: stats.displayName, class: charData.class, guild: charData.guild, kills: stats.kills, deaths: stats.deaths, kda, weightedKda, matches: stats.matches.size, mvpScore: eventScore, eventScore };
       });

@@ -31,10 +31,10 @@ interface PerfRow {
   score: number; // performance score per event participation
 }
 
-// Performance score: (kills*3) + (kda*2) - (deaths*1.5), normalized per match count
+// Performance score: (kills*3) + (kda*1) + (matches*1) - (deaths*3), normalized per match count
 function scoreOf(k: number, d: number, m: number): number {
   const kda = d === 0 ? k : k / d;
-  const raw = (k * 3) + (kda * 2) - (d * 1.5);
+  const raw = (k * 3) + (kda * 1) + (m * 1) - (d * 3);
   return m === 0 ? raw : raw / m;
 }
 
