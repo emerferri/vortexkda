@@ -32,6 +32,7 @@ export const HallDaFama = () => {
   const [previewing, setPreviewing] = useState(false);
   const [posting, setPosting] = useState<'prod' | 'homolog' | null>(null);
   const [previewData, setPreviewData] = useState<{ season: string; grouped: Record<string, any[]> } | null>(null);
+  const [postingWinners, setPostingWinners] = useState<'prod' | 'homolog' | null>(null);
 
   const { data: seasons, isLoading: loadingSeasons } = useQuery({
     queryKey: ['seasons-list'],
