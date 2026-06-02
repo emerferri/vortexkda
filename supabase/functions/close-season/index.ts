@@ -205,7 +205,7 @@ Deno.serve(async (req) => {
       const bestPerClass = (classRes.data || [])
         .filter((r: any) => r.is_best)
         .slice()
-        .sort((a: any, b: any) => String(a.class_name).localeCompare(String(b.class_name)))
+        .sort((a: any, b: any) => Number(b.event_score) - Number(a.event_score))
         .map((r: any) => ({
           class_name: r.class_name,
           player_name: r.player_name,
