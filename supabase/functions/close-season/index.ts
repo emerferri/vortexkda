@@ -216,7 +216,7 @@ Deno.serve(async (req) => {
           score: Number(r.event_score),
         }));
 
-      const payload = { season: seasonName, top3, bestPerClass };
+      const payload = { season: seasonName, top5, bestPerClass };
 
       let discordPosted = false;
       if (!skipDiscord) {
@@ -227,10 +227,10 @@ Deno.serve(async (req) => {
           const prefix = target === 'homolog' ? '🧪 **[HOMOLOG]**\n' : '';
           const header = `${prefix}🏆 **GANHADORES DO MÊS — ${seasonName}** 🏆`;
 
-          const medal = (p: number) => (p === 1 ? '🥇' : p === 2 ? '🥈' : '🥉');
-          const top3Lines = top3.length === 0
+          const medal = (p: number) => (p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `#${p}`);
+          const top5Lines = top5.length === 0
             ? '_Sem dados de PvP no período._'
-            : top3.map((t: any) => {
+            : top5.map((t: any) => {
                 const cls = t.player_class ? ` (${t.player_class})` : '';
                 const guild = t.player_guild ? ` [${t.player_guild}]` : '';
                 return `${medal(t.position)} **${t.player_name}**${cls}${guild} — \`${t.score.toFixed(2)}\` pts • ${t.kills}K/${t.deaths}D • KDA ${t.kda.toFixed(2)}`;
