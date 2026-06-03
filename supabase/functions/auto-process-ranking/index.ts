@@ -875,7 +875,16 @@ Deno.serve(async (req) => {
     if (body.testHomolog) {
       webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL'); // homolog
     } else if (eventType === 'throne_conquest') {
-      webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_THRONE');
+      // Throne Conquest: only post if triggered by cron or if manually forced AND it's a reprocess
+      // The user wants manual "Process" button in UI to NOT post automatically,
+      // so they can fill the winner guild first.
+      const isManualFirstTime = !body.trigger && !body.forceReprocess;
+      if (isManualFirstTime) {
+        console.log(`[Auto Process] 🛡️ Manual process for Throne. Skipping Discord post so admin can fill winner guild.`);
+        webhookUrl = undefined;
+      } else {
+        webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_THRONE');
+      }
     } else {
       webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL_PROD') || Deno.env.get('DISCORD_WEBHOOK_URL');
     }
