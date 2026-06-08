@@ -128,8 +128,9 @@ export const AppSidebar = ({ activeTab, onTabChange }: AppSidebarProps) => {
             <Button 
               variant="destructive" 
               size="sm" 
-              onClick={() => {
-                console.log('Clique no botão Sair (onClick)');
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                console.log('Clique no botão Sair (onMouseDown)');
                 signOut();
               }}
               className="w-full justify-start gap-2 cursor-pointer relative z-[100]"
