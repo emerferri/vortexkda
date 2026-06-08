@@ -179,7 +179,7 @@ export const AppSidebar = ({ activeTab, onTabChange }: AppSidebarProps) => {
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetContent side="left" className="w-64 p-0 bg-card">
             <SheetTitle className="sr-only">Menu de navegação</SheetTitle>
-            <NavContent />
+            <NavContent mini={false} />
           </SheetContent>
         </Sheet>
       </>
