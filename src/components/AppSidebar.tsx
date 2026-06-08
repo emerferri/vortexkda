@@ -126,17 +126,16 @@ export const AppSidebar = ({ activeTab, onTabChange }: AppSidebarProps) => {
               <span className="truncate">{user.email?.split('@')[0]}</span>
             </div>
             <Button 
-              variant="ghost" 
+              variant="destructive" 
               size="sm" 
-              onPointerDown={(e) => {
-                e.preventDefault();
-                console.log('Botão Sair pressionado (PointerDown)');
+              onClick={() => {
+                console.log('Clique no botão Sair (onClick)');
                 signOut();
               }}
-              className="w-full justify-start gap-2 cursor-pointer"
+              className="w-full justify-start gap-2 cursor-pointer relative z-[100]"
             >
               <LogOut className="w-4 h-4" />
-              Sair
+              Sair Definitivamente
             </Button>
           </div>
         ) : !mini ? (
@@ -147,14 +146,11 @@ export const AppSidebar = ({ activeTab, onTabChange }: AppSidebarProps) => {
         ) : (
           user ? (
             <Button 
-              variant="ghost" 
+              variant="destructive" 
               size="icon" 
-              onPointerDown={(e) => {
-                e.preventDefault();
-                signOut();
-              }}
+              onClick={() => signOut()}
               title="Sair" 
-              className="w-full cursor-pointer"
+              className="w-full cursor-pointer relative z-[100]"
             >
               <LogOut className="w-4 h-4" />
             </Button>
