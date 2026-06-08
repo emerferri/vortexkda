@@ -28,7 +28,19 @@ export const useAuth = () => {
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      console.log('Iniciando logout...');
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Erro ao sair:', error);
+      } else {
+        console.log('Logout realizado com sucesso');
+        // Redirecionamento explícito após logout
+        window.location.href = '/auth';
+      }
+    } catch (err) {
+      console.error('Erro inesperado no logout:', err);
+    }
   };
 
   return { user, session, loading, signOut };
