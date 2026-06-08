@@ -30,16 +30,23 @@ export const useAuth = () => {
   const signOut = async () => {
     try {
       console.log('Iniciando logout...');
+      
+      // Limpeza manual de storage para garantir que a sessão local morra
+      localStorage.clear();
+      sessionStorage.clear();
+      
       const { error } = await supabase.auth.signOut();
+      
       if (error) {
-        console.error('Erro ao sair:', error);
-      } else {
-        console.log('Logout realizado com sucesso');
-        // Redirecionamento explícito após logout
-        window.location.href = '/auth';
+        console.error('Erro ao sair via Supabase:', error);
       }
+      
+      console.log('Logout processado, redirecionando...');
+      // Força recarregamento total da página para limpar estados do React
+      window.location.assign('/auth');
     } catch (err) {
       console.error('Erro inesperado no logout:', err);
+      window.location.assign('/auth');
     }
   };
 
