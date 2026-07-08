@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { syncCharactersFromVortex, getClassShort } from '../_shared/vortexSync.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -229,6 +230,115 @@ function formatRankingTable(players: PlayerData[]): string {
   });
   
   return table;
+}
+
+function collectNamesFromGeneralBody(body: GeneralRankingBody): string[] {
+  const names = new Set<string>();
+
+  for (const player of body.playerRanking || []) {
+    if (player.name?.trim()) names.add(player.name.trim());
+  }
+
+  const sr = body.specialRankings;
+  if (sr.reiDoPVP?.name) names.add(sr.reiDoPVP.name);
+  if (sr.brabissimo?.name) names.add(sr.brabissimo.name);
+  if (sr.coneMonodedo?.name) names.add(sr.coneMonodedo.name);
+  if (sr.agenteDuplo?.name) names.add(sr.agenteDuplo.name);
+  if (sr.putinhaNoite?.dominador) names.add(sr.putinhaNoite.dominador);
+  if (sr.putinhaNoite?.putinha) names.add(sr.putinhaNoite.putinha);
+
+  for (const log of body.killLogs || []) {
+    if (log.killer_name?.trim()) names.add(log.killer_name.trim());
+    if (log.victim_name?.trim()) names.add(log.victim_name.trim());
+  }
+
+  return [...names];
+}
+
+function rebuildGuildRanking(
+  players: PlayerData[],
+  guildByName: Map<string, string>,
+): GuildData[] {
+  const guildStats: Record<string, { playerCount: number; kills: number; deaths: number }> = {};
+
+  for (const player of players) {
+    const guild = guildByName.get(player.name) || 'Sem Guild';
+    if (!guildStats[guild]) {
+      guildStats[guild] = { playerCount: 0, kills: 0, deaths: 0 };
+    }
+    guildStats[guild].playerCount++;
+    guildStats[guild].kills += player.kills;
+    guildStats[guild].deaths += player.deaths;
+  }
+
+  return Object.entries(guildStats)
+    .map(([guild, stats]) => {
+      const guildKDA = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
+      const score = (stats.kills * 3) + (guildKDA * 1) + (stats.playerCount * 1) - (stats.deaths * 3);
+      return { guild, ...stats, score };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+
+async function syncAndEnrichGeneralRanking(body: GeneralRankingBody): Promise<{
+  players: PlayerData[];
+  guildRanking: GuildData[];
+  guildByName: Map<string, string>;
+}> {
+  const players = body.playerRanking || [];
+  const names = collectNamesFromGeneralBody(body);
+
+  if (names.length === 0) {
+    return {
+      players,
+      guildRanking: body.guildRanking || [],
+      guildByName: new Map(),
+    };
+  }
+
+  const serviceClient = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+  );
+
+  console.log(`[Discord Webhook] Syncing ${names.length} characters from VortexMU...`);
+  await syncCharactersFromVortex(serviceClient, names, { concurrency: 5, delayMs: 150 });
+
+  const { data: chars, error } = await serviceClient
+    .from('characters')
+    .select('name, guild, class, class_short')
+    .in('name', names);
+
+  if (error) {
+    console.error('[Discord Webhook] Failed to load characters after sync:', error);
+    return {
+      players,
+      guildRanking: body.guildRanking || [],
+      guildByName: new Map(),
+    };
+  }
+
+  const charMap = new Map((chars || []).map((row) => [row.name, row]));
+  const guildByName = new Map<string, string>();
+
+  for (const name of names) {
+    const row = charMap.get(name);
+    guildByName.set(name, row?.guild || 'Sem Guild');
+  }
+
+  const enrichedPlayers = players.map((player) => {
+    const row = charMap.get(player.name);
+    const classShort = (player.class_short || '').trim()
+      || (row?.class_short || '').trim()
+      || getClassShort(row?.class);
+    return { ...player, class_short: classShort };
+  });
+
+  return {
+    players: enrichedPlayers,
+    guildRanking: rebuildGuildRanking(enrichedPlayers, guildByName),
+    guildByName,
+  };
 }
 
 async function enrichPlayerRankingWithClassShort(players: PlayerData[]): Promise<PlayerData[]> {
@@ -595,7 +705,9 @@ serve(async (req) => {
       // Ranking Geral - formato rico texto (mesmo modelo do auto-process-ranking)
       const generalBody = body as GeneralRankingBody;
       const isThrone = generalBody.eventType === 'throne_conquest';
-      const enrichedPlayerRanking = await enrichPlayerRankingWithClassShort(generalBody.playerRanking || []);
+      const { players: enrichedPlayerRanking, guildRanking, guildByName } =
+        await syncAndEnrichGeneralRanking(generalBody);
+      generalBody.guildRanking = guildRanking;
 
       const rankingTitle = isThrone ? '🏆 Ranking Throne Conquest' : '🏆 Ranking BOSS Diário';
       const embedColor = isThrone ? 0xF59E0B : 0x10B981;
@@ -613,7 +725,14 @@ serve(async (req) => {
       const reiStats = rei?.name ? lookup(rei.name) : undefined;
       const brabStats = brab?.name ? lookup(brab.name) : undefined;
       const coneStats = cone?.name ? lookup(cone.name) : undefined;
-      const agenteDuplo = generalBody.specialRankings.agenteDuplo;
+      const agenteDuplo = generalBody.specialRankings.agenteDuplo
+        ? {
+            ...generalBody.specialRankings.agenteDuplo,
+            guild: guildByName.get(generalBody.specialRankings.agenteDuplo.name)
+              || generalBody.specialRankings.agenteDuplo.guild
+              || '',
+          }
+        : undefined;
       const putinhaNoite = generalBody.specialRankings.putinhaNoite;
 
       // Data/hora formatadas a partir dos filtros
