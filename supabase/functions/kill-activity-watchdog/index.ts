@@ -8,8 +8,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const INACTIVITY_MIN = 12;      // minutos sem kill = "evento encerrado" (cobre 99,9% dos gaps internos legítimos do Boss)
-const MIN_ELAPSED_MIN = 35;     // só dispara após X min do início (nenhum evento real terminou antes disso)
+const INACTIVITY_MIN = 7;       // minutos sem kill = evento encerrado
+const MIN_ELAPSED_MIN = 25;     // só verifica após ~25 min do início do evento
 const MAX_WINDOW_MIN = 120;     // hard fallback: força considerar até 2h depois do início
 
 interface EventWindow {
@@ -44,9 +44,11 @@ function getValidWindows(brtNow: Date): EventWindow[] {
 }
 
 function brtNow(): Date {
-  // BRT = UTC-3 (sem horário de verão atualmente)
-  const utc = new Date();
-  return new Date(utc.getTime() - 3 * 3600000);
+  return new Date(Date.now() - 3 * 3600000);
+}
+
+function brtNowMs(): number {
+  return Date.now();
 }
 
 function ymd(d: Date): string {
@@ -107,7 +109,7 @@ Deno.serve(async (req) => {
       const endHour = Math.min(23, w.hour + 2);
       const endStr = `${today}T${String(endHour).padStart(2, '0')}:59`;
 
-      const mapFilter = w.eventType === 'throne_conquest' ? 'devias' : 'pvp_square';
+      const mapFilter = w.eventType === 'throne_conquest' ? 'Devias' : 'PvP Square';
 
       const { data: lastLog, error: logErr } = await external
         .from('logs_pvp')
@@ -128,10 +130,21 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const lastTs = new Date(lastLog[0].timestamp);
-      // Trata como BRT (sem timezone na string)
-      const lastBRT = lastTs;
-      const idleMin = Math.floor((brt.getTime() - lastBRT.getTime()) / 60000);
+      const lastTsMs = (() => {
+        const raw = lastLog[0].timestamp?.trim();
+        if (!raw) return null;
+        const match = raw.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+        if (!match) return null;
+        const [, year, month, day, hour, minute, second] = match;
+        return Date.UTC(+year, +month - 1, +day, +hour, +minute, +second) + 3 * 3600000;
+      })();
+
+      if (lastTsMs === null) {
+        results.push({ ...w, status: 'invalid_timestamp', elapsedMin });
+        continue;
+      }
+
+      const idleMin = Math.floor((brtNowMs() - lastTsMs) / 60000);
 
       if (idleMin < INACTIVITY_MIN) {
         results.push({ ...w, status: 'still_active', idleMin, elapsedMin });

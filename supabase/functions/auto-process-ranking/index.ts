@@ -1,4 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { syncCharactersFromVortex } from '../_shared/vortexSync.ts';
+
+/** Minutos sem kill no mapa do evento para considerar o PvP encerrado */
+const EVENT_IDLE_MINUTES = 7;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,6 +50,28 @@ interface RequestBody {
   eventType?: 'boss_event' | 'throne_conquest';
   testHomolog?: boolean;
   eventDate?: string; // 'YYYY-MM-DD' force a specific date (for homolog testing)
+}
+
+function brtNowMs(): number {
+  return Date.now();
+}
+
+function parseLogTimestampMs(log: ExternalLogEntry): number | null {
+  const raw = log.timestamp?.trim();
+  if (raw) {
+    const match = raw.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+    if (match) {
+      const [, year, month, day, hour, minute, second] = match;
+      // DB externo armazena horário local BRT (UTC-3)
+      return Date.UTC(+year, +month - 1, +day, +hour, +minute, +second) + 3 * 3600000;
+    }
+  }
+
+  const contentMatch = log.content?.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/);
+  if (!contentMatch) return null;
+
+  const [, day, month, year, hour, minute, second] = contentMatch;
+  return Date.UTC(+year, +month - 1, +day, +hour, +minute, +second) + 3 * 3600000;
 }
 
 // Format ranking as monospaced table for Discord
@@ -334,11 +360,13 @@ function calculateBestKillStreak(killLogs: KillLog[], bannedPlayers: Set<string>
   return best;
 }
 
-// Extract minute from the last log entry - filtered by map type
-function getLastKillMinute(logs: ExternalLogEntry[], eventType: 'boss_event' | 'throne_conquest'): number | null {
+// Extrai timestamp do último kill válido no mapa do evento
+function getLastKillTimestamp(
+  logs: ExternalLogEntry[],
+  eventType: 'boss_event' | 'throne_conquest',
+): number | null {
   if (!logs || logs.length === 0) return null;
-  
-  // Map validation patterns based on event type
+
   const mapPatterns = eventType === 'throne_conquest'
     ? [
         /\*\*Devias\*\*\s*-\s*\*\*\[Server: Boss Event PvP\]\*\*/i,
@@ -350,69 +378,32 @@ function getLastKillMinute(logs: ExternalLogEntry[], eventType: 'boss_event' | '
         /\*PvP Square\*\s*-\s*\*\[Server: (?:Boss Event PvP|Platinum PvP)\]\*/i,
         /PvP Square\s*-\s*\[Server: (?:Boss Event PvP|Platinum PvP)\]/i,
       ];
-  
-  // Find the most recent log from the valid map (logs are ordered DESC)
+
   for (const log of logs) {
     if (!log.content) continue;
-    
-    const hasValidMap = mapPatterns.some(pattern => pattern.test(log.content));
-    
+    const hasValidMap = mapPatterns.some((pattern) => pattern.test(log.content));
     if (!hasValidMap) continue;
-    
-    // Try to extract time from timestamp field (format: YYYY-MM-DDTHH:MM:SS or similar)
-    const timestampMatch = log.timestamp?.match(/(\d{2}):(\d{2}):(\d{2})/);
-    if (timestampMatch) {
-      return parseInt(timestampMatch[2], 10); // return minute
-    }
-    
-    // Try from content field
-    const contentMatch = log.content?.match(/(\d{2}):(\d{2}):(\d{2})/);
-    if (contentMatch) {
-      return parseInt(contentMatch[2], 10);
-    }
+
+    const ts = parseLogTimestampMs(log);
+    if (ts !== null) return ts;
   }
-  
+
   return null;
 }
 
-// Get minute threshold based on attempt and event configuration
-function getMinuteThreshold(attempt: number, eventHour: number, eventMinute: number = 0): number {
-  if (eventHour === 22 && eventMinute === 0) {
-    // Boss 22:00 - checks happen at 23:00, 23:20, 23:30
-    if (attempt === 1) return 59; // 23:00 checks for 22:59
-    if (attempt === 2) return 19; // 23:20 checks for 23:19
-  } else if (eventHour === 22 && eventMinute === 30) {
-    // Boss 22:30 (Tuesday/Thursday) - checks happen at 23:00, 23:20, 23:30
-    if (attempt === 1) return 29;
-    if (attempt === 2) return 49;
-  } else if (eventHour === 21 && eventMinute === 36) {
-    // Throne Conquest 21:36 - ends at 22:36
-    if (attempt === 1) return 35; // 22:40 checks for 22:35
-    if (attempt === 2) return 39; // 22:45 checks for 22:39
-  } else if (eventHour === 20 || eventHour === 21) {
-    // Boss 20:00 or 21:00
-    if (attempt === 1) return 29; // XX:30 checks for XX:29
-    if (attempt === 2) return 49; // XX:50 checks for XX:49
-  }
-  return -1; // Attempt 3 always processes
-}
+// Adia postagem enquanto ainda houver PvP ativo (último kill recente)
+function shouldPostpone(
+  forceProcess: boolean,
+  trigger: string | undefined,
+  lastKillAtMs: number | null,
+  idleMinutesRequired = EVENT_IDLE_MINUTES,
+): boolean {
+  // forceProcess só ignora idle para watchdog/manual — cron sempre respeita idle
+  if (forceProcess && trigger !== 'cron') return false;
+  if (lastKillAtMs === null) return false;
 
-// Check if event might still be active based on last kill minute
-function shouldPostpone(attempt: number, forceProcess: boolean, lastKillMinute: number | null, eventHour: number, eventMinute: number = 0): boolean {
-  if (forceProcess || attempt === 3) {
-    return false; // Always process on force or 3rd attempt
-  }
-  
-  if (lastKillMinute === null) {
-    return false; // No logs = nothing to postpone
-  }
-  
-  const threshold = getMinuteThreshold(attempt, eventHour, eventMinute);
-  if (threshold === -1) {
-    return false;
-  }
-  
-  return lastKillMinute >= threshold;
+  const idleMin = Math.floor((brtNowMs() - lastKillAtMs) / 60000);
+  return idleMin < idleMinutesRequired;
 }
 
 function getEventTimeRange(eventHour?: number, eventMinute: number = 0, eventType: 'boss_event' | 'throne_conquest' = 'boss_event'): { startDate: string; endDate: string; matchDate: string; matchHour: number; localStartDate: string; localEndDate: string } {
@@ -650,21 +641,23 @@ Deno.serve(async (req) => {
       return { success: true, status: 'no_logs', message: 'No logs found', matchDate, matchHour, attempt, eventType };
     }
 
-    // Check if we should postpone based on last kill time
-    const lastKillMinute = getLastKillMinute(logs, eventType);
-    console.log(`[Auto Process] Last kill minute (${eventType}): ${lastKillMinute}`);
-    
-    if (shouldPostpone(attempt, forceProcess, lastKillMinute, matchHour, eventMinute)) {
-      const threshold = getMinuteThreshold(attempt, matchHour, eventMinute);
-      console.log(`[Auto Process] Attempt ${attempt}: Last kill at minute ${lastKillMinute}, >= ${threshold}, postponing`);
+    // Check if we should postpone based on inactivity since last kill
+    const lastKillAtMs = getLastKillTimestamp(logs, eventType);
+    const idleMin = lastKillAtMs !== null
+      ? Math.floor((brtNowMs() - lastKillAtMs) / 60000)
+      : null;
+    console.log(`[Auto Process] Last kill ms: ${lastKillAtMs ?? 'n/a'}, idle: ${idleMin ?? 'n/a'} min`);
+
+    if (shouldPostpone(forceProcess, body.trigger, lastKillAtMs)) {
+      console.log(`[Auto Process] Attempt ${attempt}: idle ${idleMin}min < ${EVENT_IDLE_MINUTES}min, postponing`);
       return {
         success: true,
         status: 'postponed',
         attempt,
-        lastKillMinute,
-        threshold,
+        idleMin,
+        idleThreshold: EVENT_IDLE_MINUTES,
         eventType,
-        message: 'Event may still be active, waiting for next attempt',
+        message: 'Event may still be active, waiting for inactivity',
       };
     }
 
@@ -733,8 +726,16 @@ Deno.serve(async (req) => {
       console.error('[Auto Process] Failed to insert kill logs:', killLogsError.message);
     }
 
-    // Fetch character data (including banned status for filtering)
+    // Sincroniza guild/classe/sigla dos jogadores do evento antes de calcular rankings
     const playerNames = Object.keys(parseResult.players);
+    console.log(`[Auto Process] Syncing ${playerNames.length} characters from VortexMU...`);
+    const syncSummary = await syncCharactersFromVortex(internalClient, playerNames, {
+      concurrency: 5,
+      delayMs: 150,
+    });
+    console.log(`[Auto Process] VortexMU sync:`, syncSummary);
+
+    // Fetch character data (including banned status for filtering)
     const { data: characters } = await internalClient
       .from('characters')
       .select('name, guild, class, banned, class_short')
