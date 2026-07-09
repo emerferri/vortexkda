@@ -511,6 +511,7 @@ export type Database = {
           victim_class: string
         }[]
       }
+      get_cron_status: { Args: { p_job_name: string }; Returns: Json }
       get_ranking_best_per_class: {
         Args: {
           p_date_from?: string

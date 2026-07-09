@@ -5,7 +5,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import {
   Swords, LogIn, LogOut, User, Crown, Skull, Users,
   Trophy, Target, Flame, Award, Menu, X, Shield,
-  ChevronsLeft, ChevronsRight, Crosshair, TrendingDown, BarChart3, Gift, Star,
+  ChevronsLeft, ChevronsRight, Crosshair, TrendingDown, BarChart3, Gift, Star, Activity,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
@@ -41,6 +41,7 @@ const navItems: NavItem[] = [
   { id: 'analytics', label: 'Análise PvP', icon: BarChart3, requiresAuth: true },
   { id: 'sorteio', label: 'Sorteio', icon: Gift, requiresEdit: true },
   { id: 'placar', label: 'Incluir Dados', icon: Swords, requiresAdmin: true },
+  { id: 'cron', label: 'Status Cron', icon: Activity, requiresAdmin: true },
   { id: 'admin', label: 'Admin', icon: Shield, requiresAdmin: true },
 ];
 
