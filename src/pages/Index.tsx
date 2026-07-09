@@ -16,6 +16,7 @@ import { NeverPositiveKDA } from '@/components/NeverPositiveKDA';
 import { RankingFogoAmigo } from '@/components/RankingFogoAmigo';
 import { ConfrontosDiretos } from '@/components/ConfrontosDiretos';
 import { DatabaseManager } from '@/components/DatabaseManager';
+import { CronStatus } from '@/components/CronStatus';
 import { PvPAnalyticsDashboard } from '@/components/analytics/PvPAnalyticsDashboard';
 import { HallDaFama } from '@/components/HallDaFama';
 import { MarcosConquistas } from '@/components/MarcosConquistas';
