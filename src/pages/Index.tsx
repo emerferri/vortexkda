@@ -159,6 +159,8 @@ const Index = () => {
         return <LegendsSorteio />;
       case 'admin':
         return <DatabaseManager />;
+      case 'cron':
+        return <CronStatus />;
       default:
         return <RankingGeral />;
     }
