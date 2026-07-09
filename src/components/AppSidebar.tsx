@@ -41,6 +41,7 @@ const navItems: NavItem[] = [
   { id: 'analytics', label: 'Análise PvP', icon: BarChart3, requiresAuth: true },
   { id: 'sorteio', label: 'Sorteio', icon: Gift, requiresEdit: true },
   { id: 'placar', label: 'Incluir Dados', icon: Swords, requiresAdmin: true },
+  { id: 'cron', label: 'Status Cron', icon: Activity, requiresAdmin: true },
   { id: 'admin', label: 'Admin', icon: Shield, requiresAdmin: true },
 ];
 
